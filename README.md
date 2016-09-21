@@ -35,10 +35,10 @@ to use.
 
 My problem was made worse when I learned that the published maximum clock
 speed for a device wasn't necessarily the maximum clock speed that I could
-achieve.  My design needed to process the incoming signal at 500~MHz to be
-commercially viable.  500~MHz is not necessarily a clock speed
-that can be easily achieved.  250~MHz, on the other hand, is much more within
-the realm of possibility.  Achieving a 500~MHz performance with a 250~MHz
+achieve.  My design needed to process the incoming signal at 500 MHz to be
+commercially viable.  500 MHz is not necessarily a clock speed
+that can be easily achieved.  250 MHz, on the other hand, is much more within
+the realm of possibility.  Achieving a 500 MHz performance with a 250 MHz
 clock, however, requires an FFT that accepts two samples per clock.
 
 This, then, was and is the genesis of this project.
