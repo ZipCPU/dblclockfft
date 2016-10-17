@@ -48,7 +48,9 @@ all: mpy_tb dblrev_tb dblstage_tb qtrstage_tb fft_tb test
 OBJDR:= ../../sw/fft-core/obj_dir
 VSRCD = ../../sw/fft-core
 TBODR:= ../rtl/obj_dir
-VINC := -I/usr/share/verilator/include -I$(OBJDR)/ -I$(TBODR)/
+VERILATOR_ROOT   ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
+VROOT   := $(VERILATOR_ROOT)
+VINC := -I$(VROOT)/include -I$(OBJDR)/ -I$(TBODR)/
 # MPYLB:= $(OBJDR)/Vshiftaddmpy__ALL.a
 MPYLB:= $(OBJDR)/Vlongbimpy__ALL.a
 DBLRV:= $(OBJDR)/Vdblreverse__ALL.a
@@ -59,7 +61,6 @@ HWBFY:= $(OBJDR)/Vhwbfly__ALL.a
 FFTLB:= $(OBJDR)/Vfftmain__ALL.a
 IFTLB:= $(TBODR)/Vifft_tb__ALL.a
 STGLB:= $(OBJDR)/Vfftstage_o2048__ALL.a
-VERILATOR_ROOT := /usr/share/verilator
 
 mpy_tb: mpy_tb.cpp fftsize.h twoc.h $(MPYLB)
 	g++ -g $(VINC) $< twoc.cpp $(MPYLB) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
