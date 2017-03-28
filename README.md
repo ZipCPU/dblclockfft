@@ -43,3 +43,10 @@ clock, however, requires an FFT that accepts two samples per clock.
 
 This, then, was and is the genesis of this project.
 
+# Commercial Applications
+
+Should you find the GPLv3 license insufficient for your needs, other licenses
+can be purchased from Gisselquist Technology, LLC.
+
+Likewise, please contact us should you wish to fund the further development
+of this core.
