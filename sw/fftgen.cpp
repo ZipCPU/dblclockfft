@@ -6,19 +6,18 @@
 //
 // Purpose:	This is the core generator for the project.  Every part
 //		and piece of this project begins and ends in this program.
-//		Once built, this program will build an FFT (or IFFT) core
-//		of arbitrary width, precision, etc., that will run at
-//		two samples per clock.  (Incidentally, I didn't pick two
-//		samples per clock because it was easier, but rather because
-//		there weren't any two-sample per clock FFT's posted on 
-//		opencores.com.  Further, FFT's running at one sample per
-//		clock aren't that hard to find.)
+//	Once built, this program will build an FFT (or IFFT) core of arbitrary
+//	width, precision, etc., that will run at two samples per clock.
+//	(Incidentally, I didn't pick two samples per clock because it was
+//	easier, but rather because there weren't any two-sample per clock
+//	FFT's posted on opencores.com.  Further, FFT's running at one sample
+//	per aren't that hard to find.)
 //
-//		You can find the documentation for this program in two places.
-//		One is in the usage() function below.  The second is in the
-//		'doc'uments directory that comes with this package, 
-//		specifically in the spec.pdf file.  If it's not there, type
-//		make in the documents directory to build it.
+//	You can find the documentation for this program in two places.  One is
+//	in the usage() function below.  The second is in the 'doc'uments
+//	directory that comes with this package, specifically in the spec.pdf
+//	file.  If it's not there, type make in the documents directory to
+//	build it.
 //
 //	20160123 - Thanks to Lesha Birukov, adjusted for MS Visual Studio 2012.
 //		(Adjustments are at the top of the file ...)
@@ -28,7 +27,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2016, Gisselquist Technology, LLC
+// Copyright (C) 2015-2017, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -140,10 +139,10 @@ typedef	enum {
 	RND_TRUNCATE, RND_FROMZERO, RND_HALFUP, RND_CONVERGENT
 } ROUND_T;
 
-const char	cpyleft[] = 
+const char	cpyleft[] =
 "////////////////////////////////////////////////////////////////////////////////\n"
 "//\n"
-"// Copyright (C) 2015-2016, Gisselquist Technology, LLC\n"
+"// Copyright (C) 2015-2017, Gisselquist Technology, LLC\n"
 "//\n"
 "// This program is free software (firmware): you can redistribute it and/or\n"
 "// modify it under the terms of  the GNU General Public License as published\n"
@@ -208,7 +207,7 @@ int	lgdelay(int nbits, int xtra) {
 	// The butterfly code needs to compare a valid address, of this
 	// many bits, with an address two greater.  This guarantees we
 	// have enough bits for that comparison.  We'll also end up with
-	// more storage space to look for these values, but without a 
+	// more storage space to look for these values, but without a
 	// redesign that's just what we'll deal with.
 	return lgval(bflydelay(nbits, xtra)+3);
 }
@@ -368,7 +367,7 @@ void	build_roundfromzero(const char *fname) {
 
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp,
-"module	convround(i_clk, i_ce, i_val, o_val);\n"
+"module	roundfromzero(i_clk, i_ce, i_val, o_val);\n"
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
 	"\tinput\t\t\t\t\ti_clk, i_ce;\n"
 	"\tinput\t\tsigned\t[(IWID-1):0]\ti_val;\n"
@@ -466,10 +465,10 @@ void	build_convround(const char *fname) {
 "//\n"
 "// Purpose:	A convergent rounding routine, also known as banker\'s\n"
 "//		rounding, Dutch rounding, Gaussian rounding, unbiased\n"
-"//		rounding, or ... more, at least according to Wikipedia.\n"
+"//	rounding, or ... more, at least according to Wikipedia.\n"
 "//\n"
-"//		This form of rounding works by rounding, when the direction\n"
-"//		is in question, towards the nearest even value.\n"
+"//	This form of rounding works by rounding, when the direction is in\n"
+"//	question, towards the nearest even value.\n"
 "//\n"
 "//\n%s"
 "//\n",
@@ -495,6 +494,7 @@ void	build_convround(const char *fname) {
 "\t//\t\thalfway between the two.  In the halfway case we round\n"
 "\t//\t\tto the nearest even number.\n"
 "\tgenerate\n"
+// What if IWID < OWID?  We should expand here ... somehow
 	"\tif (IWID == OWID) // In this case, the shift is irrelevant and\n"
 	"\tbegin // cannot be applied.  No truncation or rounding takes\n"
 	"\t// effect here.\n"
@@ -502,6 +502,7 @@ void	build_convround(const char *fname) {
 		"\t\talways @(posedge i_clk)\n"
 			"\t\t\tif (i_ce)\to_val <= i_val[(IWID-1):0];\n"
 "\n"
+// What if IWID-SHIFT < OWID?  Shouldn't we also shift here as well?
 "\tend else if (IWID-SHIFT == OWID)\n"
 "\tbegin // No truncation or rounding, output drops no bits\n"
 "\n"
@@ -509,6 +510,9 @@ void	build_convround(const char *fname) {
 "\t\t\tif (i_ce)\to_val <= i_val[(IWID-SHIFT-1):0];\n"
 "\n"
 "\tend else if (IWID-SHIFT-1 == OWID)\n"
+// Is there any way to limit the number of bits that are examined here, for the
+// purpose of simplifying/reducing logic?  I mean, if we go from 32 to 16 bits,
+// must we check all 15 bits for equality to zero?
 "\tbegin // Output drops one bit, can only add one or ... not.\n"
 "\t\twire\t[(OWID-1):0]	truncated_value, rounded_up;\n"
 "\t\twire\t\t\tlast_valid_bit, first_lost_bit;\n"
@@ -807,7 +811,7 @@ void	build_dblstage(const char *fname, ROUND_T rounding, const bool dbg = false)
 "//\n", (dbg)?"_dbg":"", prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
-	fprintf(fp, 
+	fprintf(fp,
 "module\tdblstage%s(i_clk, i_rst, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
 	"\tparameter\tIWIDTH=%d,OWIDTH=IWIDTH+1, SHIFT=%d;\n"
 	"\tinput\t\ti_clk, i_rst, i_ce, i_sync;\n"
@@ -822,7 +826,7 @@ void	build_dblstage(const char *fname, ROUND_T rounding, const bool dbg = false)
 			"\t\t\t\t\to_left[(OWIDTH-1):(OWIDTH-16)] };\n"
 "\n");
 	}
-	fprintf(fp, 
+	fprintf(fp,
 	"\twire\tsigned\t[(IWIDTH-1):0]\ti_in_0r, i_in_0i, i_in_1r, i_in_1i;\n"
 	"\tassign\ti_in_0r = i_left[(2*IWIDTH-1):(IWIDTH)]; \n"
 	"\tassign\ti_in_0i = i_left[(IWIDTH-1):0]; \n"
@@ -953,7 +957,7 @@ void	build_multiply(const char *fname) {
 "//\n", prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
-	fprintf(fp, 
+	fprintf(fp,
 "module	shiftaddmpy(i_clk, i_ce, i_a, i_b, o_r);\n"
 	"\tparameter\tAWIDTH=%d,BWIDTH=", TST_SHIFTADDMPY_AW);
 #ifdef	TST_SHIFTADDMPY_BW
@@ -1055,7 +1059,7 @@ void	build_bimpy(const char *fname) {
 "//\n", fname, prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
-	fprintf(fp, 
+	fprintf(fp,
 "module	bimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
 "\tparameter\tBW=18, // Number of bits in i_b\n"
 "\t\t\tLUTB=2; // Number of bits in i_a for our LUT multiply\n"
@@ -1110,7 +1114,7 @@ void	build_longbimpy(const char *fname) {
 "//\n", fname, prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
-	fprintf(fp, 
+	fprintf(fp,
 "module	longbimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
 	"\tparameter	AW=%d,	// The width of i_a, min width is 5\n"
 			"\t\t\tBW=", TST_LONGBIMPY_AW);
@@ -1306,7 +1310,7 @@ void	build_dblreverse(const char *fname) {
 "//	FFT\'s would require more memories.\n"
 "//\n"
 "//\n");
-	fprintf(fp, 
+	fprintf(fp,
 "module	dblreverse(i_clk, i_rst, i_ce, i_in_0, i_in_1,\n"
 	"\t\to_out_0, o_out_1, o_sync);\n"
 	"\tparameter\t\t\tLGSIZE=%d, WIDTH=24;\n"
@@ -1315,7 +1319,7 @@ void	build_dblreverse(const char *fname) {
 	"\toutput\twire\t[(2*WIDTH-1):0]\to_out_0, o_out_1;\n"
 	"\toutput\treg\t\t\to_sync;\n", TST_DBLREVERSE_LGSIZE);
 
-	fprintf(fp, 
+	fprintf(fp,
 "\n"
 	"\treg\t\t\tin_reset;\n"
 	"\treg\t[(LGSIZE-1):0]\tiaddr;\n"
@@ -1861,7 +1865,7 @@ void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding) {
 	fprintf(fp,
 "\t// See comments in the butterfly.v source file for a discussion of\n"
 "\t// these operations and the appropriate bit widths.\n\n");
-	fprintf(fp, 
+	fprintf(fp,
 	"\treg\tsigned	[((IWIDTH+1)+(CWIDTH)-1):0]	p_one, p_two;\n"
 	"\treg\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	p_three;\n"
 "\n"
@@ -1913,7 +1917,7 @@ void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding) {
 	"\tassign\tw_two = { {(2){p_two[((IWIDTH+1)+(CWIDTH)-1)]}}, p_two };\n"
 "\n");
 
-	fprintf(fp, 
+	fprintf(fp,
 	"\t// These values are held in memory and delayed during the\n"
 	"\t// multiply.  Here, we recover them.  During the multiply,\n"
 	"\t// values were multiplied by 2^(CWIDTH-2)*exp{-j*2*pi*...},\n"
@@ -2039,7 +2043,7 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 "\t// of the span, or the base two log of the current FFT size) is 3.\n"
 "\t// Smaller spans (i.e. the span of 2) must use the dblstage module.\n"
 "\tparameter\tLGWIDTH=11, LGSPAN=9, LGBDLY=5, BFLYSHIFT=0;\n");
-	fprintf(fstage, 
+	fprintf(fstage,
 "\tinput					i_clk, i_rst, i_ce, i_sync;\n"
 "\tinput		[(2*IWIDTH-1):0]	i_data;\n"
 "\toutput	reg	[(2*OWIDTH-1):0]	o_data;\n"
@@ -2050,7 +2054,7 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 			"\t\t\t\t\to_data[(OWIDTH-1):(OWIDTH-16)] };\n"
 "\n");
 	}
-	fprintf(fstage, 
+	fprintf(fstage,
 "\treg	wait_for_sync;\n"
 "\treg	[(2*IWIDTH-1):0]	ib_a, ib_b;\n"
 "\treg	[(2*CWIDTH-1):0]	ib_c;\n"
@@ -2059,7 +2063,7 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 "\treg	b_started;\n"
 "\twire	ob_sync;\n"
 "\twire	[(2*OWIDTH-1):0]\tob_a, ob_b;\n");
-	fprintf(fstage, 
+	fprintf(fstage,
 "\n"
 "\t// %scmem is defined as an array of real and complex values,\n"
 "\t// where the top CWIDTH bits are the real value and the bottom\n"
@@ -2432,7 +2436,7 @@ int main(int argc, char **argv) {
 					case 'v':
 						verbose_flag = true;
 						break;
-					default: 
+					default:
 						printf("Unknown argument, -%c\n", argv[argn][j]);
 						usage();
 						exit(-1);
@@ -2528,7 +2532,7 @@ int main(int argc, char **argv) {
 				fprintf(stderr, "To try again, please remove this file.\n");
 				exit(-1);
 			}
-		} else	
+		} else
 			mkdir(coredir.c_str(), 0755);
 		if (access(coredir.c_str(), X_OK|W_OK) != 0) {
 			fprintf(stderr, "I have no access to the directory \'%s\'.\n", coredir.c_str());
@@ -2585,7 +2589,7 @@ int main(int argc, char **argv) {
 			fprintf(hdr, "#define\tDBLCLK%sFFT\n\n", (inverse)?"I":"");
 		if (USE_OLD_MULTIPLY)
 			fprintf(hdr, "#define\tUSE_OLD_MULTIPLY\n\n");
-		
+
 		fprintf(hdr, "// Parameters for testing the longbimpy\n");
 		fprintf(hdr, "#define\tTST_LONGBIMPY_AW\t%d\n", TST_LONGBIMPY_AW);
 #ifdef	TST_LONGBIMPY_BW
@@ -2709,7 +2713,7 @@ int main(int argc, char **argv) {
 	fprintf(vmain, "\n\n");
 
 	fprintf(vmain, "\t// Outputs of the FFT, ready for bit reversal.\n");
-	fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_left, br_right;\n"); 
+	fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_left, br_right;\n");
 	fprintf(vmain, "\n\n");
 
 	int	tmp_size = fftsize, lgtmp = lgsize;
