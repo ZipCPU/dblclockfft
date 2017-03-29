@@ -1219,7 +1219,7 @@ void	build_longbimpy(const char *fname) {
 		"\t\talways @(posedge i_clk)\n"
 			"\t\t\tif (i_ce)\n"
 				"\t\t\t\tacc[k+1] <= acc[k] + {{(IW-LUTB*(k+3)){1'b0}},\n"
-					"\t\t\t\t\tgenp, {{(LUTB*(k+2))}{1'b0}} };\n"
+					"\t\t\t\t\tgenp, {(LUTB*(k+2)){1'b0}} };\n"
 	"\tend endgenerate\n"
 "\n"
 	"\twire	[(IW+BW-1):0]	w_r;\n"
