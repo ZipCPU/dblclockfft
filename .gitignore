@@ -3,11 +3,12 @@ obj_dir
 obj-pc
 fft-core
 *.o
+.*.swp
+.*.swo
 *.hex
 *_tb
 *_tb.dbl
-.*.swp
-.*.swo
 fftgen
 fftsize.h
 ifftsize.h
+tags
