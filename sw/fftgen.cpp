@@ -1228,6 +1228,14 @@ void	build_longbimpy(const char *fname) {
 		"\t\tif (i_ce)\n"
 			"\t\t\to_r <= w_r[(AW+BW-1):0];\n"
 "\n"
+	"\tgenerate if (IW > AW)\n"
+	"\tbegin : VUNUSED\n"
+	"\t\t// verilator lint_off UNUSED\n"
+	"\t\twire\t[(IW-AW)-1:0]\tunused;\n"
+	"\t\tassign\tunused = w_r[(IW+BW-1):(AW+BW)];\n"
+	"\t\t// verilator lint_on UNUSED\n"
+	"\tend endgenerate\n"
+"\n"
 "endmodule\n");
 
 	fclose(fp);
@@ -1512,10 +1520,7 @@ void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding) {
 	"\n", lgdelay(16,xtracbits), bflydelay(16, xtracbits),
 		lgdelay(16,xtracbits));
 	fprintf(fp,
-	"\twire\t[(OWIDTH-1):0]	o_left_r, o_left_i, o_right_r, o_right_i;\n"
-"\n"
 	"\treg\t[(2*IWIDTH-1):0]\tr_left, r_right;\n"
-	"\treg\t\t\t\tr_aux, r_aux_2;\n"
 	"\treg\t[(2*CWIDTH-1):0]\tr_coef, r_coef_2;\n"
 	"\twire\tsigned\t[(IWIDTH-1):0]\tr_left_r, r_left_i, r_right_r, r_right_i;\n"
 	"\tassign\tr_left_r  = r_left[ (2*IWIDTH-1):(IWIDTH)];\n"
@@ -1660,8 +1665,6 @@ void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding) {
 	"\tassign\tfifo_i = { {2{fifo_read[(IWIDTH+1)-1]}}, fifo_read[((IWIDTH+1)-1):0], {(CWIDTH-2){1\'b0}} };\n"
 "\n"
 "\n"
-	"\treg\tsigned\t[(OWIDTH-1):0]	b_left_r, b_left_i,\n"
-			"\t\t\t\t\t\tb_right_r, b_right_i;\n"
 	"\treg\tsigned\t[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n"
 "\n");
 	fprintf(fp,
@@ -1719,12 +1722,6 @@ void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding) {
 			"\t\t\t// extra bits we need to get rid of.)\n"
 			"\t\t\tmpy_r <= p_one - p_two;\n"
 			"\t\t\tmpy_i <= p_three - p_one - p_two;\n"
-"\n"
-			"\t\t\t// Second clock, round and latch for final clock\n"
-			"\t\t\tb_right_r <= rnd_right_r;\n"
-			"\t\t\tb_right_i <= rnd_right_i;\n"
-			"\t\t\tb_left_r <= rnd_left_r;\n"
-			"\t\t\tb_left_i <= rnd_left_i;\n"
 		"\t\tend\n"
 "\n");
 
@@ -1813,11 +1810,9 @@ void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding) {
 	"\toutput\treg\to_aux;\n"
 "\n", xtracbits);
 	fprintf(fp,
-	"\twire\t[(OWIDTH-1):0]	o_left_r, o_left_i, o_right_r, o_right_i;\n"
-"\n"
 	"\treg\t[(2*IWIDTH-1):0]	r_left, r_right;\n"
 	"\treg\t			r_aux, r_aux_2;\n"
-	"\treg\t[(2*CWIDTH-1):0]	r_coef, r_coef_2;\n"
+	"\treg\t[(2*CWIDTH-1):0]	r_coef;\n"
 	"\twire	signed	[(IWIDTH-1):0]	r_left_r, r_left_i, r_right_r, r_right_i;\n"
 	"\tassign\tr_left_r  = r_left[ (2*IWIDTH-1):(IWIDTH)];\n"
 	"\tassign\tr_left_i  = r_left[ (IWIDTH-1):0];\n"
@@ -2749,7 +2744,8 @@ int main(int argc, char **argv) {
 			if (mpystage)
 				fprintf(vmain, "\t// A hardware optimized FFT stage\n");
 			fprintf(vmain, "\n\n");
-			fprintf(vmain, "\twire\t\tw_s%d, w_os%d;\n", fftsize, fftsize);
+			fprintf(vmain, "\twire\t\tw_s%d;\n", fftsize);
+			fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os%d;\n\t// verilator lint_on  UNUSED\n", fftsize);
 			fprintf(vmain, "\twire\t[%d:0]\tw_e%d, w_o%d;\n", 2*(obits+xtrapbits)-1, fftsize, fftsize);
 			fprintf(vmain, "\t%sfftstage_e%d%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0)\tstage_e%d(i_clk, i_rst, i_ce,\n",
 				(inverse)?"i":"", fftsize,
@@ -2806,8 +2802,10 @@ int main(int argc, char **argv) {
 
 				if (mpystage)
 					fprintf(vmain, "\t// A hardware optimized FFT stage\n");
-				fprintf(vmain, "\twire\t\tw_s%d, w_os%d;\n",
-					tmp_size, tmp_size);
+				fprintf(vmain, "\twire\t\tw_s%d;\n",
+					tmp_size);
+				fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os%d;\n\t// verilator lint_on  UNUSED\n",
+					tmp_size);
 				fprintf(vmain,"\twire\t[%d:0]\tw_e%d, w_o%d;\n",
 					2*(obits+xtrapbits)-1,
 					tmp_size, tmp_size);
@@ -2876,7 +2874,8 @@ int main(int argc, char **argv) {
 			if ((maxbitsout > 0)&&(obits > maxbitsout))
 				obits = maxbitsout;
 
-			fprintf(vmain, "\twire\t\tw_s4, w_os4;\n");
+			fprintf(vmain, "\twire\t\tw_s4;\n");
+			fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os4;\n\t// verilator lint_on  UNUSED\n");
 			fprintf(vmain, "\twire\t[%d:0]\tw_e4, w_o4;\n", 2*(obits+xtrapbits)-1);
 			fprintf(vmain, "\tqtrstage%s\t#(%d,%d,%d,0,%d,%d)\tstage_e4(i_clk, i_rst, i_ce,\n",
 				((dbg)&&(dbgstage==4))?"_dbg":"",

@@ -51,6 +51,14 @@
 #define	DATAMSK	(DATALEN-1)
 #define	PAGEMSK	(FFTSIZE)
 
+#ifdef	NEW_VERILATOR
+#define	VVAR(A)	dblreverse__DOT_ ## A
+#else
+#define	VVAR(A)	v__DOT_ ## A
+#endif
+
+#define	iaddr	VVAR(_iaddr)
+
 void	tick(Vdblreverse *dblrev) {
 	dblrev->i_clk = 0;
 	dblrev->eval();
@@ -107,7 +115,7 @@ int	main(int argc, char **argv, char **envp) {
 		printf("k=%3d: IN = %6lx : %6lx, OUT = %6lx : %6lx, SYNC = %d\t(%x)\n",
 			k, dblrev->i_in_0, dblrev->i_in_1,
 			dblrev->o_out_0, dblrev->o_out_1, dblrev->o_sync,
-			dblrev->v__DOT__iaddr);
+			dblrev->iaddr);
 
 		if ((k>BREV_OFFSET)&&(((BREV_OFFSET==(k&(FFTMASK>>1)))?1:0) != dblrev->o_sync)) {
 			fprintf(stdout, "FAIL, BAD SYNC\n");

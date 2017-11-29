@@ -49,6 +49,29 @@
 
 #include "fftsize.h"
 
+
+#ifdef	NEW_VERILATOR
+#define	VVAR(A)	fftmain__DOT_ ## A
+#else
+#define	VVAR(A)	v__DOT_ ## A
+#endif
+
+
+#define	revstage_iaddr	VVAR(_revstage__DOT__iaddr)
+#define	br_sync		VVAR(_br_sync)
+#define	br_started	VVAR(_r_br_started)
+#define	w_s2048		VVAR(_w_s2048)
+#define	w_s1024		VVAR(_w_s1024)
+#define	w_s512		VVAR(_w_s512)
+#define	w_s256		VVAR(_w_s256)
+#define	w_s128		VVAR(_w_s128)
+#define	w_s64		VVAR(_w_s64)
+#define	w_s32		VVAR(_w_s32)
+#define	w_s16		VVAR(_w_s16)
+#define	w_s8		VVAR(_w_s8)
+#define	w_s4		VVAR(_w_s4)
+
+
 #define	IWIDTH	FFT_IWIDTH
 #define	OWIDTH	FFT_OWIDTH
 #define	LGWIDTH	FFT_LGWIDTH
@@ -264,57 +287,42 @@ public:
 			m_iaddr, m_oaddr,
 			lft, rht, m_fft->o_left, m_fft->o_right);
 
-	/*
-		printf(" %011lx,%011lx", m_fft->v__DOT__w_e2048,
-			m_fft->v__DOT__w_o2048);
-
-		printf(" BF(%d,%11x,%11x,%11lx -> %d,%03x,%8x,%8x)", // %d,%11x,%11x)",
-			m_fft->v__DOT__stage_o2048__DOT__ib_sync,
-			m_fft->v__DOT__stage_o2048__DOT__ib_a,
-			m_fft->v__DOT__stage_o2048__DOT__ib_b,
-			m_fft->v__DOT__stage_o2048__DOT__ib_c,
-			m_fft->v__DOT__stage_o2048__DOT__ob_sync,
-			m_fft->v__DOT__stage_o2048__DOT__oB,
-			m_fft->v__DOT__stage_o2048__DOT__bfly__DOT__rnd_left_r,
-			m_fft->v__DOT__stage_o2048__DOT__bfly__DOT__rnd_right_r);
-	*/
-
 #ifndef	APPLY_BITREVERSE_LOCALLY
-		printf(" [%3x]%s", m_fft->v__DOT__revstage__DOT__iaddr,
-			(m_fft->v__DOT__br_sync)?"S"
-				:((m_fft->v__DOT__r_br_started)?".":"x"));
+		printf(" [%3x]%s", m_fft->revstage_iaddr,
+			(m_fft->br_sync)?"S"
+				:((m_fft->br_started)?".":"x"));
 #endif
 
 		printf(" ");
 #if (FFT_SIZE>=2048)
-		printf("%s", (m_fft->v__DOT__w_s2048)?"S":"-");
+		printf("%s", (m_fft->w_s2048)?"S":"-");
 #endif
 #if (FFT_SIZE>1024)
-		printf("%s", (m_fft->v__DOT__w_s1024)?"S":"-");
+		printf("%s", (m_fft->w_s1024)?"S":"-");
 #endif
 #if (FFT_SIZE>512)
-		printf("%s", (m_fft->v__DOT__w_s512)?"S":"-");
+		printf("%s", (m_fft->w_s512)?"S":"-");
 #endif
 #if (FFT_SIZE>256)
-		printf("%s", (m_fft->v__DOT__w_s256)?"S":"-");
+		printf("%s", (m_fft->w_s256)?"S":"-");
 #endif
 #if (FFT_SIZE>128)
-		printf("%s", (m_fft->v__DOT__w_s128)?"S":"-");
+		printf("%s", (m_fft->w_s128)?"S":"-");
 #endif
 #if (FFT_SIZE>64)
-		printf("%s", (m_fft->v__DOT__w_s64)?"S":"-");
+		printf("%s", (m_fft->w_s64)?"S":"-");
 #endif
 #if (FFT_SIZE>32)
-		printf("%s", (m_fft->v__DOT__w_s32)?"S":"-");
+		printf("%s", (m_fft->w_s32)?"S":"-");
 #endif
 #if (FFT_SIZE>16)
-		printf("%s", (m_fft->v__DOT__w_s16)?"S":"-");
+		printf("%s", (m_fft->w_s16)?"S":"-");
 #endif
 #if (FFT_SIZE>8)
-		printf("%s", (m_fft->v__DOT__w_s8)?"S":"-");
+		printf("%s", (m_fft->w_s8)?"S":"-");
 #endif
 #if (FFT_SIZE>4)
-		printf("%s", (m_fft->v__DOT__w_s4)?"S":"-");
+		printf("%s", (m_fft->w_s4)?"S":"-");
 #endif
 
 		printf(" %s%s\n",

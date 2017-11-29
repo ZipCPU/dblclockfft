@@ -54,6 +54,21 @@
 #define	ASIZ	32
 #define	AMSK	(ASIZ-1)
 
+#ifdef	NEW_VERILATOR
+#define	VVAR(A)	qtrstage__DOT_ ## A
+#else
+#define	VVAR(A)	v__DOT_ ## A
+#endif
+
+#define	sum_r		VVAR(_sum_r)
+#define	sum_i		VVAR(_sum_i)
+#define	diff_r		VVAR(_diff_r)
+#define	diff_i		VVAR(_diff_i)
+#define	pipeline	VVAR(_pipeline)
+#define	iaddr		VVAR(_iaddr)
+#define	imem		VVAR(_imem)
+#define	wait_for_sync	VVAR(_wait_for_sync)
+
 class	QTRTEST_TB {
 public:
 	Vqtrstage	*m_qstage;
@@ -150,14 +165,15 @@ public:
 		printf("k=%4d: ISYNC=%d, IN = %08x, OUT =%09lx, SYNC=%d\t%5x,%5x,%5x,%5x\t%x %4x %8x %d\n",
 			(m_addr-m_offset), isync, m_qstage->i_data,
 			m_qstage->o_data, m_qstage->o_sync,
-			m_qstage->v__DOT__sum_r,
-			m_qstage->v__DOT__sum_i,
-			m_qstage->v__DOT__diff_r,
-			m_qstage->v__DOT__diff_i,
-			m_qstage->v__DOT__pipeline,
-			m_qstage->v__DOT__iaddr,
-			m_qstage->v__DOT__imem,
-			m_qstage->v__DOT__wait_for_sync);
+
+			m_qstage->sum_r,
+			m_qstage->sum_i,
+			m_qstage->diff_r,
+			m_qstage->diff_i,
+			m_qstage->pipeline,
+			m_qstage->iaddr,
+			m_qstage->imem,
+			m_qstage->wait_for_sync);
 
 		check_results();
 	}

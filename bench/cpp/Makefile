@@ -48,8 +48,15 @@ all: mpy_tb dblrev_tb dblstage_tb qtrstage_tb fft_tb test
 OBJDR:= ../../sw/fft-core/obj_dir
 VSRCD = ../../sw/fft-core
 TBODR:= ../rtl/obj_dir
-VERILATOR_ROOT   ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
+ifneq ($(VERILATOR_ROOT),)
+VERILATOR:=$(VERILATOR_ROOT)/bin/verilator
+else
+VERILATOR:=verilator
+VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
+endif
+export	$(VERILATOR)
 VROOT   := $(VERILATOR_ROOT)
+VDEFS:= $(shell ./vversion.sh)
 VINC := -I$(VROOT)/include -I$(OBJDR)/ -I$(TBODR)/
 # MPYLB:= $(OBJDR)/Vshiftaddmpy__ALL.a
 MPYLB:= $(OBJDR)/Vlongbimpy__ALL.a
@@ -61,33 +68,34 @@ HWBFY:= $(OBJDR)/Vhwbfly__ALL.a
 FFTLB:= $(OBJDR)/Vfftmain__ALL.a
 IFTLB:= $(TBODR)/Vifft_tb__ALL.a
 STGLB:= $(OBJDR)/Vfftstage_o2048__ALL.a
+VSRCS:= $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_vcd_c.cpp
 
 mpy_tb: mpy_tb.cpp fftsize.h twoc.h $(MPYLB)
-	g++ -g $(VINC) $< twoc.cpp $(MPYLB) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(MPYLB) $(VSRCS) -o $@
 
 dblrev_tb: dblrev_tb.cpp twoc.cpp twoc.h fftsize.h $(DBLRV)
-	g++ -g $(VINC) $< twoc.cpp $(DBLRV) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLRV) $(VSRCS) -o $@
 
 dblstage_tb: dblstage_tb.cpp twoc.cpp twoc.h $(DBLSG)
-	g++ -g $(VINC) $< twoc.cpp $(DBLSG) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLSG) $(VSRCS) -o $@
 
 qtrstage_tb: qtrstage_tb.cpp twoc.cpp twoc.h $(QTRSG)
-	g++ -g $(VINC) $< twoc.cpp $(QTRSG) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(QTRSG) $(VSRCS) -o $@
 
 butterfly_tb: butterfly_tb.cpp twoc.cpp twoc.h fftsize.h $(BFLYL)
-	g++ -g $(VINC) $< twoc.cpp $(BFLYL) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(BFLYL) $(VSRCS) -o $@
 
 hwbfly_tb: hwbfly_tb.cpp twoc.cpp twoc.h $(HWBFY)
-	g++ -g $(VINC) $< twoc.cpp $(HWBFY) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(HWBFY) $(VSRCS) -o $@
 
 fftstage_o2048_tb: fftstage_o2048_tb.cpp twoc.cpp twoc.h $(STGLB)
-	g++ -g $(VINC) $< twoc.cpp $(STGLB) $(VERILATOR_ROOT)/include/verilated.cpp -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(STGLB) $(VSRCS) -o $@
 
 fft_tb: fft_tb.cpp twoc.cpp twoc.h fftsize.h $(FFTLB)
-	g++ -g $(VINC) $< twoc.cpp $(FFTLB) $(VERILATOR_ROOT)/include/verilated.cpp -lfftw3 -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(FFTLB) $(VSRCS) -lfftw3 -o $@
 
 ifft_tb: ifft_tb.cpp twoc.cpp twoc.h fftsize.h $(IFTLB)
-	g++ -g $(VINC) $< twoc.cpp $(IFTLB) $(VERILATOR_ROOT)/include/verilated.cpp -lfftw3 -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(IFTLB) $(VSRCS) -lfftw3 -o $@
 
 .PHONY: HEX
 # HEX:	 cmem_e2048.hex  cmem_e1024.hex  cmem_e512.hex  cmem_e256.hex 

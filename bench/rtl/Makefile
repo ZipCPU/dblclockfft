@@ -41,13 +41,23 @@ all: ifft_tb
 ##
 ##
 ##########################################################################/
+##
+##
+# This is really simple ...
+all: ifft_tb
+CORED := fft-core
+ifneq ($(VERILATOR_ROOT),)
+VERILATOR:=$(VERILATOR_ROOT)/bin/verilator
+else
+VERILATOR:=verilator
+VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
+endif
+export	$(VERILATOR)
+VROOT   := $(VERILATOR_ROOT)
+VSRCD   := ../../sw/$(CORED)
+VFLAGS  := -Wall -MMD --trace -y $(VSRCD) -cc
 
-OBJDR:= ../../sw/fft-core/obj_dir
-VSRCD:= ../../sw/fft-core
 LCLDR:= obj_dir
-VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT|head -1 | sed -e " s/^.*=\s*//"')
-VROOT := VERILATOR_ROOT
-VINC := -I$(VROOT)/include -I$(OBJDR)/ -I$(LCLDR)/
 IFTLB:= $(LCLDR)/Vifft_tb__ALL.a
 
 .PHONY: ifft_tb
@@ -56,7 +66,7 @@ ifft_tb: $(IFTLB)
 $(IFTLB): $(LCLDR)/Vifft_tb.cpp
 	cd $(LCLDR); make -f Vifft_tb.mk
 $(LCLDR)/Vifft_tb.cpp: ifft_tb.v $(VSRCD)/fftmain.v $(VSRCD)/ifftmain.v
-	verilator -y $(VSRCD) -cc ifft_tb.v
+	$(VERILATOR) $(VFLAGS) ifft_tb.v
 
 .PHONY: clean
 clean:

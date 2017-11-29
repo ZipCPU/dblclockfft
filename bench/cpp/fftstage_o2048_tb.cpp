@@ -47,6 +47,16 @@
 #include "Vfftstage_o2048.h"
 #include "verilated.h"
 
+
+#ifdef	NEW_VERILATOR
+#define	VVAR(A)	fftstage_o2048__DOT_ ## A
+#else
+#define	VVAR(A)	v__DOT_ ## A
+#endif
+
+#define	cmem	VVAR(_cmem)
+#define	iaddr	VVAR(_iaddr)
+
 #define	FFTBITS	11
 #define	FFTLEN	(1<<FFTBITS)
 #define	FFTSIZE	FFTLEN
@@ -180,7 +190,7 @@ public:
 		i_data &= (~(-1l<<(2*IWIDTH)));
 		m_ftstage->i_data = i_data;
 
-		cv = m_ftstage->v__DOT__cmem[m_iaddr & SPANMASK];
+		cv = m_ftstage->cmem[m_iaddr & SPANMASK];
 		bc = m_iaddr & (1<<LGSPAN);
 		if (!bc)
 			m_vals[m_iaddr & (SPANMASK)] = i_data;
@@ -222,8 +232,9 @@ public:
 			m_iaddr, m_oaddr,
 			i_sync, i_data & (~(-1l << (2*IWIDTH))),
 			m_ftstage->o_data, m_ftstage->o_sync,
-			m_ftstage->v__DOT__iaddr&(FFTMASK>>1),
-			m_ftstage->v__DOT__cmem[m_ftstage->v__DOT__iaddr&(SPANMASK>>1)] & (~(-1l<<(2*CWIDTH))),
+
+			m_ftstage->iaddr&(FFTMASK>>1),
+			m_ftstage->cmem[m_ftstage->iaddr&(SPANMASK>>1)] & (~(-1l<<(2*CWIDTH))),
 			m_out[raddr]);
 
 		if ((m_syncd)&&(m_ftstage->o_sync != ((((m_iaddr-m_offset)&((1<<(LGSPAN+1))-1))==0)?1:0))) {

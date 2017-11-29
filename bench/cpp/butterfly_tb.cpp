@@ -137,29 +137,6 @@ public:
 			m_bfly->o_left,
 			m_bfly->o_right,
 			m_bfly->o_aux);
-		/*
-		printf("\tFI=%010lx",
-			((((long)m_bfly->v__DOT__r_aux_2)&1l)<<34)
-			|((((long)m_bfly->v__DOT__r_sum_r)&0x01ffffl)<<17)
-			|(((long)m_bfly->v__DOT__r_sum_i)&0x01ffffl));
-		printf("\tFO=%010lx SUMR=%05x SUMI=%05x A=%d",
-			m_bfly->v__DOT__fifo_read,
-			m_bfly->v__DOT__r_sum_r,
-			m_bfly->v__DOT__r_sum_i,
-			m_bfly->v__DOT__r_aux_2);
-		printf("\tML=%09lx, MR=%09lx, ",
-			m_left[ (m_addr-23)&(64-1)],
-			m_right[(m_addr-23)&(64-1)]);
-		*/
-		/*
-		printf("\tBLFTR=%10lx BLFTI=%10lx",
-			m_bfly->v__DOT__b_left_r & (~(-1l<<40)),
-			m_bfly->v__DOT__b_left_i & (~(-1l<<40)));
-		printf("\tMPYR=%10lx MPYI=%10lx",
-			m_bfly->v__DOT__mpy_r & (~(-1l<<40)),
-			m_bfly->v__DOT__mpy_i & (~(-1l<<40)));
-		printf("\n");
-		*/
 
 		if ((m_syncd)&&(m_left[(m_addr-m_offset)&(64-1)] != m_bfly->o_left)) {
 			printf("WRONG O_LEFT! (%lx(exp) != %lx(sut))\n",

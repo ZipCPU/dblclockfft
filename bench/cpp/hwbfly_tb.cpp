@@ -46,6 +46,13 @@
 #include "verilated.h"
 #include "twoc.h"
 
+#ifdef	NEW_VERILATOR
+#define	VVAR(A)	hwbfly__DOT_ ## A
+#else
+#define	VVAR(A)	v__DOT_ ## A
+#endif
+
+
 class	BFLY_TB {
 public:
 	Vhwbfly		*m_bfly;
@@ -123,32 +130,6 @@ public:
 			m_bfly->o_left,
 			m_bfly->o_right,
 			m_bfly->o_aux);
-		/*
-		printf("\tFI=%010lx",
-			((((long)m_bfly->v__DOT__r_aux_2)&1l)<<34)
-			|((((long)m_bfly->v__DOT__r_sum_r)&0x01ffffl)<<17)
-			|(((long)m_bfly->v__DOT__r_sum_i)&0x01ffffl));
-		printf("\tFO=%010lx SUMR=%05x SUMI=%05x A=%d",
-			m_bfly->v__DOT__left_saved,
-			m_bfly->v__DOT__r_sum_r,
-			m_bfly->v__DOT__r_sum_i,
-			m_bfly->v__DOT__r_aux_2);
-		printf("\tDIFR=%05x DIFI=%05x ",
-			m_bfly->v__DOT__r_dif_r,
-			m_bfly->v__DOT__r_dif_i);
-		printf("\tML=%09lx, MR=%09lx (o=%d)",
-			m_left[ (m_addr-4)&(64-1)],
-			m_right[(m_addr-4)&(64-1)], m_offset);
-		printf("\tBLFTR=%10lx BLFTI=%10lx",
-			m_bfly->v__DOT__b_left_r & (~(-1l<<40)),
-			m_bfly->v__DOT__b_left_i & (~(-1l<<40)));
-		printf("\tBRHTR=%10lx BRHTI=%10lx",
-			m_bfly->v__DOT__b_right_r & (~(-1l<<40)),
-			m_bfly->v__DOT__b_right_i & (~(-1l<<40)));
-		printf("\tMPYR=%10lx MPYI=%10lx",
-			m_bfly->v__DOT__mpy_r & (~(-1l<<40)),
-			m_bfly->v__DOT__mpy_i & (~(-1l<<40)));
-		*/
 		printf("\n");
 
 		if ((m_syncd)&&(m_left[(m_addr-m_offset)&(64-1)] != m_bfly->o_left)) {
