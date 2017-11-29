@@ -247,6 +247,7 @@ void	build_truncator(const char *fname) {
 		prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	truncate(i_clk, i_ce, i_val, o_val);\n"
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
@@ -288,6 +289,7 @@ void	build_roundhalfup(const char *fname) {
 		prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	roundhalfup(i_clk, i_ce, i_val, o_val);\n"
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
@@ -320,7 +322,7 @@ void	build_roundhalfup(const char *fname) {
 		"\t\talways @(posedge i_clk)\n"
 		"\t\t\tif (i_ce)\n"
 		"\t\t\tbegin\n"
-			"\t\t\t\tif (~first_lost_bit) // Round down / truncate\n"
+			"\t\t\t\tif (!first_lost_bit) // Round down / truncate\n"
 			"\t\t\t\t\to_val <= truncated_value;\n"
 			"\t\t\t\telse\n"
 			"\t\t\t\t\to_val <= rounded_up; // even value\n"
@@ -366,6 +368,7 @@ void	build_roundfromzero(const char *fname) {
 		prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	roundfromzero(i_clk, i_ce, i_val, o_val);\n"
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
@@ -410,7 +413,7 @@ void	build_roundfromzero(const char *fname) {
 	"\t\talways @(posedge i_clk)\n"
 		"\t\t\tif (i_ce)\n"
 		"\t\t\tbegin\n"
-			"\t\t\t\tif (~first_lost_bit) // Round down / truncate\n"
+			"\t\t\t\tif (!first_lost_bit) // Round down / truncate\n"
 				"\t\t\t\t\to_val <= truncated_value;\n"
 			"\t\t\t\telse if (sign_bit)\n"
 				"\t\t\t\t\to_val <= truncated_value;\n"
@@ -433,7 +436,7 @@ void	build_roundfromzero(const char *fname) {
 		"\t\talways @(posedge i_clk)\n"
 			"\t\t\tif (i_ce)\n"
 			"\t\t\tbegin\n"
-			"\t\t\t\tif (~first_lost_bit) // Round down / truncate\n"
+			"\t\t\t\tif (!first_lost_bit) // Round down / truncate\n"
 				"\t\t\t\t\to_val <= truncated_value;\n"
 			"\t\t\t\telse if (|other_lost_bits) // Round up to\n"
 				"\t\t\t\t\to_val <= rounded_up; // closest value\n"
@@ -475,6 +478,7 @@ void	build_convround(const char *fname) {
 		prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	convround(i_clk, i_ce, i_val, o_val);\n"
 "\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
@@ -524,7 +528,7 @@ void	build_convround(const char *fname) {
 "\t\talways @(posedge i_clk)\n"
 "\t\t\tif (i_ce)\n"
 "\t\t\tbegin\n"
-"\t\t\t\tif (~first_lost_bit) // Round down / truncate\n"
+"\t\t\t\tif (!first_lost_bit) // Round down / truncate\n"
 "\t\t\t\t\to_val <= truncated_value;\n"
 "\t\t\t\telse if (last_valid_bit)// Round up to nearest\n"
 "\t\t\t\t\to_val <= rounded_up; // even value\n"
@@ -547,7 +551,7 @@ void	build_convround(const char *fname) {
 "\t\talways @(posedge i_clk)\n"
 "\t\t\tif (i_ce)\n"
 "\t\t\tbegin\n"
-"\t\t\t\tif (~first_lost_bit) // Round down / truncate\n"
+"\t\t\t\tif (!first_lost_bit) // Round down / truncate\n"
 "\t\t\t\t\to_val <= truncated_value;\n"
 "\t\t\t\telse if (|other_lost_bits) // Round up to\n"
 "\t\t\t\t\to_val <= rounded_up; // closest value\n"
@@ -596,6 +600,7 @@ void	build_quarters(const char *fname, ROUND_T rounding, bool dbg=false) {
 "//\n",
 		(dbg)?"_dbg":"", prjname, creator);
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 
 	fprintf(fp,
 "module\tqtrstage%s(i_clk, i_rst, i_ce, i_sync, i_data, o_data, o_sync%s);\n"
@@ -676,7 +681,7 @@ void	build_quarters(const char *fname, ROUND_T rounding, bool dbg=false) {
 		"\t\tbegin\n"
 			"\t\t\twait_for_sync <= 1\'b1;\n"
 			"\t\t\tiaddr <= 0;\n"
-		"\t\tend else if ((i_ce)&&((~wait_for_sync)||(i_sync)))\n"
+		"\t\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
 		"\t\tbegin\n"
 			"\t\t\tiaddr <= iaddr + { {(LGWIDTH-1){1\'b0}}, 1\'b1 };\n"
 			"\t\t\twait_for_sync <= 1\'b0;\n"
@@ -811,6 +816,7 @@ void	build_dblstage(const char *fname, ROUND_T rounding, const bool dbg = false)
 "//\n", (dbg)?"_dbg":"", prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module\tdblstage%s(i_clk, i_rst, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
 	"\tparameter\tIWIDTH=%d,OWIDTH=IWIDTH+1, SHIFT=%d;\n"
@@ -957,6 +963,7 @@ void	build_multiply(const char *fname) {
 "//\n", prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	shiftaddmpy(i_clk, i_ce, i_a, i_b, o_r);\n"
 	"\tparameter\tAWIDTH=%d,BWIDTH=", TST_SHIFTADDMPY_AW);
@@ -1059,6 +1066,7 @@ void	build_bimpy(const char *fname) {
 "//\n", fname, prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	bimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
 "\tparameter\tBW=18, // Number of bits in i_b\n"
@@ -1114,6 +1122,7 @@ void	build_longbimpy(const char *fname) {
 "//\n", fname, prjname, creator);
 
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	longbimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
 	"\tparameter	AW=%d,	// The width of i_a, min width is 5\n"
@@ -1284,6 +1293,7 @@ void	build_dblreverse(const char *fname) {
 "//\n%s"
 "//\n", prjname, creator);
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "\n\n"
 "//\n"
@@ -1487,6 +1497,7 @@ void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding) {
 "//\n%s"
 "//\n", prjname, creator);
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 
 	fprintf(fp,
 "module\tbutterfly(i_clk, i_rst, i_ce, i_coef, i_left, i_right, i_aux,\n"
@@ -1786,15 +1797,16 @@ void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding) {
 "//\n"
 "// Purpose:	This routine is identical to the butterfly.v routine found\n"
 "//		in 'butterfly.v', save only that it uses the verilog \n"
-"//		operator '*' in hopes that the synthesizer would be able\n"
-"//		to optimize it with hardware resources.\n"
+"//	operator '*' in hopes that the synthesizer would be able to optimize\n"
+"//	it with hardware resources.\n"
 "//\n"
-"//		It is understood that a hardware multiply can complete its\n"
-"//		operation in a single clock.\n"
+"//	It is understood that a hardware multiply can complete its operation in\n"
+"//	a single clock.\n"
 "//\n"
 "//\n%s"
 "//\n", prjname, creator);
 	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	hwbfly(i_clk, i_rst, i_ce, i_coef, i_left, i_right, i_aux,\n"
 		"\t\to_left, o_right, o_aux);\n"
@@ -2024,6 +2036,7 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 "//\n",
 		(inv)?"i":"", (odd)?'o':'e', stage*2, (dbg)?"_dbg":"", prjname, creator);
 	fprintf(fstage, "%s", cpyleft);
+	fprintf(fstage, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fstage, "module\t%sfftstage_%c%d%s(i_clk, i_rst, i_ce, i_sync, i_data, o_data, o_sync%s);\n",
 		(inv)?"i":"", (odd)?'o':'e', stage*2, (dbg)?"_dbg":"",
 		(dbg)?", o_dbg":"");
@@ -2135,7 +2148,7 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 		"\t\t\twait_for_sync <= 1\'b1;\n"
 		"\t\t\tiaddr <= 0;\n"
 	"\t\tend\n"
-	"\t\telse if ((i_ce)&&((~wait_for_sync)||(i_sync)))\n"
+	"\t\telse if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
 	"\t\tbegin\n"
 		"\t\t\t//\n"
 		"\t\t\t// First step: Record what we\'re not ready to use yet\n"
@@ -2144,7 +2157,7 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 		"\t\t\twait_for_sync <= 1\'b0;\n"
 	"\t\tend\n"
 "\talways @(posedge i_clk) // Need to make certain here that we don\'t read\n"
-	"\t\tif ((i_ce)&&(~iaddr[LGSPAN])) // and write the same address on\n"
+	"\t\tif ((i_ce)&&(!iaddr[LGSPAN])) // and write the same address on\n"
 		"\t\t\timem[iaddr[(LGSPAN-1):0]] <= i_data; // the same clk\n"
 	"\n");
 
@@ -2204,10 +2217,10 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 		"\t\t\tb_started <= 0;\n"
 	"\t\tend else if (i_ce)\n"
 	"\t\tbegin\n"
-	"\t\t\to_sync <= (~oB[LGSPAN])?ob_sync : 1\'b0;\n"
+	"\t\t\to_sync <= (!oB[LGSPAN])?ob_sync : 1\'b0;\n"
 	"\t\t\tif (ob_sync||b_started)\n"
 		"\t\t\t\toB <= oB + { {(LGSPAN){1\'b0}}, 1\'b1 };\n"
-	"\t\t\tif ((ob_sync)&&(~oB[LGSPAN]))\n"
+	"\t\t\tif ((ob_sync)&&(!oB[LGSPAN]))\n"
 		"\t\t\t// A butterfly output is available\n"
 			"\t\t\t\tb_started <= 1\'b1;\n"
 	"\t\tend\n\n");
@@ -2227,7 +2240,7 @@ void	build_stage(const char *fname, const char *coredir, int stage, bool odd, in
 	fprintf(fstage,
 	"\talways @(posedge i_clk)\n"
 	"\t\tif (i_ce)\n"
-	"\t\t\to_data <= (~oB[LGSPAN])?ob_a : omem[oB[(LGSPAN-1):0]];\n"
+	"\t\t\to_data <= (!oB[LGSPAN])?ob_a : omem[oB[(LGSPAN-1):0]];\n"
 "\n");
 	fprintf(fstage, "endmodule\n");
 }
@@ -2689,6 +2702,7 @@ int main(int argc, char **argv) {
 	fprintf(vmain, "%s", creator);
 	fprintf(vmain, "//\n");
 	fprintf(vmain, "%s", cpyleft);
+	fprintf(vmain, "//\n//\n`default_nettype\tnone\n//\n");
 
 
 	fprintf(vmain, "//\n");
@@ -2724,7 +2738,7 @@ int main(int argc, char **argv) {
 		}
 		fprintf(vmain, "\n\n");
 		fprintf(vmain, "\tdblstage\t#(IWIDTH)\tstage_2(i_clk, i_rst, i_ce,\n");
-		fprintf(vmain, "\t\t\t(~i_rst), i_left, i_right, br_left, br_right);\n");
+		fprintf(vmain, "\t\t\t(!i_rst), i_left, i_right, br_left, br_right);\n");
 		fprintf(vmain, "\n\n");
 	} else {
 		int	nbits = nbitsin, dropbit=0;
@@ -2753,13 +2767,13 @@ int main(int argc, char **argv) {
 				xtracbits, obits+xtrapbits,
 				lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
 				fftsize);
-			fprintf(vmain, "\t\t\t(~i_rst), i_left, w_e%d, w_s%d%s);\n", fftsize, fftsize, ((dbg)&&(dbgstage == fftsize))?", o_dbg":"");
+			fprintf(vmain, "\t\t\t(!i_rst), i_left, w_e%d, w_s%d%s);\n", fftsize, fftsize, ((dbg)&&(dbgstage == fftsize))?", o_dbg":"");
 			fprintf(vmain, "\t%sfftstage_o%d\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0)\tstage_o%d(i_clk, i_rst, i_ce,\n",
 				(inverse)?"i":"", fftsize,
 				xtracbits, obits+xtrapbits,
 				lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
 				fftsize);
-			fprintf(vmain, "\t\t\t(~i_rst), i_right, w_o%d, w_os%d);\n", fftsize, fftsize);
+			fprintf(vmain, "\t\t\t(!i_rst), i_right, w_o%d, w_os%d);\n", fftsize, fftsize);
 			fprintf(vmain, "\n\n");
 
 
