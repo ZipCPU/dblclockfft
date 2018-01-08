@@ -2,17 +2,16 @@
 ##
 ## Filename: 	Makefile
 ##
-## Project:	A Doubletime Pipelined FFT
+## Project:	A Generic Pipelined FFT Implementation
 ##
 ## Purpose:	This is the main Makefile for the FFT core generator.
 ##		It is very simple in its construction, the most complicated
-##		parts being the building of the Verilator simulation--a
-##		step that may not be required for your project.
+##	parts being the building of the Verilator simulation--a step that may
+##	not be required for your project.
 ##
-##		To build the FFT generator, just type 'make' on a line
-##		by itself.  For a quick tutorial in how to run the
-##		generator, just type './fftgen -h' to read the usage()
-##		statement.
+##	To build the FFT generator, just type 'make' on a line by itself.  For
+##	a quick tutorial in how to run the generator, just type './fftgen -h'
+##	to read the usage() statement.
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
@@ -57,16 +56,17 @@ VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | 
 endif
 export	$(VERILATOR)
 VROOT   := $(VERILATOR_ROOT)
-VFLAGS  := -Wall -MMD --trace -cc
+VFLAGS  := -Wall -O3 -MMD --trace -cc
+CFLAGS  := -g -Wall
 
 fftgen: fftgen.o
-	$(CXX) $< -o $@
+	$(CXX) $(CFLAGS) $< -o $@
 
 %.o: %.cpp
-	$(CXX) -c $< -o $@
+	$(CXX) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
-test: fft ifft butterfly dblreverse qtrstage dblstage fftstage_o2048
+test: fft ifft butterfly dblreverse qtrstage dblstage fftstage
 test: hwbfly shiftaddmpy longbimpy
 
 #
@@ -77,15 +77,39 @@ test: hwbfly shiftaddmpy longbimpy
 # changes work.
 #
 .PHONY: fft
-fft: fftgen
-	./fftgen -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
+fft: $(OBJDR)/Vfftmain__ALL.so
+$(CORED)/fftmain.v: fftgen
+	./fftgen -v -1 -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
+$(OBJDR)/Vfftmain.h: $(CORED)/fftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftmain.v
+$(OBJDR)/Vfftmain__ALL.so: $(OBJDR)/Vfftmain.h
 	cd $(OBJDR); make -f Vfftmain.mk
 
+.PHONY: dblfft
+dblfft: $(OBJDR)/Vdblfftmain__ALL.so
+$(CORED)/dblfftmain.v: fftgen
+	./fftgen -v -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/dblfftsize.h
+$(OBJDR)/Vdblfftmain.h: $(CORED)/dblfftmain.v
+	cd $(CORED)/; $(VERILATOR) $(VFLAGS) dblfftmain.v
+$(OBJDR)/Vdblfftmain__ALL.so: $(OBJDR)/Vdblfftmain.h
+	cd $(OBJDR); make -f Vdblfftmain.mk
+
+.PHONY: idblfft
+idblfft: $(OBJDR)/Vidblfftmain__ALL.so
+$(CORED)/idblfftmain.v: fftgen
+	./fftgen -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/idblfftsize.h
+$(OBJDR)/Vidblfftmain.h: $(CORED)/idblfftmain.v
+	cd $(CORED)/; $(VERILATOR) $(VFLAGS) idblfftmain.v
+$(OBJDR)/Vidblfftmain__ALL.so: $(OBJDR)/Vidblfftmain.h
+	cd $(OBJDR); make -f Vidblfftmain.mk
+
 .PHONY: ifft
-ifft: fftgen
-	./fftgen -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/ifftsize.h
+ifft: $(OBJDR)/Vifftmain__ALL.so
+$(CORED)/ifftmain.v: fftgen
+	./fftgen -1 -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/ifftsize.h
+$(OBJDR)/Vifftmain.h: $(CORED)/ifftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) ifftmain.v
+$(OBJDR)/Vifftmain__ALL.so: $(OBJDR)/Vifftmain.h
 	cd $(OBJDR); make -f Vifftmain.mk
 
 .PHONY: shiftaddmpy
@@ -158,15 +182,15 @@ $(OBJDR)/Vdblstage__ALL.a: $(OBJDR)/Vdblstage.h
 $(OBJDR)/Vdblstage__ALL.a: $(OBJDR)/Vdblstage.cpp
 	cd $(OBJDR)/; make -f Vdblstage.mk
 
-.PHONY: fftstage_o2048
-dblstage: $(OBJDR)/Vfftstage_o2048__ALL.a
+.PHONY: fftstage
+dblstage: $(OBJDR)/Vfftstage__ALL.a
 
-$(CORED)/fftstage_o2048.v: fft
-$(OBJDR)/Vfftstage_o2048.cpp $(OBJDR)/Vfftstage_o2048.h: $(CORED)/fftstage_o2048.v
-	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftstage_o2048.v
-$(OBJDR)/Vfftstage_o2048__ALL.a: $(OBJDR)/Vfftstage_o2048.h
-$(OBJDR)/Vfftstage_o2048__ALL.a: $(OBJDR)/Vfftstage_o2048.cpp
-	cd $(OBJDR)/; make -f Vfftstage_o2048.mk
+$(CORED)/fftstage.v: fft
+$(OBJDR)/Vfftstage.cpp $(OBJDR)/Vfftstage.h: $(CORED)/fftstage.v
+	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftstage.v
+$(OBJDR)/Vfftstage__ALL.a: $(OBJDR)/Vfftstage.h
+$(OBJDR)/Vfftstage__ALL.a: $(OBJDR)/Vfftstage.cpp
+	cd $(OBJDR)/; make -f Vfftstage.mk
 
 .PHONY: clean
 clean:
