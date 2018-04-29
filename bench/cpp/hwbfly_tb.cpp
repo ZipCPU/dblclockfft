@@ -1,23 +1,23 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	butterfly_tb.cpp
+// Filename: 	hwbfly_tb.cpp
 //
 // Project:	A Doubletime Pipelined FFT
 //
-// Purpose:	A test-bench for the butterfly.v subfile of the double
+// Purpose:	A test-bench for the hardware butterfly subfile of the double
 //		clocked FFT.  This file may be run autonomously.  If so,
-//		the last line output will either read "SUCCESS" on success,
-//		or some other failure message otherwise.
+//	the last line output will either read "SUCCESS" on success, or some
+//	other failure message otherwise.
 //
-//		This file depends upon verilator to both compile, run, and
-//		therefore test butterfly.v
+//	This file depends upon verilator to both compile, run, and therefore
+//	test hwbfly.v
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2018 Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -44,7 +44,9 @@
 
 #include "Vhwbfly.h"
 #include "verilated.h"
+#include "verilated_vcd_c.h"
 #include "twoc.h"
+#include "fftsize.h"
 
 #ifdef	NEW_VERILATOR
 #define	VVAR(A)	hwbfly__DOT_ ## A
@@ -52,59 +54,106 @@
 #define	VVAR(A)	v__DOT_ ## A
 #endif
 
-
 class	BFLY_TB {
 public:
 	Vhwbfly		*m_bfly;
+	VerilatedVcdC	*m_trace;
 	unsigned long	m_left[64], m_right[64];
 	bool		m_aux[64];
 	int		m_addr, m_lastaux, m_offset;
 	bool		m_syncd;
+	uint64_t	m_tickcount;
 
 	BFLY_TB(void) {
+		Verilated::traceEverOn(true);
 		m_bfly = new Vhwbfly;
 		m_addr = 0;
 		m_syncd = 0;
+		m_tickcount = 0;
+		m_bfly->i_reset = 1;
+		m_bfly->i_clk = 0;
+		m_bfly->eval();
+		m_bfly->i_reset = 0;
+	}
+
+	void	opentrace(const char *vcdname) {
+		if (!m_trace) {
+			m_trace = new VerilatedVcdC;
+			m_bfly->trace(m_trace, 99);
+			m_trace->open(vcdname);
+		}
+	}
+
+	void	closetrace(void) {
+		if (m_trace) {
+			m_trace->close();
+			delete	m_trace;
+			m_trace = NULL;
+		}
 	}
 
 	void	tick(void) {
+		m_tickcount++;
+
 		m_lastaux = m_bfly->o_aux;
-		m_bfly->i_clk = 0;
 		m_bfly->eval();
+		if (m_trace) m_trace->dump((uint64_t)(10ul*m_tickcount-2));
 		m_bfly->i_clk = 1;
 		m_bfly->eval();
+		if (m_trace) m_trace->dump((uint64_t)(10ul*m_tickcount));
+		m_bfly->i_clk = 0;
+		m_bfly->eval();
+		if (m_trace) {
+			m_trace->dump((uint64_t)(10ul*m_tickcount+5));
+			m_trace->flush();
+		}
 
 		if ((!m_syncd)&&(m_bfly->o_aux))
 			m_offset = m_addr;
 		m_syncd = (m_syncd) || (m_bfly->o_aux);
 	}
 
+	void	cetick(void) {
+		int	ce = m_bfly->i_ce, nkce;
+
+		nkce = FFT_CKPCE + (rand()&1);
+		tick();
+
+		if ((ce)&&(nkce>0)) {
+			m_bfly->i_ce = 0;
+			for(int kce=0; kce<nkce-1; kce++)
+				tick();
+		}
+
+		m_bfly->i_ce = ce;
+	}
+
 	void	reset(void) {
 		m_bfly->i_ce    = 0;
-		m_bfly->i_rst   = 1;
+		m_bfly->i_reset = 1;
 		m_bfly->i_coef  = 0l;
 		m_bfly->i_left  = 0;
 		m_bfly->i_right = 0;
 		tick();
-		m_bfly->i_rst = 0;
+		m_bfly->i_reset = 0;
 		m_bfly->i_ce  = 1;
 		//
 		// Let's run a RESET test here, forcing the whole butterfly
 		// to be filled with aux=1.  If the reset works right,
 		// we'll never get an aux=1 output.
 		//
-		m_bfly->i_rst = 1;
+		m_bfly->i_reset = 1;
 		m_bfly->i_ce  = 1;
 		m_bfly->i_aux = 1;
 		for(int i=0; i<200; i++)
-			tick();
+			cetick();
 
 		// Now here's the RESET line, so let's see what the test does
-		m_bfly->i_rst = 1;
+		m_bfly->i_reset = 1;
 		m_bfly->i_ce  = 1;
 		m_bfly->i_aux = 1;
-		tick();
-		m_bfly->i_rst = 0;
+		cetick();
+		m_bfly->i_reset = 0;
 		m_syncd = 0;
 	}
 
@@ -117,7 +166,7 @@ public:
 		m_bfly->i_aux   = aux & 1;
 
 		m_bfly->i_ce = 1;
-		tick();
+		cetick();
 
 		if ((m_bfly->o_aux)&&(!m_lastaux))
 			printf("\n");
@@ -130,6 +179,20 @@ public:
 			m_bfly->o_left,
 			m_bfly->o_right,
 			m_bfly->o_aux);
+#if (FFT_CKPCE == 1)
+		printf(", p1 = 0x%08lx p2 = 0x%08lx, p3 = 0x%08lx",
+			m_bfly->v__DOT__CKPCE_ONE__DOT__rp_one,
+			m_bfly->v__DOT__CKPCE_ONE__DOT__rp_two,
+			m_bfly->v__DOT__CKPCE_ONE__DOT__rp_three);
+#elif (FFT_CKPCE == 2)
+		printf(", p1 = 0x%08lx p2 = 0x%08lx, p3 = 0x%08lx",
+			m_bfly->v__DOT__genblk1__DOT__CKPCE_TWO__DOT__rp2_one,
+			m_bfly->v__DOT__genblk1__DOT__CKPCE_TWO__DOT__rp_two,
+			m_bfly->v__DOT__genblk1__DOT__CKPCE_TWO__DOT__rp_three);
+#else
+		printf("CKPCE = %d\n", CKPCE);
+#endif
+
 		printf("\n");
 
 		if ((m_syncd)&&(m_left[(m_addr-m_offset)&(64-1)] != m_bfly->o_left)) {
@@ -239,6 +302,8 @@ int	main(int argc, char **argv, char **envp) {
 	int		rnd = 0;
 
 	const int	TESTSZ = 256;
+
+	bfly->opentrace("hwbfly.vcd");
 
 	bfly->reset();
 

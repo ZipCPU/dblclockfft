@@ -2,7 +2,7 @@
 //
 // Filename: 	fftgen.cpp
 //
-// Project:	A Doubletime Pipelined FFT
+// Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	This is the core generator for the project.  Every part
 //		and piece of this project begins and ends in this program.
@@ -165,7 +165,7 @@ SLASHLINE
 "//\n"
 "//\n"
 SLASHLINE;
-const char	prjname[] = "A Generic Pipelined FFT Implementation";
+const char	prjname[] = "A General Purpose Pipelined FFT Implementation";
 const char	creator[] =	"// Creator:	Dan Gisselquist, Ph.D.\n"
 				"//		Gisselquist Technology, LLC\n";
 
@@ -1295,26 +1295,41 @@ SLASHLINE
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	longbimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
-	"\tparameter	AW=%d,	// The width of i_a, min width is 5\n"
-			"\t\t\tBW=", TST_LONGBIMPY_AW);
+	"\tparameter	IAW=%d,	// The width of i_a, min width is 5\n"
+			"\t\t\tIBW=", TST_LONGBIMPY_AW);
 #ifdef	TST_LONGBIMPY_BW
 	fprintf(fp, "%d", TST_LONGBIMPY_BW);
 #else
-	fprintf(fp, "AW");
+	fprintf(fp, "IAW");
 #endif
 
 	fprintf(fp, ",	// The width of i_b, can be anything\n"
 			"\t\t\t// The following three parameters should not be changed\n"
 			"\t\t\t// by any implementation, but are based upon hardware\n"
 			"\t\t\t// and the above values:\n"
-			"\t\t\tOW=AW+BW,	// The output width\n"
+			"\t\t\tOW=IAW+IBW;	// The output width\n");
+	fprintf(fp,
+	"\tlocalparam	AW = (IAW<IBW) ? AW : BW,\n"
 			"\t\t\tIW=(AW+1)&(-2),	// Internal width of A\n"
 			"\t\t\tLUTB=2,	// How many bits we can multiply by at once\n"
 			"\t\t\tTLEN=(AW+(LUTB-1))/LUTB; // Nmbr of rows in our tableau\n"
 	"\tinput\t\t\t\ti_clk, i_ce;\n"
-	"\tinput\t\t[(AW-1):0]\ti_a;\n"
-	"\tinput\t\t[(BW-1):0]\ti_b;\n"
+	"\tinput\t\t[(IAW-1):0]\ti_a_unsorted;\n"
+	"\tinput\t\t[(IBW-1):0]\ti_b_unsorted;\n"
 	"\toutput\treg\t[(AW+BW-1):0]\to_r;\n"
+"\n"
+	"\t//\n"
+	"\t// Swap parameter order, so that AW <= BW -- for performance\n"
+	"\t// reasons\n"
+	"\twire	[AW-1:0]	i_a;\n"
+	"\twire	[BW-1:0]	i_b;\n"
+	"\tgenerate if (IAW <= IBW)\n"
+	"\t\tassign i_a = i_a_unsorted;\n"
+	"\t\tassign i_b = i_b_unsorted;\n"
+	"\tend else begin\n"
+	"\t\tassign i_a = i_b_unsorted;\n"
+	"\t\tassign i_b = i_a_unsorted;\n"
+	"\tend endgenerate\n"
 "\n"
 	"\treg\t[(IW-1):0]\tu_a;\n"
 	"\treg\t[(BW-1):0]\tu_b;\n"
@@ -1444,7 +1459,6 @@ SLASHLINE
 "//	straightforward bitreverse, rather than one written to handle two\n"
 "//	words at once.\n"
 "//\n"
-"//\n"
 "//\n%s"
 "//\n", prjname, creator);
 	fprintf(fp, "%s", cpyleft);
@@ -1499,7 +1513,7 @@ SLASHLINE
 "		end\n"
 "\n"
 "	always @(posedge i_clk)\n"
-"		if (i_ce) // If (i_rst) we just output junk ... not a problem\n"
+"		if (i_ce) // If (i_reset) we just output junk ... not a problem\n"
 "			o_out <= brmem[rdaddr]; // w/o a sync pulse\n"
 "\n"
 "	initial	o_sync = 1'b0;\n");
@@ -1511,7 +1525,7 @@ SLASHLINE
 	fprintf(fp,
 "			o_sync <= 1'b0;\n"
 "		else if ((i_ce)&&(!in_reset))\n"
-"			o_sync <= &wraddr[(LGSIZE-1):0];\n"
+"			o_sync <= (wraddr[(LGSIZE-1):0] == 0);\n"
 "\n"
 "endmodule\n");
 
@@ -1689,6 +1703,7 @@ SLASHLINE
 }
 
 void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding,
+			int	ckpce = 1,
 			const bool async_reset = false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -1705,6 +1720,16 @@ void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding,
 		rnd_string = "roundhalfup";
 	else
 		rnd_string = "convround";
+
+	//if (ckpce >= 3)
+		//ckpce = 3;
+	if (ckpce <= 1)
+		ckpce = 1;
+	if (ckpce > 1) {
+		fprintf(stderr, "WARNING: Butterfly code does not yet support CKPCE=%d\n", ckpce);
+		fprintf(stderr, "WARNING: Using CKPCE=1 instead\n");
+		ckpce = 1;
+	}
 
 	std::string	resetw("i_reset");
 	if (async_reset)
@@ -1811,6 +1836,7 @@ SLASHLINE
 	"\t// this value is fractional, then round up to the nearest\n"
 	"\t// integer: LGDELAY=ceil(log(MPYDELAY)/log(2));\n"
 	"\tparameter\tLGDELAY=%d;\n"
+	"\tparameter\tCKPCE=%d;\n"
 	"\tinput\t\ti_clk, %s, i_ce;\n"
 	"\tinput\t\t[(2*CWIDTH-1):0] i_coef;\n"
 	"\tinput\t\t[(2*IWIDTH-1):0] i_left, i_right;\n"
@@ -1818,7 +1844,7 @@ SLASHLINE
 	"\toutput\twire	[(2*OWIDTH-1):0] o_left, o_right;\n"
 	"\toutput\treg\to_aux;\n"
 	"\n", lgdelay(16,xtracbits), bflydelay(16, xtracbits),
-		lgdelay(16,xtracbits), resetw.c_str());
+		lgdelay(16,xtracbits), ckpce, resetw.c_str());
 	fprintf(fp,
 	"\treg\t[(2*IWIDTH-1):0]\tr_left, r_right;\n"
 	"\treg\t[(2*CWIDTH-1):0]\tr_coef, r_coef_2;\n"
@@ -1832,7 +1858,7 @@ SLASHLINE
 "\n"
 	"\treg	[(LGDELAY-1):0]	fifo_addr;\n"
 	"\twire	[(LGDELAY-1):0]	fifo_read_addr;\n"
-	"\tassign\tfifo_read_addr = fifo_addr - MPYDELAY;\n"
+	"\tassign\tfifo_read_addr = fifo_addr - MPYDELAY[(LGDELAY-1):0];\n"
 	"\treg	[(2*IWIDTH+1):0]	fifo_left [ 0:((1<<LGDELAY)-1)];\n"
 "\n");
 	fprintf(fp,
@@ -1914,8 +1940,9 @@ SLASHLINE
 	"\t// This should really be based upon an IF, such as in\n"
 	"\t// if (IWIDTH < CWIDTH) then ...\n"
 	"\t// However, this is the only (other) way I know to do it.\n"
-	"\tgenerate if (CWIDTH < IWIDTH+1)\n"
+	"\tgenerate if (CKPCE <= 1)\n"
 	"\tbegin\n"
+"\n"
 		"\t\twire\t[(CWIDTH):0]\tp3c_in;\n"
 		"\t\twire\t[(IWIDTH+1):0]\tp3d_in;\n"
 		"\t\tassign\tp3c_in = ir_coef_i + ir_coef_r;\n"
@@ -1932,20 +1959,10 @@ SLASHLINE
 				"\t\t\t\t{r_dif_i[IWIDTH],r_dif_i}, p_two);\n"
 		"\t\t%s #(CWIDTH+1,IWIDTH+2) p3(i_clk, i_ce,\n"
 			"\t\t\t\tp3c_in, p3d_in, p_three);\n"
-	"\tend else begin\n"
-		"\t\twire\t[(CWIDTH):0]\tp3c_in;\n"
-		"\t\twire\t[(IWIDTH+1):0]\tp3d_in;\n"
-		"\t\tassign\tp3c_in = ir_coef_i + ir_coef_r;\n"
-		"\t\tassign\tp3d_in = r_dif_r + r_dif_i;\n"
-		"\n"
-		"\t\t%s #(IWIDTH+2,CWIDTH+1) p1a(i_clk, i_ce,\n"
-				"\t\t\t\t{r_dif_r[IWIDTH],r_dif_r},\n"
-				"\t\t\t\t{ir_coef_r[CWIDTH-1],ir_coef_r}, p_one);\n"
-		"\t\t%s #(IWIDTH+2,CWIDTH+1) p2a(i_clk, i_ce,\n"
-				"\t\t\t\t{r_dif_i[IWIDTH], r_dif_i},\n"
-				"\t\t\t\t{ir_coef_i[CWIDTH-1],ir_coef_i}, p_two);\n"
-		"\t\t%s #(IWIDTH+2,CWIDTH+1) p3a(i_clk, i_ce,\n"
-				"\t\t\t\tp3d_in, p3c_in, p_three);\n"
+"\n"
+	"\tend else if (CKPCE == 2)\n"
+	"\tbegin\n"
+	"\tend else begin // if (CKPCE >= 3)\n"
 	"\tend\n"
 	"\tendgenerate\n"
 "\n",
@@ -2068,6 +2085,7 @@ SLASHLINE
 }
 
 void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding,
+		int ckpce = 3,
 		const bool async_reset= false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -2117,13 +2135,14 @@ SLASHLINE
 	"\tparameter IWIDTH=16,CWIDTH=IWIDTH+%d,OWIDTH=IWIDTH+1;\n"
 	"\t// Parameters specific to the core that should not be changed.\n"
 	"\tparameter\tSHIFT=0;\n"
+	"\tparameter\t[1:0]\tCKPCE=%d;\n"
 	"\tinput\t\ti_clk, %s, i_ce;\n"
 	"\tinput\t\t[(2*CWIDTH-1):0]\ti_coef;\n"
 	"\tinput\t\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
 	"\tinput\t\ti_aux;\n"
 	"\toutput\twire\t[(2*OWIDTH-1):0]\to_left, o_right;\n"
 	"\toutput\treg\to_aux;\n"
-"\n", resetw.c_str(), xtracbits, resetw.c_str());
+"\n", resetw.c_str(), xtracbits, ckpce, resetw.c_str());
 	fprintf(fp,
 	"\treg\t[(2*IWIDTH-1):0]	r_left, r_right;\n"
 	"\treg\t			r_aux, r_aux_2;\n"
@@ -2179,13 +2198,8 @@ SLASHLINE
 "\t// See comments in the butterfly.v source file for a discussion of\n"
 "\t// these operations and the appropriate bit widths.\n\n");
 	fprintf(fp,
-	"\treg\tsigned	[((IWIDTH+1)+(CWIDTH)-1):0]	p_one, p_two;\n"
-	"\treg\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	p_three;\n"
-"\n"
-	"\treg\tsigned	[(CWIDTH-1):0]	p1c_in, p2c_in; // Coefficient multiply inputs\n"
-	"\treg\tsigned	[(IWIDTH):0]	p1d_in, p2d_in; // Data multiply inputs\n"
-	"\treg\tsigned	[(CWIDTH):0]	p3c_in; // Product 3, coefficient input\n"
-	"\treg\tsigned	[(IWIDTH+1):0]	p3d_in; // Product 3, data input\n"
+	"\twire\tsigned	[((IWIDTH+1)+(CWIDTH)-1):0]	p_one, p_two;\n"
+	"\twire\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	p_three;\n"
 "\n"
 	"\tinitial leftv    = 0;\n"
 	"\tinitial leftvv   = 0;\n");
@@ -2206,26 +2220,253 @@ SLASHLINE
 			"\t\t\t//   As desired, each of these lines infers a DSP48\n"
 			"\t\t\tleftvv <= leftv;\n"
 		"\t\tend\n"
+"\n");
+
+	// Nominally, we should handle code for 1, 2, or 3 clocks per CE, with
+	// one clock per CE meaning CE could be constant.  The code below
+	// instead handles 1 or 3 clocks per CE, leaving the two clocks per
+	// CE optimization(s) unfulfilled.
+
+//	fprintf(fp,
+//"\tend else if (CKPCI == 2'b01)\n\tbegin\n");
+
+	///////////////////////////////////////////
+	///
+	///	One clock per CE, so CE, CE, CE, CE, CE is possible
+	///
+	fprintf(fp,
+"\tgenerate if (CKPCE <= 2'b01)\n\tbegin : CKPCE_ONE\n");
+
+	fprintf(fp,
+	"\t\t// Coefficient multiply inputs\n"
+	"\t\treg\tsigned	[(CWIDTH-1):0]	p1c_in, p2c_in;\n"
+	"\t\t// Data multiply inputs\n"
+	"\t\treg\tsigned	[(IWIDTH):0]	p1d_in, p2d_in;\n"
+	"\t\t// Product 3, coefficient input\n"
+	"\t\treg\tsigned	[(CWIDTH):0]	p3c_in;\n"
+	"\t\t// Product 3, data input\n"
+	"\t\treg\tsigned	[(IWIDTH+1):0]	p3d_in;\n"
+"\n");
+	fprintf(fp,
+	"\t\treg\tsigned	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one, rp_two;\n"
+	"\t\treg\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
+"\n");
+
+	fprintf(fp,
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif (i_ce)\n"
+	"\t\tbegin\n"
+		"\t\t\t// Second clock, pipeline = 1\n"
+		"\t\t\tp1c_in <= ir_coef_r;\n"
+		"\t\t\tp2c_in <= ir_coef_i;\n"
+		"\t\t\tp1d_in <= r_dif_r;\n"
+		"\t\t\tp2d_in <= r_dif_i;\n"
+		"\t\t\tp3c_in <= ir_coef_i + ir_coef_r;\n"
+		"\t\t\tp3d_in <= r_dif_r + r_dif_i;\n"
 "\n"
-	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
+"\n"
+		"\t\t\t// Third clock, pipeline = 3\n"
+		"\t\t\t//   As desired, each of these lines infers a DSP48\n"
+		"\t\t\trp_one   <= p1c_in * p1d_in;\n"
+		"\t\t\trp_two   <= p2c_in * p2d_in;\n"
+		"\t\t\trp_three <= p3c_in * p3d_in;\n"
+	"\t\tend\n"
+"\n"
+	"\t\tassign\tp_one   = rp_one;\n"
+	"\t\tassign\tp_two   = rp_two;\n"
+	"\t\tassign\tp_three = rp_three;\n"
+"\n");
+
+	///////////////////////////////////////////
+	///
+	///	Two clocks per CE, so CE, no-ce, CE, no-ce, etc
+	///
+	fprintf(fp,
+	"\tend else if (CKPCE <= 2'b10)\n"
+	"\tbegin : CKPCE_TWO\n"
+		"\t\t// Coefficient multiply inputs\n"
+		"\t\treg		[2*(CWIDTH)-1:0]	mpy_pipe_c;\n"
+		"\t\t// Data multiply inputs\n"
+		"\t\treg		[2*(IWIDTH+1)-1:0]	mpy_pipe_d;\n"
+		"\t\twire	signed	[(CWIDTH-1):0]	mpy_pipe_vc;\n"
+		"\t\twire	signed	[(IWIDTH):0]	mpy_pipe_vd;\n"
+		"\t\t//\n"
+		"\t\treg	signed	[(CWIDTH)-1:0]		mpy_cof_sum;\n"
+		"\t\treg	signed	[(IWIDTH+1)-1:0]	mpy_dif_sum;\n"
+"\n"
+		"\t\tassign	mpy_pipe_vc =  mpy_pipe_c[2*(CWIDTH)-1:CWIDTH];\n"
+		"\t\tassign	mpy_pipe_vd =  mpy_pipe_d[2*(IWIDTH+1)-1:IWIDTH+1];\n"
+"\n"
+		"\t\treg			mpy_pipe_v;\n"
+		"\t\treg			ce_phase;\n"
+"\n"
+		"\t\treg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
+		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
+"\n"
+"\n"
+		"\t\tinitial	ce_phase = 1'b1;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_reset)\n"
+			"\t\t\tce_phase <= 1'b1;\n"
+		"\t\telse if (i_ce)\n"
+			"\t\t\tce_phase <= 1'b0;\n"
+		"\t\telse\n"
+			"\t\t\tce_phase <= 1'b1;\n"
+"\n"
+		"\t\talways @(*)\n"
+			"\t\t\tmpy_pipe_v = (i_ce)||(!ce_phase);\n"
+"\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (!ce_phase)\n"
 		"\t\tbegin\n"
-			"\t\t\t// Second clock, pipeline = 1\n"
-			"\t\t\tp1c_in <= ir_coef_r;\n"
-			"\t\t\tp2c_in <= ir_coef_i;\n"
-			"\t\t\tp1d_in <= r_dif_r;\n"
-			"\t\t\tp2d_in <= r_dif_i;\n"
-			"\t\t\tp3c_in <= ir_coef_i + ir_coef_r;\n"
-			"\t\t\tp3d_in <= r_dif_r + r_dif_i;\n"
+			"\t\t\t// Pre-clock\n"
+			"\t\t\tmpy_pipe_c[2*CWIDTH-1:0] <=\n"
+				"\t\t\t\t\t{ ir_coef_r, ir_coef_i };\n"
+			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <=\n"
+				"\t\t\t\t\t{ r_dif_r, r_dif_i };\n"
 "\n"
+			"\t\t\tmpy_cof_sum  <= ir_coef_i + ir_coef_r;\n"
+			"\t\t\tmpy_dif_sum <= r_dif_r + r_dif_i;\n"
 "\n"
-			"\t\t\t// Third clock, pipeline = 3\n"
-			"\t\t\t//   As desired, each of these lines infers a DSP48\n"
-			"\t\t\tp_one   <= p1c_in * p1d_in;\n"
-			"\t\t\tp_two   <= p2c_in * p2d_in;\n"
-			"\t\t\tp_three <= p3c_in * p3d_in;\n"
+		"\t\tend else if (i_ce)\n"
+		"\t\tbegin\n"
+			"\t\t\t// First clock\n"
+			"\t\t\tmpy_pipe_c[2*(CWIDTH)-1:0] <= {\n"
+				"\t\t\t\tmpy_pipe_c[(CWIDTH)-1:0], {(CWIDTH){1'b0}} };\n"
+			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <= {\n"
+				"\t\t\t\tmpy_pipe_d[(IWIDTH+1)-1:0], {(IWIDTH+1){1'b0}} };\n"
 		"\t\tend\n"
 "\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce) // First clock\n"
+			"\t\t\tlongmpy <= mpy_cof_sum * mpy_dif_sum;\n"
+"\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (mpy_pipe_v)\n"
+			"\t\t\tmpy_pipe_out <= mpy_pipe_vc * mpy_pipe_vd;\n"
+"\n"
+		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one;\n"
+		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one,\n"
+				"\t\t\t\t\t\t\t\trp_two;\n"
+		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
+"\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (!ce_phase) // 1.5 clock\n"
+			"\t\t\trp_one <= mpy_pipe_out;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce) // two clocks\n"
+			"\t\t\trp_two <= mpy_pipe_out;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce) // Second clock\n"
+			"\t\t\trp_three<= longmpy;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\trp2_one<= rp_one;\n"
+"\n"
+		"\t\tassign	p_one	= rp2_one;\n"
+		"\t\tassign	p_two	= rp_two;\n"
+		"\t\tassign	p_three	= rp_three;\n"
+"\n");
+
+	/////////////////////////
+	///
+	///	Three clock per CE, so CE, no-ce, no-ce*, CE
+	///
+	fprintf(fp,
+"\tend else if (CKPCE <= 2'b11)\n\tbegin : CKPCE_THREE\n");
+
+	fprintf(fp,
+	"\t\t// Coefficient multiply inputs\n"
+	"\t\treg\t\t[3*(CWIDTH+1)-1:0]\tmpy_pipe_c;\n"
+	"\t\t// Data multiply inputs\n"
+	"\t\treg\t\t[3*(IWIDTH+2)-1:0]\tmpy_pipe_d;\n"
+	"\t\twire\tsigned	[(CWIDTH):0]	mpy_pipe_vc;\n"
+	"\t\twire\tsigned	[(IWIDTH+1):0]	mpy_pipe_vd;\n"
+	"\n"
+	"\t\tassign\tmpy_pipe_vc =  mpy_pipe_c[3*(CWIDTH+1)-1:2*(CWIDTH+1)];\n"
+	"\t\tassign\tmpy_pipe_vd =  mpy_pipe_d[3*(IWIDTH+2)-1:2*(IWIDTH+2)];\n"
+	"\n"
+	"\t\treg\t\t\tmpy_pipe_v;\n"
+	"\t\treg\t\t[2:0]\tce_phase;\n"
+	"\n"
+	"\t\treg\tsigned	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
+"\n");
+	fprintf(fp,
+	"\t\tinitial\tce_phase = 3'b011;\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif (i_reset)\n"
+		"\t\t\tce_phase <= 3'b011;\n"
+	"\t\telse if (i_ce)\n"
+		"\t\t\tce_phase <= 3'b000;\n"
+	"\t\telse if (ce_phase != 3'b011)\n"
+		"\t\t\tce_phase <= ce_phase + 1'b1;\n"
+"\n"
+	"\t\talways @(*)\n"
+		"\t\t\tmpy_pipe_v = (i_ce)||(ce_phase < 3'b010);\n"
+"\n");
+
+	fprintf(fp,
+	"\t\talways @(posedge i_clk)\n"
+		"\t\t\tif (ce_phase == 3\'b000)\n"
+		"\t\t\tbegin\n"
+			"\t\t\t\t// Second clock\n"
+			"\t\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:(CWIDTH+1)] <= {\n"
+			"\t\t\t\t\tir_coef_r[CWIDTH-1], ir_coef_r,\n"
+			"\t\t\t\t\tir_coef_i[CWIDTH-1], ir_coef_i };\n"
+			"\t\t\t\tmpy_pipe_c[CWIDTH:0] <= ir_coef_i + ir_coef_r;\n"
+			"\t\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:(IWIDTH+2)] <= {\n"
+			"\t\t\t\t\tr_dif_r[IWIDTH], r_dif_r,\n"
+			"\t\t\t\t\tr_dif_i[IWIDTH], r_dif_i };\n"
+			"\t\t\t\tmpy_pipe_d[(IWIDTH+2)-1:0] <= r_dif_r + r_dif_i;\n"
+"\n"
+		"\t\t\tend else if (mpy_pipe_v)\n"
+		"\t\t\tbegin\n"
+			"\t\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:0] <= {\n"
+			"\t\t\t\t\tmpy_pipe_c[2*(CWIDTH+1)-1:0], {(CWIDTH+1){1\'b0}} };\n"
+			"\t\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:0] <= {\n"
+			"\t\t\t\t\tmpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1\'b0}} };\n"
+		"\t\t\tend\n"
+"\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\t\tif (mpy_pipe_v)\n"
+			"\t\t\t\tmpy_pipe_out <= mpy_pipe_vc * mpy_pipe_vd;\n"
+"\n");
+
+	fprintf(fp,
+	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp_one, rp_two;\n"
+	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp2_one, rp2_two;\n"
+	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\trp_three, rp2_three;\n"
+
+"\n");
+
+	fprintf(fp,
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif(i_ce)\n"
+		"\t\t\trp_one <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif(ce_phase == 3'b000)\n"
+		"\t\t\trp_two <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif(ce_phase == 3'b001)\n"
+		"\t\t\trp_three <= mpy_pipe_out;\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif (i_ce)\n"
+	"\t\tbegin\n"
+		"\t\t\trp2_one<= rp_one;\n"
+		"\t\t\trp2_two<= rp_two;\n"
+		"\t\t\trp2_three<= rp_three;\n"
+	"\t\tend\n");
+	fprintf(fp,
+
+	"\t\tassign\tp_one\t= rp2_one;\n"
+	"\t\tassign\tp_two\t= rp2_two;\n"
+	"\t\tassign\tp_three\t= rp2_three;\n"
+"\n");
+
+	fprintf(fp,
+"\tend endgenerate\n");
+
+	fprintf(fp,
 	"\twire\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	w_one, w_two;\n"
 	"\tassign\tw_one = { {(2){p_one[((IWIDTH+1)+(CWIDTH)-1)]}}, p_one };\n"
 	"\tassign\tw_two = { {(2){p_two[((IWIDTH+1)+(CWIDTH)-1)]}}, p_two };\n"
@@ -2245,26 +2486,7 @@ SLASHLINE
 	"\tassign\tleft_si = { {2{left_saved[(IWIDTH+1)-1]}}, left_saved[((IWIDTH+1)-1):0], {(CWIDTH-2){1\'b0}} };\n"
 	"\tassign\taux_s = left_saved[2*IWIDTH+2];\n"
 "\n"
-"\n"
-	"\t(* use_dsp48=\"no\" *)\n"
-	"\treg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n");
-	fprintf(fp,
-	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;\n\n");
-
-	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_r(i_clk, i_ce,\n"
-	"\t\t\t\tleft_sr, rnd_left_r);\n\n",
-		rnd_string);
-	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_i(i_clk, i_ce,\n"
-	"\t\t\t\tleft_si, rnd_left_i);\n\n",
-		rnd_string);
-	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_r(i_clk, i_ce,\n"
-	"\t\t\t\tmpy_r, rnd_right_r);\n\n", rnd_string);
-	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_i(i_clk, i_ce,\n"
-	"\t\t\t\tmpy_i, rnd_right_i);\n\n", rnd_string);
+"\n");
 
 	fprintf(fp,
 	"\tinitial left_saved = 0;\n"
@@ -2301,6 +2523,28 @@ SLASHLINE
 		"\t\t\tmpy_i <= p_three - w_one - w_two;\n"
 	"\t\tend\n"
 	"\n");
+
+	fprintf(fp,
+	"\t// Round the results\n"
+	"\t(* use_dsp48=\"no\" *)\n"
+	"\treg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n");
+	fprintf(fp,
+	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;\n\n");
+	fprintf(fp,
+	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_r(i_clk, i_ce,\n"
+	"\t\t\t\tleft_sr, rnd_left_r);\n\n",
+		rnd_string);
+	fprintf(fp,
+	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_i(i_clk, i_ce,\n"
+	"\t\t\t\tleft_si, rnd_left_i);\n\n",
+		rnd_string);
+	fprintf(fp,
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_r(i_clk, i_ce,\n"
+	"\t\t\t\tmpy_r, rnd_right_r);\n\n", rnd_string);
+	fprintf(fp,
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_i(i_clk, i_ce,\n"
+	"\t\t\t\tmpy_i, rnd_right_i);\n\n", rnd_string);
+
 
 	fprintf(fp,
 	"\t// As a final step, we pack our outputs into two packed two's\n"
@@ -2347,10 +2591,18 @@ std::string	gen_coeff_fname(const char *coredir,
 
 	memfile = new char[strlen(coredir)+3+10+strlen(".hex")+64];
 	if (nwide == 2) {
-		sprintf(memfile, "%s/%scmem_%c%d.hex",
-			coredir, (inv)?"i":"",
-			(offset==1)?'o':'e', stage*nwide);
-	} else // if (nwide == 1)
+		if (coredir[0] == '\0') {
+			sprintf(memfile, "%scmem_%c%d.hex",
+				(inv)?"i":"", (offset==1)?'o':'e', stage*nwide);
+		} else {
+			sprintf(memfile, "%s/%scmem_%c%d.hex",
+				coredir, (inv)?"i":"",
+				(offset==1)?'o':'e', stage*nwide);
+		}
+	} else if (coredir[0] == '\0') // if (nwide == 1)
+		sprintf(memfile, "%scmem_%d.hex",
+			(inv)?"i":"", stage);
+	else
 		sprintf(memfile, "%s/%scmem_%d.hex",
 			coredir, (inv)?"i":"", stage);
 
@@ -2437,6 +2689,19 @@ SLASHLINE
 "\t// Smaller spans (i.e. the span of 2) must use the dblstage module.\n"
 "\tparameter\tLGWIDTH=11, LGSPAN=9, LGBDLY=5, BFLYSHIFT=0;\n"
 "\tparameter\t[0:0]	OPT_HWMPY = 1\'b1;\n");
+	fprintf(fstage,
+"\t// Clocks per CE.  If your incoming data rate is less than 50%% of your\n"
+"\t// clock speed, you can set CKPCE to 2\'b10, make sure there's at least\n"
+"\t// one clock between cycles when i_ce is high, and then use two\n"
+"\t// multiplies instead of three.  Setting CKPCE to 2\'b11, and insisting\n"
+"\t// on at least two clocks with i_ce low between cycles with i_ce high,\n"
+"\t// then the hardware optimized butterfly code will used one multiply\n"
+"\t// instead of two.\n"
+"\tparameter\t[1:0]	CKPCE = 2'b1;\n");
+
+	fprintf(fstage,
+"\t// The COEFFILE parameter contains the name of the file containing the\n"
+"\t// FFT twiddle factors\n");
 	if (nwide == 2) {
 		fprintf(fstage, "\tparameter\tCOEFFILE=\"%scmem_%c%d.hex\";\n",
 			(inv)?"i":"", (offset)?'o':'e', stage*2);
@@ -2542,12 +2807,13 @@ SLASHLINE
 "\tgenerate if (OPT_HWMPY)\n"
 "\tbegin : HWBFLY\n"
 "\t\thwbfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
-			"\t\t\t\t.SHIFT(BFLYSHIFT))\n"
+			"\t\t\t\t.CKPCE(CKPCE), .SHIFT(BFLYSHIFT))\n"
 		"\t\t\tbfly(i_clk, %s, i_ce, ib_c,\n"
 			"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
 "\tend else begin : FWBFLY\n"
 "\t\tbutterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
-		"\t\t\t\t.MPYDELAY(%d\'d%d),.LGDELAY(LGBDLY),.SHIFT(BFLYSHIFT))\n"
+		"\t\t\t\t.MPYDELAY(%d\'d%d),.LGDELAY(LGBDLY),\n"
+		"\t\t\t\t.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))\n"
 	"\t\t\tbfly(i_clk, %s, i_ce, ib_c,\n"
 		"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
 "\tend endgenerate\n\n",
@@ -2605,8 +2871,8 @@ void	usage(void) {
 	fprintf(stderr,
 "USAGE:\tfftgen [-f <size>] [-d dir] [-c cbits] [-n nbits] [-m mxbits] [-s]\n"
 // "\tfftgen -i\n"
-"\t-1\tBuild a normal FFT, running at one clock per complex sample, or (for\n"
-"\t\ta real FFT) at one clock per two real input samples.\n"
+"\t-1\tBuild a normal FFT, running at one clock per complex sample, or\n"
+"\t\t(for a real FFT) at one clock per two real input samples.\n"
 "\t-c <cbits>\tCauses all internal complex coefficients to be\n"
 "\t\tlonger than the corresponding data bits, to help avoid\n"
 "\t\tcoefficient truncation errors.  The default is %d bits longer\n"
@@ -2619,6 +2885,8 @@ void	usage(void) {
 "\t-i\tAn inverse FFT, meaning that the coefficients are\n"
 "\t\tgiven by e^{ j 2 pi k/N n }.  The default is a forward FFT, with\n"
 "\t\tcoefficients given by e^{ -j 2 pi k/N n }.\n"
+"\t-k #\tSets # clocks per sample, used to minimize multiplies.  Also\n"
+"\t\tsets one sample in per i_ce clock (opt -1)\n"
 "\t-m <mxbits>\tSets the maximum bit width that the FFT should ever\n"
 "\t\tproduce.  Internal values greater than this value will be\n"
 "\t\ttruncated to this value.  (The default value grows the input\n"
@@ -2626,11 +2894,9 @@ void	usage(void) {
 "\t-n <nbits>\tSets the bitwidth for values coming into the (i)FFT.\n"
 "\t\tThe default is %d bits input for each component of the two\n"
 "\t\tcomplex values into the FFT.\n"
-"\t-p <nmpy>\tSets the number of stages that will use any hardware\n"
-"\t\tmultiplication facility, instead of shift-add emulation.\n"
-"\t\tThree multiplies per butterfly, or six multiplies per stage will\n"
-"\t\tbe accelerated in this fashion.  The default is not to use any\n"
-"\t\thardware multipliers.\n"
+"\t-p <nmpy>\tSets the number of hardware multiplies (DSPs) to use, versus\n"
+"\t\tshift-add emulation.  The default is not to use any hardware\n"
+"\t\tmultipliers.\n"
 "\t-r\tBuild a real-FFT at four input points per sample, rather than a\n"
 "\t\tcomplex FFT.  (Default is a Complex FFT.)\n"
 "\t-s\tSkip the final bit reversal stage.  This is useful in\n"
@@ -2658,8 +2924,9 @@ void	usage(void) {
 int main(int argc, char **argv) {
 	int	fftsize = -1, lgsize = -1;
 	int	nbitsin = DEF_NBITSIN, xtracbits = DEF_XTRACBITS,
-			nummpy=DEF_NMPY, nonmpy=2;
-	int	nbitsout, maxbitsout = -1, xtrapbits=DEF_XTRAPBITS;
+			nummpy=DEF_NMPY, nmpypstage=6, mpy_stages;
+	int	nbitsout, maxbitsout = -1, xtrapbits=DEF_XTRAPBITS, ckpce = 0;
+	const char *EMPTYSTR = "";
 	bool	bitreverse = true, inverse=false,
 		verbose_flag = false,
 		single_clock = false,
@@ -2676,150 +2943,61 @@ int main(int argc, char **argv) {
 	if (argc <= 1)
 		usage();
 
+	// Copy the original command line before we mess with it
 	cmdline = argv[0];
 	for(int argn=1; argn<argc; argn++) {
 		cmdline += " ";
 		cmdline += argv[argn];
 	}
 
-	for(int argn=1; argn<argc; argn++) {
-		if ('-' == argv[argn][0]) {
-			for(int j=1; (argv[argn][j])&&(j<100); j++) {
-				switch(argv[argn][j]) {
-					/*
-					case '0':
-						inverse = false;
+	{ int c;
+	while((c = getopt(argc, argv, "12Aa:c:d:D:f:hik:m:n:p:rsSx:v")) != -1) {
+		switch(c) {
+		case '1':	single_clock = true;  break;
+		case '2':	single_clock = false; break;
+		case 'A':	async_reset  = true;  break;
+		case 'a':	hdrname = strdup(optarg);	break;
+		case 'c':	xtracbits = atoi(optarg);	break;
+		case 'd':	coredir = std::string(optarg);	break;
+		case 'D':	dbgstage = atoi(optarg);	break;
+		case 'f':	fftsize = atoi(optarg);	
+				{ int sln = strlen(optarg);
+				if (!isdigit(optarg[sln-1])){
+					switch(optarg[sln-1]) {
+					case 'k': case 'K':
+						fftsize <<= 10;
 						break;
-					*/
-					case '1':
-						single_clock = true;
+					case 'm': case 'M':
+						fftsize <<= 20;
 						break;
-					case '2':
-						single_clock = false;
-						break;
-					case 'A':
-						async_reset = true;
-						break;
-					case 'a':
-						if (argn+1 >= argc) {
-							printf("ERR: No header filename given\n\n");
-							usage(); exit(EXIT_FAILURE);
-						}
-						hdrname = argv[++argn];
-						j+= 200;
-						break;
-					case 'c':
-						if (argn+1 >= argc) {
-							printf("ERR: No extra number of coefficient bits given!\n\n");
-							usage(); exit(EXIT_FAILURE);
-						}
-						xtracbits = atoi(argv[++argn]);
-						j+= 200;
-						break;
-					case 'd':
-						if (argn+1 >= argc) {
-							printf("ERR: No directory given into which to place the core!\n\n");
-							usage(); exit(EXIT_FAILURE);
-						}
-						coredir = argv[++argn];
-						j += 200;
-						break;
-					case 'D':
-						dbg = true;
-						if (argn+1 >= argc) {
-							printf("ERR: No debug stage number given!\n\n");
-							usage(); exit(EXIT_FAILURE);
-						}
-						dbgstage = atoi(argv[++argn]);
-						j+= 200;
-						break;
-					case 'f':
-						if (argn+1 >= argc) {
-							printf("ERR: No FFT Size given!\n\n");
-							usage(); exit(-1);
-						}
-						fftsize = atoi(argv[++argn]);
-						{ int sln = strlen(argv[argn]);
-						if (!isdigit(argv[argn][sln-1])){
-							switch(argv[argn][sln-1]) {
-							case 'k': case 'K':
-								fftsize <<= 10;
-								break;
-							case 'm': case 'M':
-								fftsize <<= 20;
-								break;
-							case 'g': case 'G':
-								fftsize <<= 30;
-								break;
-							default:
-								printf("ERR: Unknown FFT size, %s!\n", argv[argn]);
-								exit(EXIT_FAILURE);
-							}
-						}}
-						j += 200;
-						break;
-					case 'h':
-						usage();
-						exit(EXIT_SUCCESS);
-						break;
-					case 'i':
-						inverse = true;
-						break;
-					case 'm':
-						if (argn+1 >= argc) {
-							printf("ERR: No maximum output bit value given!\n\n");
-							exit(EXIT_FAILURE);
-						}
-						maxbitsout = atoi(argv[++argn]);
-						j += 200;
-						break;
-					case 'n':
-						if (argn+1 >= argc) {
-							printf("ERR: No input bit size given!\n\n");
-							exit(EXIT_FAILURE);
-						}
-						nbitsin = atoi(argv[++argn]);
-						j += 200;
-						break;
-					case 'p':
-						if (argn+1 >= argc) {
-							printf("ERR: No number given for number of hardware multiply stages!\n\n");
-							exit(EXIT_FAILURE);
-						}
-						nummpy = atoi(argv[++argn]);
-						j += 200;
-						break;
-					case 'r':
-						real_fft = true;
-						break;
-					case 'S':
-						bitreverse = true;
-						break;
-					case 's':
-						bitreverse = false;
-						break;
-					case 'x':
-						if (argn+1 >= argc) {
-							printf("ERR: No extra number of bits given!\n\n");
-							usage(); exit(EXIT_FAILURE);
-						} j+= 200;
-						xtrapbits = atoi(argv[++argn]);
-						break;
-					case 'v':
-						verbose_flag = true;
+					case 'g': case 'G':
+						fftsize <<= 30;
 						break;
 					default:
-						printf("Unknown argument, -%c\n", argv[argn][j]);
-						usage();
+						printf("ERR: Unknown FFT size, %s!\n", optarg);
 						exit(EXIT_FAILURE);
-				}
-			}
-		} else {
-			printf("Unrecognized argument, %s\n", argv[argn]);
+					}
+				}} break;
+		case 'h':	usage(); exit(EXIT_SUCCESS);	break;
+		case 'i':	inverse = true;			break;
+		case 'k':	ckpce = atoi(optarg);
+				single_clock = true;
+				break;
+		case 'm':	maxbitsout = atoi(optarg);	break;
+		case 'n':	nbitsin = atoi(optarg);		break;
+		case 'p':	nummpy = atoi(optarg);		break;
+		case 'r':	real_fft = true;		break;
+		case 'S':	bitreverse = true;		break;
+		case 's':	bitreverse = false;		break;
+		case 'x':	xtrapbits = atoi(optarg);	break;
+		case 'v':	verbose_flag = true;		break;
+		// case 'z':	variable_size = true;		break;
+		default:
+			printf("Unknown argument, -%c\n", c);
 			usage();
 			exit(EXIT_FAILURE);
 		}
-	}
+	}}
 
 	if (verbose_flag) {
 		if (inverse)
@@ -2852,9 +3030,15 @@ int main(int argc, char **argv) {
 
 	if (single_clock) {
 		printf(
-"WARNING: The single clock FFT option is not fully tested yet, but insted\n"
+"WARNING: The single clock FFT option is not fully tested yet, but instead\n"
 "represents a work in progress.  Feel free to use it at your own risk.\n");
-	}
+	} if (ckpce >= 1) {
+		printf(
+"WARNING: The non-hw optimized butterfly that uses multiple clocks per CE has\n"
+" not yet been fully tested, but rather represent a work in progress.  Feel\n"
+" free to use the ckpce option(s) at your own risk.\n");
+	} else 
+		ckpce = 1;
 	if (!bitreverse) {
 		printf("WARNING: While I can skip the bit reverse stage, the code to do\n");
 		printf("an inverse FFT on a bit--reversed input has not yet been\n");
@@ -2926,13 +3110,18 @@ int main(int argc, char **argv) {
 	}
 
 	// Figure out how many multiply stages to use, and how many to skip
-	{
-		int	lgv = lgval(fftsize);
+	if (!single_clock) {
+		nmpypstage = 6;
+	} else if (ckpce <= 1) {
+		nmpypstage = 3;
+	} else if (ckpce == 2) {
+		nmpypstage = 2;
+	} else
+		nmpypstage = 1;
 
-		nonmpy = lgv - nummpy;
-		if (nonmpy < 2)	nonmpy = 2;
-		nummpy = lgv - nonmpy;
-	}
+	mpy_stages = nummpy / nmpypstage;
+	if (mpy_stages > lgval(fftsize)-2)
+		mpy_stages = lgval(fftsize)-2;
 
 	{
 		struct stat	sbuf;
@@ -2992,6 +3181,11 @@ SLASHLINE
 			(inverse)?"I":"", nbitsout,
 			(inverse)?"I":"", lgsize,
 			(inverse)?"I":"", (inverse)?"I":"");
+		if (ckpce > 0)
+			fprintf(hdr, "#define\t%sFFT_CKPCE\t%d\t// Clocks per CE\n",
+				(inverse)?"I":"", ckpce);
+		else
+			fprintf(hdr, "// Two samples per i_ce\n");
 		if (!bitreverse)
 			fprintf(hdr, "#define\t%sFFT_SKIPS_BIT_REVERSE\n",
 				(inverse)?"I":"");
@@ -3070,9 +3264,10 @@ SLASHLINE
 "//\n"
 "// Project:	%s\n"
 "//\n"
-"// Purpose:	This is the main module in the Doubletime FPGA FFT project.\n"
-"//		As such, all other modules are subordinate to this one.\n"
-"//	This module accomplish a fixed size Complex FFT on %d data points.\n",
+"// Purpose:	This is the main module in the General Purpose FPGA FFT\n"
+"//		implementation.  As such, all other modules are subordinate\n"
+"//	to this one.  This module accomplish a fixed size Complex FFT on\n"
+"//	%d data points.\n",
 		(inverse)?"i":"", (single_clock)?"":"dbl",prjname, fftsize);
 	if (single_clock) {
 	fprintf(vmain,
@@ -3221,7 +3416,7 @@ SLASHLINE
 
 			// Last two stages are always non-multiply stages
 			// since the multiplies can be done by adds
-			mpystage = ((lgtmp-2) <= nummpy);
+			mpystage = ((lgtmp-2) <= mpy_stages);
 
 			if (mpystage)
 				fprintf(vmain, "\t// A hardware optimized FFT stage\n");
@@ -3229,15 +3424,15 @@ SLASHLINE
 			fprintf(vmain, "\twire\t\tw_s%d;\n", fftsize);
 			if (single_clock) {
 				fprintf(vmain, "\twire\t[%d:0]\tw_d%d;\n", 2*(obits+xtrapbits)-1, fftsize);
-				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 1, 0, inverse);
+				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
-					(mpystage)?1:0,cmem.c_str(), fftsize,
-					resetw.c_str());
+					(mpystage)?1:0, ckpce, cmem.c_str(),
+					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d%d, w_s%d%s);\n",
 					(async_reset)?"":"!", resetw.c_str(),
 					fftsize, fftsize,
@@ -3246,27 +3441,27 @@ SLASHLINE
 			} else {
 				fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os%d;\n\t// verilator lint_on  UNUSED\n", fftsize);
 				fprintf(vmain, "\twire\t[%d:0]\tw_e%d, w_o%d;\n", 2*(obits+xtrapbits)-1, fftsize, fftsize);
-				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 2, 0, inverse);
+				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
-					(mpystage)?1:0,cmem.c_str(), fftsize,
-					resetw.c_str());
+					(mpystage)?1:0, ckpce, cmem.c_str(),
+					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_left, w_e%d, w_s%d%s);\n",
 					(async_reset)?"":"!", resetw.c_str(),
 					fftsize, fftsize,
 					((dbg)&&(dbgstage == fftsize))?", o_dbg":"");
-				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 2, 1, inverse);
+				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
-				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
-					(mpystage)?1:0,cmem.c_str(), fftsize,
-					resetw.c_str());
+					(mpystage)?1:0, ckpce, cmem.c_str(),
+					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_right, w_o%d, w_os%d);\n",
 					(async_reset)?"":"!",resetw.c_str(),
 					fftsize, fftsize);
@@ -3307,7 +3502,7 @@ SLASHLINE
 			{
 				bool		mpystage;
 
-				mpystage = ((lgtmp-2) <= nummpy);
+				mpystage = ((lgtmp-2) <= mpy_stages);
 
 				if (mpystage)
 					fprintf(vmain, "\t// A hardware optimized FFT stage\n");
@@ -3317,10 +3512,10 @@ SLASHLINE
 					fprintf(vmain,"\twire\t[%d:0]\tw_d%d;\n",
 						2*(obits+xtrapbits)-1,
 						tmp_size);
-					cmem = gen_coeff_fname(coredir.c_str(), tmp_size, 1, 0, inverse);
+					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,  nbitsin+xtracbits, 1, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -3328,7 +3523,8 @@ SLASHLINE
 						lgsize, lgtmp-2,
 						lgdelay(nbits+xtrapbits,xtracbits),
 						(dropbit)?0:0,
-						(mpystage)?1:0, cmem.c_str(), tmp_size,
+						(mpystage)?1:0, ckpce,
+						cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_d%d, w_d%d, w_s%d%s);\n",
 						tmp_size<<1, tmp_size<<1,
@@ -3341,10 +3537,10 @@ SLASHLINE
 					fprintf(vmain,"\twire\t[%d:0]\tw_e%d, w_o%d;\n",
 						2*(obits+xtrapbits)-1,
 						tmp_size, tmp_size);
-					cmem = gen_coeff_fname(coredir.c_str(), tmp_size, 2, 0, inverse);
+					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,  nbitsin+xtracbits, 2, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -3352,23 +3548,25 @@ SLASHLINE
 						lgsize, lgtmp-2,
 						lgdelay(nbits+xtrapbits,xtracbits),
 						(dropbit)?0:0,
-						(mpystage)?1:0, cmem.c_str(), tmp_size,
+						(mpystage)?1:0, ckpce,
+						cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_e%d, w_e%d, w_s%d%s);\n",
 						tmp_size<<1, tmp_size<<1,
 						tmp_size, tmp_size,
 						((dbg)&&(dbgstage == tmp_size))
 							?", o_dbg":"");
-					cmem = gen_coeff_fname(coredir.c_str(), tmp_size, 2, 1, inverse);
+					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 1, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,  nbitsin+xtracbits, 2, 1, inverse);
-					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
 						lgsize, lgtmp-2,
 						lgdelay(nbits+xtrapbits,xtracbits),
-						(dropbit)?0:0, (mpystage)?1:0, cmem.c_str(), tmp_size,
+						(dropbit)?0:0, (mpystage)?1:0,
+						ckpce, cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_o%d, w_o%d, w_os%d);\n",
 						tmp_size<<1, tmp_size<<1,
@@ -3480,6 +3678,7 @@ SLASHLINE
 		}
 	}
 
+
 	fprintf(vmain, "\n");
 	fprintf(vmain, "\t// Now for the bit-reversal stage.\n");
 	fprintf(vmain, "\twire\tbr_sync;\n");
@@ -3538,15 +3737,16 @@ SLASHLINE
 "endmodule\n");
 	fclose(vmain);
 
+
 	{
 		std::string	fname;
 
 		fname = coredir + "/butterfly.v";
 		build_butterfly(fname.c_str(), xtracbits, rounding);
 
-		if (nummpy > 0) {
+		if (mpy_stages > 0) {
 			fname = coredir + "/hwbfly.v";
-			build_hwbfly(fname.c_str(), xtracbits, rounding, async_reset);
+			build_hwbfly(fname.c_str(), xtracbits, rounding, ckpce, async_reset);
 		}
 
 		{

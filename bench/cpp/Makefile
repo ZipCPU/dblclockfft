@@ -6,22 +6,21 @@
 ##
 ## Purpose:	This programs the build process for the test benches
 ##		associated with the double clocked FFT project.  These
-##		test benches are designed for the size and arguments of the
-##		FFT as given by the Makefile in the trunk/sw directory, 
-##		although they shouldn't be too difficult to modify for
-##		other FFT parameters.
+##	test benches are designed for the size and arguments of the FFT as
+##	given by the Makefile in the trunk/sw directory, although they shouldn't
+##	be too difficult to modify for other FFT parameters.
 ##
-##		Please note that running these test benches requires access
-##		to the *cmem_*.hex files found in trunk/sw/fft-core.  I
-##		usually soft link them into this directory, but such linking
-##		is not currently part of this makefile or the build scripts.
+##	Please note that running these test benches requires access to the
+##	*cmem_*.hex files found in trunk/sw/fft-core.  I usually soft link
+##	them into this directory, but such linking is not currently part of
+##	this makefile or the build scripts.
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
 ##########################################################################/
 ##
-## Copyright (C) 2015, Gisselquist Technology, LLC
+## Copyright (C) 2015,2018 Gisselquist Technology, LLC
 ##
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
@@ -43,7 +42,7 @@
 ##
 ##
 ##########################################################################/
-all: mpy_tb dblrev_tb dblstage_tb qtrstage_tb fft_tb test
+all: mpy_tb dblrev_tb dblstage_tb qtrstage_tb fft_tb test snglrev_tb
 
 OBJDR:= ../../sw/fft-core/obj_dir
 VSRCD = ../../sw/fft-core
@@ -61,6 +60,7 @@ VINC := -I$(VROOT)/include -I$(OBJDR)/ -I$(TBODR)/
 # MPYLB:= $(OBJDR)/Vshiftaddmpy__ALL.a
 MPYLB:= $(OBJDR)/Vlongbimpy__ALL.a
 DBLRV:= $(OBJDR)/Vdblreverse__ALL.a
+SGLRV:= $(OBJDR)/Vsnglbrev__ALL.a
 DBLSG:= $(OBJDR)/Vdblstage__ALL.a
 QTRSG:= $(OBJDR)/Vqtrstage__ALL.a
 BFLYL:= $(OBJDR)/Vbutterfly__ALL.a
@@ -75,6 +75,9 @@ mpy_tb: mpy_tb.cpp fftsize.h twoc.h $(MPYLB)
 
 dblrev_tb: dblrev_tb.cpp twoc.cpp twoc.h fftsize.h $(DBLRV)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLRV) $(VSRCS) -o $@
+
+snglbrev_tb: snglbrev_tb.cpp twoc.cpp twoc.h fftsize.h $(SGLRV)
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(SGLRV) $(VSRCS) -o $@
 
 dblstage_tb: dblstage_tb.cpp twoc.cpp twoc.h $(DBLSG)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLSG) $(VSRCS) -o $@

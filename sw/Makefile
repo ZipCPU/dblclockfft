@@ -18,7 +18,7 @@
 ##
 ##########################################################################/
 ##
-## Copyright (C) 2015, Gisselquist Technology, LLC
+## Copyright (C) 2015,2018, Gisselquist Technology, LLC
 ##
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
@@ -66,8 +66,9 @@ fftgen: fftgen.o
 	$(CXX) $(CFLAGS) -c $< -o $@
 
 .PHONY: test
-test: fft ifft butterfly dblreverse qtrstage dblstage fftstage
-test: hwbfly shiftaddmpy longbimpy
+test: fft ifft butterfly fftstage hwbfly shiftaddmpy longbimpy
+# test: dblreverse qtrstage dblstage
+test: snglbrev sngllast
 
 #
 # Although these parameters, a 2048 point FFT of 16 bits input, aren't
@@ -79,7 +80,7 @@ test: hwbfly shiftaddmpy longbimpy
 .PHONY: fft
 fft: $(OBJDR)/Vfftmain__ALL.so
 $(CORED)/fftmain.v: fftgen
-	./fftgen -v -1 -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
+	./fftgen -v -k 2 -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
 $(OBJDR)/Vfftmain.h: $(CORED)/fftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftmain.v
 $(OBJDR)/Vfftmain__ALL.so: $(OBJDR)/Vfftmain.h
@@ -162,6 +163,16 @@ $(OBJDR)/Vdblreverse__ALL.a: $(OBJDR)/Vdblreverse.h
 $(OBJDR)/Vdblreverse__ALL.a: $(OBJDR)/Vdblreverse.cpp
 	cd $(OBJDR)/; make -f Vdblreverse.mk
 
+.PHONY: snglbrev
+snglbrev: $(OBJDR)/Vsnglbrev__ALL.a
+
+$(CORED)/snglbrev.v: fft
+$(OBJDR)/Vsnglbrev.cpp $(OBJDR)/Vsnglbrev.h: $(CORED)/snglbrev.v
+	cd $(CORED)/; $(VERILATOR) $(VFLAGS) snglbrev.v
+$(OBJDR)/Vsnglbrev__ALL.a: $(OBJDR)/Vsnglbrev.h
+$(OBJDR)/Vsnglbrev__ALL.a: $(OBJDR)/Vsnglbrev.cpp
+	cd $(OBJDR)/; make -f Vsnglbrev.mk
+
 .PHONY: qtrstage
 qtrstage: $(OBJDR)/Vqtrstage__ALL.a
 
@@ -181,6 +192,16 @@ $(OBJDR)/Vdblstage.cpp $(OBJDR)/Vdblstage.h: $(CORED)/dblstage.v
 $(OBJDR)/Vdblstage__ALL.a: $(OBJDR)/Vdblstage.h
 $(OBJDR)/Vdblstage__ALL.a: $(OBJDR)/Vdblstage.cpp
 	cd $(OBJDR)/; make -f Vdblstage.mk
+
+.PHONY: sngllast
+sngllast: $(OBJDR)/Vsngllast__ALL.a
+
+$(CORED)/sngllast.v: fft
+$(OBJDR)/Vsngllast.cpp $(OBJDR)/Vsngllast.h: $(CORED)/sngllast.v
+	cd $(CORED)/; $(VERILATOR) $(VFLAGS) sngllast.v
+$(OBJDR)/Vsngllast__ALL.a: $(OBJDR)/Vsngllast.h
+$(OBJDR)/Vsngllast__ALL.a: $(OBJDR)/Vsngllast.cpp
+	cd $(OBJDR)/; make -f Vsngllast.mk
 
 .PHONY: fftstage
 dblstage: $(OBJDR)/Vfftstage__ALL.a
