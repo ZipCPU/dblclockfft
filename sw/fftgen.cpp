@@ -1294,7 +1294,7 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	longbimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
+"module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);\n"
 	"\tparameter	IAW=%d,	// The width of i_a, min width is 5\n"
 			"\t\t\tIBW=", TST_LONGBIMPY_AW);
 #ifdef	TST_LONGBIMPY_BW
@@ -1309,7 +1309,8 @@ SLASHLINE
 			"\t\t\t// and the above values:\n"
 			"\t\t\tOW=IAW+IBW;	// The output width\n");
 	fprintf(fp,
-	"\tlocalparam	AW = (IAW<IBW) ? AW : BW,\n"
+	"\tlocalparam	AW = (IAW<IBW) ? IAW : IBW,\n"
+			"\t\t\tBW = (IAW<IBW) ? IBW : IAW,\n"
 			"\t\t\tIW=(AW+1)&(-2),	// Internal width of A\n"
 			"\t\t\tLUTB=2,	// How many bits we can multiply by at once\n"
 			"\t\t\tTLEN=(AW+(LUTB-1))/LUTB; // Nmbr of rows in our tableau\n"
@@ -1324,9 +1325,10 @@ SLASHLINE
 	"\twire	[AW-1:0]	i_a;\n"
 	"\twire	[BW-1:0]	i_b;\n"
 	"\tgenerate if (IAW <= IBW)\n"
+	"\tbegin : NO_PARAM_CHANGE\n"
 	"\t\tassign i_a = i_a_unsorted;\n"
 	"\t\tassign i_b = i_b_unsorted;\n"
-	"\tend else begin\n"
+	"\tend else begin : SWAP_PARAMETERS\n"
 	"\t\tassign i_a = i_b_unsorted;\n"
 	"\t\tassign i_b = i_a_unsorted;\n"
 	"\tend endgenerate\n"
@@ -1960,18 +1962,214 @@ SLASHLINE
 		"\t\t%s #(CWIDTH+1,IWIDTH+2) p3(i_clk, i_ce,\n"
 			"\t\t\t\tp3c_in, p3d_in, p_three);\n"
 "\n"
-	"\tend else if (CKPCE == 2)\n"
-	"\tbegin\n"
-	"\tend else begin // if (CKPCE >= 3)\n"
-	"\tend\n"
-	"\tendgenerate\n"
-"\n",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
 		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
 		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
 		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy");
+
+	///////////////////////////////////////////
+	///
+	///	Two clocks per CE, so CE, no-ce, CE, no-ce, etc
+	///
+	fprintf(fp,
+	"\tend else if (CKPCE == 2)\n"
+	"\tbegin : CKPCE_TWO\n"
+		"\t\t// Coefficient multiply inputs\n"
+		"\t\treg		[2*(CWIDTH)-1:0]	mpy_pipe_c;\n"
+		"\t\t// Data multiply inputs\n"
+		"\t\treg		[2*(IWIDTH+1)-1:0]	mpy_pipe_d;\n"
+		"\t\twire	signed	[(CWIDTH-1):0]	mpy_pipe_vc;\n"
+		"\t\twire	signed	[(IWIDTH):0]	mpy_pipe_vd;\n"
+		"\t\t//\n"
+		"\t\treg	signed	[(CWIDTH)-1:0]		mpy_cof_sum;\n"
+		"\t\treg	signed	[(IWIDTH+1)-1:0]	mpy_dif_sum;\n"
+"\n"
+		"\t\tassign	mpy_pipe_vc =  mpy_pipe_c[2*(CWIDTH)-1:CWIDTH];\n"
+		"\t\tassign	mpy_pipe_vd =  mpy_pipe_d[2*(IWIDTH+1)-1:IWIDTH+1];\n"
+"\n"
+		"\t\treg			mpy_pipe_v;\n"
+		"\t\treg			ce_phase;\n"
+"\n"
+		"\t\treg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
+		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
+"\n"
+"\n"
+		"\t\tinitial	ce_phase = 1'b0;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_reset)\n"
+			"\t\t\tce_phase <= 1'b0;\n"
+		"\t\telse if (i_ce)\n"
+			"\t\t\tce_phase <= 1'b1;\n"
+		"\t\telse\n"
+			"\t\t\tce_phase <= 1'b0;\n"
+"\n"
+		"\t\talways @(*)\n"
+			"\t\t\tmpy_pipe_v = (i_ce)||(ce_phase);\n"
+"\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (ce_phase)\n"
+		"\t\tbegin\n"
+			"\t\t\t// Pre-clock\n"
+			"\t\t\tmpy_pipe_c[2*CWIDTH-1:0] <=\n"
+				"\t\t\t\t\t{ ir_coef_r, ir_coef_i };\n"
+			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <=\n"
+				"\t\t\t\t\t{ r_dif_r, r_dif_i };\n"
+"\n"
+			"\t\t\tmpy_cof_sum  <= ir_coef_i + ir_coef_r;\n"
+			"\t\t\tmpy_dif_sum <= r_dif_r + r_dif_i;\n"
+"\n"
+		"\t\tend else if (i_ce)\n"
+		"\t\tbegin\n"
+			"\t\t\t// First clock\n"
+			"\t\t\tmpy_pipe_c[2*(CWIDTH)-1:0] <= {\n"
+				"\t\t\t\tmpy_pipe_c[(CWIDTH)-1:0], {(CWIDTH){1'b0}} };\n"
+			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <= {\n"
+				"\t\t\t\tmpy_pipe_d[(IWIDTH+1)-1:0], {(IWIDTH+1){1'b0}} };\n"
+		"\t\tend\n"
+"\n"
+	fprintf(fp,
+		"\t\t%s #(CWIDTH+1,IWIDTH+2) mpy0(i_clk, mpy_pipe_v,\n"
+			"\t\t\t\tmpy_cof_sum, mpy_dif_sum, longmpy);\n"
+"\n"
+		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
+"\n");
+
+	fprintf(fp,
+		"\t\t%s #(CWIDTH,IWIDTH+1) mpy1(i_clk, mpy_pipe_v,\n"
+			"\t\t\t\tmpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out);\n"
+"\n"
+		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
+"\n");
+
+	fprintf(fp,
+		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one;\n"
+		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one,\n"
+				"\t\t\t\t\t\t\t\trp_two;\n"
+		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
+"\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (ce_phase) // 1.5 clock\n"
+			"\t\t\trp_one <= mpy_pipe_out;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce) // two clocks\n"
+			"\t\t\trp_two <= mpy_pipe_out;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce) // Second clock\n"
+			"\t\t\trp_three<= longmpy;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\trp2_one<= rp_one;\n"
+"\n"
+		"\t\tassign	p_one	= rp2_one;\n"
+		"\t\tassign	p_two	= rp_two;\n"
+		"\t\tassign	p_three	= rp_three;\n"
+"\n");
+
+	/////////////////////////
+	///
+	///	Three clock per CE, so CE, no-ce, no-ce*, CE
+	///
+	fprintf(fp,
+"\tend else if (CKPCE <= 3)\n\tbegin : CKPCE_THREE\n");
+
+	fprintf(fp,
+	"\t\t// Coefficient multiply inputs\n"
+	"\t\treg\t\t[3*(CWIDTH+1)-1:0]\tmpy_pipe_c;\n"
+	"\t\t// Data multiply inputs\n"
+	"\t\treg\t\t[3*(IWIDTH+2)-1:0]\tmpy_pipe_d;\n"
+	"\t\twire\tsigned	[(CWIDTH):0]	mpy_pipe_vc;\n"
+	"\t\twire\tsigned	[(IWIDTH+1):0]	mpy_pipe_vd;\n"
+	"\n"
+	"\t\tassign\tmpy_pipe_vc =  mpy_pipe_c[3*(CWIDTH+1)-1:2*(CWIDTH+1)];\n"
+	"\t\tassign\tmpy_pipe_vd =  mpy_pipe_d[3*(IWIDTH+2)-1:2*(IWIDTH+2)];\n"
+	"\n"
+	"\t\treg\t\t\tmpy_pipe_v;\n"
+	"\t\treg\t\t[2:0]\tce_phase;\n"
+	"\n"
+	"\t\treg\tsigned	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
+"\n");
+	fprintf(fp,
+	"\t\tinitial\tce_phase = 3'b011;\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif (i_reset)\n"
+		"\t\t\tce_phase <= 3'b011;\n"
+	"\t\telse if (i_ce)\n"
+		"\t\t\tce_phase <= 3'b000;\n"
+	"\t\telse if (ce_phase != 3'b011)\n"
+		"\t\t\tce_phase <= ce_phase + 1'b1;\n"
+"\n"
+	"\t\talways @(*)\n"
+		"\t\t\tmpy_pipe_v = (i_ce)||(ce_phase < 3'b010);\n"
+"\n");
+
+	fprintf(fp,
+	"\t\talways @(posedge i_clk)\n"
+		"\t\t\tif (ce_phase == 3\'b000)\n"
+		"\t\t\tbegin\n"
+			"\t\t\t\t// Second clock\n"
+			"\t\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:(CWIDTH+1)] <= {\n"
+			"\t\t\t\t\tir_coef_r[CWIDTH-1], ir_coef_r,\n"
+			"\t\t\t\t\tir_coef_i[CWIDTH-1], ir_coef_i };\n"
+			"\t\t\t\tmpy_pipe_c[CWIDTH:0] <= ir_coef_i + ir_coef_r;\n"
+			"\t\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:(IWIDTH+2)] <= {\n"
+			"\t\t\t\t\tr_dif_r[IWIDTH], r_dif_r,\n"
+			"\t\t\t\t\tr_dif_i[IWIDTH], r_dif_i };\n"
+			"\t\t\t\tmpy_pipe_d[(IWIDTH+2)-1:0] <= r_dif_r + r_dif_i;\n"
+"\n"
+		"\t\t\tend else if (mpy_pipe_v)\n"
+		"\t\t\tbegin\n"
+			"\t\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:0] <= {\n"
+			"\t\t\t\t\tmpy_pipe_c[2*(CWIDTH+1)-1:0], {(CWIDTH+1){1\'b0}} };\n"
+			"\t\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:0] <= {\n"
+			"\t\t\t\t\tmpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1\'b0}} };\n"
+		"\t\t\tend\n"
+"\n");
+	fprintf(fp,
+		"\t\t%s #(CWIDTH+1,IWIDTH+2) mpy(i_clk, mpy_pipe_v,\n"
+			"\t\t\t\tmpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out);\n"
+"\n"
+		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
+"\n");
+
+	fprintf(fp,
+	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp_one, rp_two;\n"
+	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp2_one, rp2_two;\n"
+	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\trp_three, rp2_three;\n"
+
+"\n");
+
+	fprintf(fp,
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif(i_ce)\n"
+		"\t\t\trp_one <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif(ce_phase == 3'b000)\n"
+		"\t\t\trp_two <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif(ce_phase == 3'b001)\n"
+		"\t\t\trp_three <= mpy_pipe_out;\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif (i_ce)\n"
+	"\t\tbegin\n"
+		"\t\t\trp2_one<= rp_one;\n"
+		"\t\t\trp2_two<= rp_two;\n"
+		"\t\t\trp2_three<= rp_three;\n"
+	"\t\tend\n");
+	fprintf(fp,
+
+	"\t\tassign\tp_one\t= rp2_one;\n"
+	"\t\tassign\tp_two\t= rp2_two;\n"
+	"\t\tassign\tp_three\t= rp2_three;\n"
+"\n");
+
+	fprintf(fp,
+"\tend endgenerate\n");
+
+	fprintf(fp,
+	"\tend else begin // if (CKPCE >= 3)\n"
+	"\tend\n"
+	"\tendgenerate\n"
+"\n");
+
 	fprintf(fp,
 	"\t// These values are held in memory and delayed during the\n"
 	"\t// multiply.  Here, we recover them.  During the multiply,\n"
@@ -2661,7 +2859,7 @@ void	build_stage(const char *fname,
 	fprintf(fstage,
 SLASHLINE
 "//\n"
-"// Filename:\tfftstage%s.v\n"
+"// Filename:\t%sfftstage%s.v\n"
 "//\n"
 "// Project:\t%s\n"
 "//\n"
@@ -2672,11 +2870,12 @@ SLASHLINE
 "//	(N-1) of these stages.\n"
 "//\n%s"
 "//\n",
-		(dbg)?"_dbg":"", prjname, creator);
+		(inv)?"i":"", (dbg)?"_dbg":"", prjname, creator);
 	fprintf(fstage, "%s", cpyleft);
 	fprintf(fstage, "//\n//\n`default_nettype\tnone\n//\n");
-	fprintf(fstage, "module\tfftstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n",
-		(dbg)?"_dbg":"", resetw.c_str(), (dbg)?", o_dbg":"");
+	fprintf(fstage, "module\t%sfftstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n",
+		(inv)?"i":"", (dbg)?"_dbg":"", resetw.c_str(),
+		(dbg)?", o_dbg":"");
 	// These parameter values are useless at this point--they are to be
 	// replaced by the parameter values in the calling program.  Only
 	// problem is, the CWIDTH needs to match exactly!
@@ -3193,6 +3392,8 @@ SLASHLINE
 			fprintf(hdr, "#define\tRL%sFFT\n\n", (inverse)?"I":"");
 		if (!single_clock)
 			fprintf(hdr, "#define\tDBLCLK%sFFT\n\n", (inverse)?"I":"");
+		else
+			fprintf(hdr, "// #define\tDBLCLK%sFFT // this FFT takes one input sample per clock\n\n", (inverse)?"I":"");
 		if (USE_OLD_MULTIPLY)
 			fprintf(hdr, "#define\tUSE_OLD_MULTIPLY\n\n");
 
@@ -3427,7 +3628,8 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+					(inverse)?"i":"",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
@@ -3444,7 +3646,8 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+					(inverse)?"i":"",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
@@ -3457,7 +3660,8 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
-				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\t%sfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+					(inverse)?"i":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
 					(mpystage)?1:0, ckpce, cmem.c_str(),
@@ -3472,6 +3676,8 @@ SLASHLINE
 			std::string	fname;
 
 			fname = coredir + "/";
+			if (inverse)
+				fname += "i";
 			fname += "fftstage";
 			if ((dbg)&&(dbgstage == fftsize))
 				fname += "_dbg";
@@ -3515,7 +3721,8 @@ SLASHLINE
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,  nbitsin+xtracbits, 1, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+						(inverse)?"i":"",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -3540,7 +3747,8 @@ SLASHLINE
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,  nbitsin+xtracbits, 2, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+						(inverse)?"i":"",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -3559,7 +3767,8 @@ SLASHLINE
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 1, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,  nbitsin+xtracbits, 2, 1, inverse);
-					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\t%sfftstage\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+						(inverse)?"i":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,

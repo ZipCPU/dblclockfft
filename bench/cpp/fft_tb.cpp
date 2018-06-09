@@ -44,6 +44,7 @@
 #include <fftw3.h>
 
 #include "verilated.h"
+#include "verilated_vcd_c.h"
 #include "Vfftmain.h"
 #include "twoc.h"
 
@@ -56,8 +57,11 @@
 #define	VVAR(A)	v__DOT_ ## A
 #endif
 
-
+#ifdef	DBLCLKFFT
 #define	revstage_iaddr	VVAR(_revstage__DOT__iaddr)
+#else
+#define	revstage_iaddr	VVAR(_revstage__DOT__wraddr)
+#endif
 #define	br_sync		VVAR(_br_sync)
 #define	br_started	VVAR(_r_br_started)
 #define	w_s2048		VVAR(_w_s2048)
@@ -119,9 +123,11 @@ public:
 	double		*m_fft_buf;
 	bool		m_syncd;
 	unsigned long	m_tickcount;
+	VerilatedVcdC*	m_trace;
 
 	FFT_TB(void) {
 		m_fft = new Vfftmain;
+		Verilated::traceEverOn(true);
 		m_iaddr = m_oaddr = 0;
 		m_dumpfp = NULL;
 
@@ -135,35 +141,54 @@ public:
 		m_tickcount = 0l;
 	}
 
+	~FFT_TB(void) {
+		closetrace();
+		delete m_fft;
+		m_fft = NULL;
+	}
+
+	virtual void opentrace(const char *vcdname) {
+		if (!m_trace) {
+			m_trace = new VerilatedVcdC;
+			m_fft->trace(m_trace, 99);
+			m_trace->open(vcdname);
+		}
+	}
+
+	virtual void closetrace(void) {
+		if (m_trace) {
+			m_trace->close();
+			delete m_trace;
+			m_trace = NULL;
+		}
+	}
+
 	void	tick(void) {
-		if ((!m_fft->i_ce)||(m_fft->i_rst))
+		m_tickcount++;
+		if ((!m_fft->i_ce)||(m_fft->i_reset))
 			printf("TICK(%s,%s)\n",
-				(m_fft->i_rst)?"RST":"   ",
+				(m_fft->i_reset)?"RST":"   ",
 				(m_fft->i_ce)?"CE":"  ");
-		m_fft->i_clk = 0;
+
 		m_fft->eval();
+		if (m_trace)
+			m_trace->dump((vluint64_t)(10*m_tickcount-2));
 		m_fft->i_clk = 1;
 		m_fft->eval();
-
-		m_tickcount++;
-
-		/*
-		int nrpt = (rand()&0x01f) + 1;
-		m_fft->i_ce = 0;
-		for(int i=0; i<nrpt; i++) {
-			m_fft->i_clk = 0;
-			m_fft->eval();
-			m_fft->i_clk = 1;
-			m_fft->eval();
+		if (m_trace)
+			m_trace->dump((vluint64_t)(10*m_tickcount));
+		m_fft->eval();
+		if (m_trace) {
+			m_trace->dump((vluint64_t)(10*m_tickcount+5));
+			m_trace->flush();
 		}
-		*/
 	}
 
 	void	reset(void) {
 		m_fft->i_ce  = 0;
-		m_fft->i_rst = 1;
+		m_fft->i_reset = 1;
 		tick();
-		m_fft->i_rst = 0;
+		m_fft->i_reset = 0;
 		tick();
 
 		m_iaddr = m_oaddr = m_logbase = 0;
@@ -263,9 +288,10 @@ public:
 		m_ntest++;
 	}
 
+#ifdef	DBLCLKFFT
 	bool	test(ITYP lft, ITYP rht) {
 		m_fft->i_ce    = 1;
-		m_fft->i_rst   = 0;
+		m_fft->i_reset = 0;
 		m_fft->i_left  = lft;
 		m_fft->i_right = rht;
 
@@ -339,6 +365,87 @@ public:
 
 		return (m_fft->o_sync);
 	}
+#else
+	bool	test(ITYP data) {
+		m_fft->i_ce    = 1;
+		m_fft->i_reset = 0;
+		m_fft->i_sample  = data;
+
+		m_log[(m_iaddr++)&(NFTLOG*FFTLEN-1)] = data;
+
+		tick();
+		m_fft->i_ce = 0;
+#ifdef	FFT_CKPCE
+		for(int i=0; i<FFT_CKPCE-1; i++)
+			tick();
+#endif
+		if (rand()&1)
+			tick();
+
+		if (m_fft->o_sync) {
+			if (!m_syncd) {
+				m_syncd = true;
+				printf("ORIGINAL SYNC AT 0x%lx, m_oaddr set to 0x%x\n", m_tickcount, m_oaddr);
+				m_logbase = m_iaddr;
+			} else printf("RESYNC AT %lx\n", m_tickcount);
+			m_oaddr &= (-1<<LGWIDTH);
+		} else m_oaddr += 1;
+
+		printf("%8x,%5d: %08x -> %011lx\t",
+			m_iaddr, m_oaddr, data, m_fft->o_result);
+
+#ifndef	APPLY_BITREVERSE_LOCALLY
+		printf(" [%3x]%s", m_fft->revstage_iaddr,
+			(m_fft->br_sync)?"S"
+				:((m_fft->br_started)?".":"x"));
+#endif
+
+		printf(" ");
+#if (FFT_SIZE>=2048)
+		printf("%s", (m_fft->w_s2048)?"S":"-");
+#endif
+#if (FFT_SIZE>1024)
+		printf("%s", (m_fft->w_s1024)?"S":"-");
+#endif
+#if (FFT_SIZE>512)
+		printf("%s", (m_fft->w_s512)?"S":"-");
+#endif
+#if (FFT_SIZE>256)
+		printf("%s", (m_fft->w_s256)?"S":"-");
+#endif
+#if (FFT_SIZE>128)
+		printf("%s", (m_fft->w_s128)?"S":"-");
+#endif
+#if (FFT_SIZE>64)
+		printf("%s", (m_fft->w_s64)?"S":"-");
+#endif
+#if (FFT_SIZE>32)
+		printf("%s", (m_fft->w_s32)?"S":"-");
+#endif
+#if (FFT_SIZE>16)
+		printf("%s", (m_fft->w_s16)?"S":"-");
+#endif
+#if (FFT_SIZE>8)
+		printf("%s", (m_fft->w_s8)?"S":"-");
+#endif
+#if (FFT_SIZE>4)
+		printf("%s", (m_fft->w_s4)?"S":"-");
+#endif
+
+		printf(" %s%s\n",
+			(m_fft->o_sync)?"\t(SYNC!)":"",
+			(m_fft->o_result)?"  (NZ)":"");
+
+		m_data[(m_oaddr  )&(FFTLEN-1)] = m_fft->o_result;
+
+		if ((m_syncd)&&((m_oaddr&(FFTLEN-1)) == FFTLEN-1)) {
+			dumpwrite();
+			checkresults();
+		}
+
+		return (m_fft->o_sync);
+	}
+#endif
 
 	bool	test(double lft_r, double lft_i, double rht_r, double rht_i) {
 		ITYP	ilft, irht, ilft_r, ilft_i, irht_r, irht_i;
@@ -351,7 +458,12 @@ public:
 		ilft = (ilft_r << IWIDTH) | ilft_i;
 		irht = (irht_r << IWIDTH) | irht_i;
 
+#ifdef	DBLCLOCKFFT
 		return test(ilft, irht);
+#else
+		test(ilft);
+		return test(irht);
+#endif
 	}
 
 	double	rdata(int addr) {
