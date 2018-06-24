@@ -52,7 +52,7 @@
 #define	PAGEMSK	(FFTSIZE)
 
 #ifdef	NEW_VERILATOR
-#define	VVAR(A)	dblreverse__DOT_ ## A
+#define	VVAR(A)	snglbrev__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A
 #endif
