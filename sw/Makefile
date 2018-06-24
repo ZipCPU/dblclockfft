@@ -44,10 +44,16 @@
 ##
 # This is really simple ...
 all: fftgen
-CORED := fft-core
-OBJDR := $(CORED)/obj_dir
-TESTSZ := 2048
-BENCHD := ../bench/cpp
+CORED := ../rtl
+VOBJDR  := $(CORED)/obj_dir
+OBJDIR   := obj-pc
+TESTSZ  := 2048
+BENCHD  := ../bench/cpp
+SOURCES := bitreverse.cpp bldstage.cpp butterfly.cpp fftgen.cpp fftlib.cpp \
+		legal.cpp rounding.cpp softmpy.cpp
+CKPCE   := -k 2
+OBJECTS := $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SOURCES)))
+HEADERS := $(wildcard *.h)
 ifneq ($(VERILATOR_ROOT),)
 VERILATOR:=$(VERILATOR_ROOT)/bin/verilator
 else
@@ -59,11 +65,12 @@ VROOT   := $(VERILATOR_ROOT)
 VFLAGS  := -Wall -O3 -MMD --trace -cc
 CFLAGS  := -g -Wall
 
-fftgen: fftgen.o
-	$(CXX) $(CFLAGS) $< -o $@
+$(OBJDIR)/%.o: %.cpp
+	$(mk-objdir)
+	$(CXX) -c $(CFLAGS) $< -o $@
 
-%.o: %.cpp
-	$(CXX) $(CFLAGS) -c $< -o $@
+fftgen: $(OBJECTS)
+	$(CXX) $(CFLAGS) $^ -o $@
 
 .PHONY: test
 test: fft ifft butterfly fftstage hwbfly shiftaddmpy longbimpy
@@ -78,144 +85,178 @@ test: snglbrev sngllast
 # changes work.
 #
 .PHONY: fft
-fft: $(OBJDR)/Vfftmain__ALL.so
+fft: $(VOBJDR)/Vfftmain__ALL.so
 $(CORED)/fftmain.v: fftgen
-	./fftgen -v -k 2 -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
-$(OBJDR)/Vfftmain.h: $(CORED)/fftmain.v
+	./fftgen -v -d $(CORED) $(CKPCE) -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
+$(VOBJDR)/Vfftmain.h: $(CORED)/fftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftmain.v
-$(OBJDR)/Vfftmain__ALL.so: $(OBJDR)/Vfftmain.h
-	cd $(OBJDR); make -f Vfftmain.mk
+$(VOBJDR)/Vfftmain__ALL.so: $(VOBJDR)/Vfftmain.h
+	cd $(VOBJDR); make -f Vfftmain.mk
 
 .PHONY: dblfft
-dblfft: $(OBJDR)/Vdblfftmain__ALL.so
+dblfft: $(VOBJDR)/Vdblfftmain__ALL.so
 $(CORED)/dblfftmain.v: fftgen
-	./fftgen -v -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/dblfftsize.h
-$(OBJDR)/Vdblfftmain.h: $(CORED)/dblfftmain.v
+	./fftgen -v -d $(CORED) -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/dblfftsize.h
+$(VOBJDR)/Vdblfftmain.h: $(CORED)/dblfftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) dblfftmain.v
-$(OBJDR)/Vdblfftmain__ALL.so: $(OBJDR)/Vdblfftmain.h
-	cd $(OBJDR); make -f Vdblfftmain.mk
+$(VOBJDR)/Vdblfftmain__ALL.so: $(VOBJDR)/Vdblfftmain.h
+	cd $(VOBJDR); make -f Vdblfftmain.mk
 
 .PHONY: idblfft
-idblfft: $(OBJDR)/Vidblfftmain__ALL.so
+idblfft: $(VOBJDR)/Vidblfftmain__ALL.so
 $(CORED)/idblfftmain.v: fftgen
-	./fftgen -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/idblfftsize.h
-$(OBJDR)/Vidblfftmain.h: $(CORED)/idblfftmain.v
+	./fftgen -d $(CORED) -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/idblfftsize.h
+$(VOBJDR)/Vidblfftmain.h: $(CORED)/idblfftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) idblfftmain.v
-$(OBJDR)/Vidblfftmain__ALL.so: $(OBJDR)/Vidblfftmain.h
-	cd $(OBJDR); make -f Vidblfftmain.mk
+$(VOBJDR)/Vidblfftmain__ALL.so: $(VOBJDR)/Vidblfftmain.h
+	cd $(VOBJDR); make -f Vidblfftmain.mk
 
 .PHONY: ifft
-ifft: $(OBJDR)/Vifftmain__ALL.so
+ifft: $(VOBJDR)/Vifftmain__ALL.so
 $(CORED)/ifftmain.v: fftgen
-	./fftgen -1 -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/ifftsize.h
-$(OBJDR)/Vifftmain.h: $(CORED)/ifftmain.v
+	./fftgen -d $(CORED) $(CKPCE) -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/ifftsize.h
+$(VOBJDR)/Vifftmain.h: $(CORED)/ifftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) ifftmain.v
-$(OBJDR)/Vifftmain__ALL.so: $(OBJDR)/Vifftmain.h
-	cd $(OBJDR); make -f Vifftmain.mk
+$(VOBJDR)/Vifftmain__ALL.so: $(VOBJDR)/Vifftmain.h
+	cd $(VOBJDR); make -f Vifftmain.mk
 
 .PHONY: shiftaddmpy
-shiftaddmpy: $(OBJDR)/Vshiftaddmpy__ALL.a
+shiftaddmpy: $(VOBJDR)/Vshiftaddmpy__ALL.a
 
 $(CORED)/shiftaddmpy.v: fft
-$(OBJDR)/Vshiftaddmpy.cpp $(OBJDR)/Vshiftaddmpy.h: $(CORED)/shiftaddmpy.v
+$(VOBJDR)/Vshiftaddmpy.cpp $(VOBJDR)/Vshiftaddmpy.h: $(CORED)/shiftaddmpy.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) shiftaddmpy.v
-$(OBJDR)/Vshiftaddmpy__ALL.a: $(OBJDR)/Vshiftaddmpy.h
-$(OBJDR)/Vshiftaddmpy__ALL.a: $(OBJDR)/Vshiftaddmpy.cpp
-	cd $(OBJDR)/; make -f Vshiftaddmpy.mk
+$(VOBJDR)/Vshiftaddmpy__ALL.a: $(VOBJDR)/Vshiftaddmpy.h
+$(VOBJDR)/Vshiftaddmpy__ALL.a: $(VOBJDR)/Vshiftaddmpy.cpp
+	cd $(VOBJDR)/; make -f Vshiftaddmpy.mk
 
 .PHONY: longbimpy
-longbimpy: $(OBJDR)/Vlongbimpy__ALL.a
+longbimpy: $(VOBJDR)/Vlongbimpy__ALL.a
 
 $(CORED)/longbimpy.v: fft
-$(OBJDR)/Vlongbimpy.cpp $(OBJDR)/Vlongbimpy.h: $(CORED)/longbimpy.v
+$(VOBJDR)/Vlongbimpy.cpp $(VOBJDR)/Vlongbimpy.h: $(CORED)/longbimpy.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) longbimpy.v
-$(OBJDR)/Vlongbimpy__ALL.a: $(OBJDR)/Vlongbimpy.h
-$(OBJDR)/Vlongbimpy__ALL.a: $(OBJDR)/Vlongbimpy.cpp
-	cd $(OBJDR)/; make -f Vlongbimpy.mk
+$(VOBJDR)/Vlongbimpy__ALL.a: $(VOBJDR)/Vlongbimpy.h
+$(VOBJDR)/Vlongbimpy__ALL.a: $(VOBJDR)/Vlongbimpy.cpp
+	cd $(VOBJDR)/; make -f Vlongbimpy.mk
 
 .PHONY: butterfly
-butterfly: $(OBJDR)/Vbutterfly__ALL.a
+butterfly: $(VOBJDR)/Vbutterfly__ALL.a
 
 $(CORED)/butterfly.v: fft
-$(OBJDR)/Vbutterfly.cpp $(OBJDR)/Vbutterfly.h: $(CORED)/butterfly.v
+$(VOBJDR)/Vbutterfly.cpp $(VOBJDR)/Vbutterfly.h: $(CORED)/butterfly.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) butterfly.v
-$(OBJDR)/Vbutterfly__ALL.a: $(OBJDR)/Vbutterfly.h
-$(OBJDR)/Vbutterfly__ALL.a: $(OBJDR)/Vbutterfly.cpp
-	cd $(OBJDR)/; make -f Vbutterfly.mk
+$(VOBJDR)/Vbutterfly__ALL.a: $(VOBJDR)/Vbutterfly.h
+$(VOBJDR)/Vbutterfly__ALL.a: $(VOBJDR)/Vbutterfly.cpp
+	cd $(VOBJDR)/; make -f Vbutterfly.mk
 
 .PHONY: hwbfly
-hwbfly: $(OBJDR)/Vhwbfly__ALL.a
+hwbfly: $(VOBJDR)/Vhwbfly__ALL.a
 
 $(CORED)/hwbfly.v: fft
-$(OBJDR)/Vhwbfly.cpp $(OBJDR)/Vhwbfly.h: $(CORED)/hwbfly.v
+$(VOBJDR)/Vhwbfly.cpp $(VOBJDR)/Vhwbfly.h: $(CORED)/hwbfly.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) hwbfly.v
-$(OBJDR)/Vhwbfly__ALL.a: $(OBJDR)/Vhwbfly.h
-$(OBJDR)/Vhwbfly__ALL.a: $(OBJDR)/Vhwbfly.cpp
-	cd $(OBJDR)/; make -f Vhwbfly.mk
+$(VOBJDR)/Vhwbfly__ALL.a: $(VOBJDR)/Vhwbfly.h
+$(VOBJDR)/Vhwbfly__ALL.a: $(VOBJDR)/Vhwbfly.cpp
+	cd $(VOBJDR)/; make -f Vhwbfly.mk
 
 .PHONY: dblreverse
-dblreverse: $(OBJDR)/Vdblreverse__ALL.a
+dblreverse: $(VOBJDR)/Vdblreverse__ALL.a
 
 $(CORED)/dblreverse.v: fft
-$(OBJDR)/Vdblreverse.cpp $(OBJDR)/Vdblreverse.h: $(CORED)/dblreverse.v
+$(VOBJDR)/Vdblreverse.cpp $(VOBJDR)/Vdblreverse.h: $(CORED)/dblreverse.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) dblreverse.v
-$(OBJDR)/Vdblreverse__ALL.a: $(OBJDR)/Vdblreverse.h
-$(OBJDR)/Vdblreverse__ALL.a: $(OBJDR)/Vdblreverse.cpp
-	cd $(OBJDR)/; make -f Vdblreverse.mk
+$(VOBJDR)/Vdblreverse__ALL.a: $(VOBJDR)/Vdblreverse.h
+$(VOBJDR)/Vdblreverse__ALL.a: $(VOBJDR)/Vdblreverse.cpp
+	cd $(VOBJDR)/; make -f Vdblreverse.mk
 
 .PHONY: snglbrev
-snglbrev: $(OBJDR)/Vsnglbrev__ALL.a
+snglbrev: $(VOBJDR)/Vsnglbrev__ALL.a
 
 $(CORED)/snglbrev.v: fft
-$(OBJDR)/Vsnglbrev.cpp $(OBJDR)/Vsnglbrev.h: $(CORED)/snglbrev.v
+$(VOBJDR)/Vsnglbrev.cpp $(VOBJDR)/Vsnglbrev.h: $(CORED)/snglbrev.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) snglbrev.v
-$(OBJDR)/Vsnglbrev__ALL.a: $(OBJDR)/Vsnglbrev.h
-$(OBJDR)/Vsnglbrev__ALL.a: $(OBJDR)/Vsnglbrev.cpp
-	cd $(OBJDR)/; make -f Vsnglbrev.mk
+$(VOBJDR)/Vsnglbrev__ALL.a: $(VOBJDR)/Vsnglbrev.h
+$(VOBJDR)/Vsnglbrev__ALL.a: $(VOBJDR)/Vsnglbrev.cpp
+	cd $(VOBJDR)/; make -f Vsnglbrev.mk
 
 .PHONY: qtrstage
-qtrstage: $(OBJDR)/Vqtrstage__ALL.a
+qtrstage: $(VOBJDR)/Vqtrstage__ALL.a
 
 $(CORED)/qtrstage.v: fft
-$(OBJDR)/Vqtrstage.cpp $(OBJDR)/Vqtrstage.h: $(CORED)/qtrstage.v
+$(VOBJDR)/Vqtrstage.cpp $(VOBJDR)/Vqtrstage.h: $(CORED)/qtrstage.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) qtrstage.v
-$(OBJDR)/Vqtrstage__ALL.a: $(OBJDR)/Vqtrstage.h
-$(OBJDR)/Vqtrstage__ALL.a: $(OBJDR)/Vqtrstage.cpp
-	cd $(OBJDR)/; make -f Vqtrstage.mk
+$(VOBJDR)/Vqtrstage__ALL.a: $(VOBJDR)/Vqtrstage.h
+$(VOBJDR)/Vqtrstage__ALL.a: $(VOBJDR)/Vqtrstage.cpp
+	cd $(VOBJDR)/; make -f Vqtrstage.mk
 
 .PHONY: dblstage
-dblstage: $(OBJDR)/Vdblstage__ALL.a
+dblstage: $(VOBJDR)/Vdblstage__ALL.a
 
 $(CORED)/dblstage.v: fft
-$(OBJDR)/Vdblstage.cpp $(OBJDR)/Vdblstage.h: $(CORED)/dblstage.v
+$(VOBJDR)/Vdblstage.cpp $(VOBJDR)/Vdblstage.h: $(CORED)/dblstage.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) dblstage.v
-$(OBJDR)/Vdblstage__ALL.a: $(OBJDR)/Vdblstage.h
-$(OBJDR)/Vdblstage__ALL.a: $(OBJDR)/Vdblstage.cpp
-	cd $(OBJDR)/; make -f Vdblstage.mk
+$(VOBJDR)/Vdblstage__ALL.a: $(VOBJDR)/Vdblstage.h
+$(VOBJDR)/Vdblstage__ALL.a: $(VOBJDR)/Vdblstage.cpp
+	cd $(VOBJDR)/; make -f Vdblstage.mk
 
 .PHONY: sngllast
-sngllast: $(OBJDR)/Vsngllast__ALL.a
+sngllast: $(VOBJDR)/Vsngllast__ALL.a
 
 $(CORED)/sngllast.v: fft
-$(OBJDR)/Vsngllast.cpp $(OBJDR)/Vsngllast.h: $(CORED)/sngllast.v
+$(VOBJDR)/Vsngllast.cpp $(VOBJDR)/Vsngllast.h: $(CORED)/sngllast.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) sngllast.v
-$(OBJDR)/Vsngllast__ALL.a: $(OBJDR)/Vsngllast.h
-$(OBJDR)/Vsngllast__ALL.a: $(OBJDR)/Vsngllast.cpp
-	cd $(OBJDR)/; make -f Vsngllast.mk
+$(VOBJDR)/Vsngllast__ALL.a: $(VOBJDR)/Vsngllast.h
+$(VOBJDR)/Vsngllast__ALL.a: $(VOBJDR)/Vsngllast.cpp
+	cd $(VOBJDR)/; make -f Vsngllast.mk
 
 .PHONY: fftstage
-dblstage: $(OBJDR)/Vfftstage__ALL.a
+fftstage: $(VOBJDR)/Vfftstage__ALL.a
 
 $(CORED)/fftstage.v: fft
-$(OBJDR)/Vfftstage.cpp $(OBJDR)/Vfftstage.h: $(CORED)/fftstage.v
+$(VOBJDR)/Vfftstage.cpp $(VOBJDR)/Vfftstage.h: $(CORED)/fftstage.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftstage.v
-$(OBJDR)/Vfftstage__ALL.a: $(OBJDR)/Vfftstage.h
-$(OBJDR)/Vfftstage__ALL.a: $(OBJDR)/Vfftstage.cpp
-	cd $(OBJDR)/; make -f Vfftstage.mk
+$(VOBJDR)/Vfftstage__ALL.a: $(VOBJDR)/Vfftstage.h
+$(VOBJDR)/Vfftstage__ALL.a: $(VOBJDR)/Vfftstage.cpp
+	cd $(VOBJDR)/; make -f Vfftstage.mk
+
 
 .PHONY: clean
 clean:
 	rm fftgen fftgen.o
 	rm -rf $(CORED)
 
+#
+# The "depends" target, to know what files things depend upon.  The depends
+# file itself is kept in $(OBJDIR)/depends.txt
+#
+define	build-depends
+	$(mk-objdir)
+	@echo "Building dependency file"
+	@$(CXX) $(CFLAGS) $(INCS) -MM $(SOURCES) > $(OBJDIR)/xdepends.txt
+@sed -e 's/^.*.o: /$(OBJDIR)\/&/' < $(OBJDIR)/xdepends.txt > $(OBJDIR)/depends.txt
+	@rm $(OBJDIR)/xdepends.txt
+endef
 
+.PHONY: depends
+depends: tags
+	$(build-depends)
+
+$(OBJDIR)/depends.txt: depends
+
+#
+# Make a directory to hold all of the FFT-gen (i.e. the C++) build products
+# (object files)
+#
+define	mk-objdir
+	@bash -c "if [ ! -e $(OBJDIR) ]; then mkdir -p $(OBJDIR); fi"
+endef
+
+#
+# The "tags" target
+#
+tags:	$(SOURCES) $(HEADERS)
+	@echo "Generating tags"
+	@ctags $(SOURCES) $(HEADERS)
+
+-include $(OBJDIR)/depends.txt
