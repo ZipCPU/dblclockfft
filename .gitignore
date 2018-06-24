@@ -12,3 +12,4 @@ fftgen
 fftsize.h
 ifftsize.h
 tags
+*.vcd
