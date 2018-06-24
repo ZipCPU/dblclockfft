@@ -11,7 +11,7 @@
 ##	be too difficult to modify for other FFT parameters.
 ##
 ##	Please note that running these test benches requires access to the
-##	*cmem_*.hex files found in trunk/sw/fft-core.  I usually soft link
+##	*cmem_*.hex files found in trunk/rtl.  I usually soft link
 ##	them into this directory, but such linking is not currently part of
 ##	this makefile or the build scripts.
 ##
@@ -44,8 +44,8 @@
 ##########################################################################/
 all: mpy_tb dblrev_tb dblstage_tb qtrstage_tb fft_tb test snglrev_tb
 
-OBJDR:= ../../sw/fft-core/obj_dir
-VSRCD = ../../sw/fft-core
+OBJDR:= ../../rtl/obj_dir
+VSRCD = ../../rtl
 TBODR:= ../rtl/obj_dir
 ifneq ($(VERILATOR_ROOT),)
 VERILATOR:=$(VERILATOR_ROOT)/bin/verilator
@@ -67,17 +67,19 @@ BFLYL:= $(OBJDR)/Vbutterfly__ALL.a
 HWBFY:= $(OBJDR)/Vhwbfly__ALL.a
 FFTLB:= $(OBJDR)/Vfftmain__ALL.a
 IFTLB:= $(TBODR)/Vifft_tb__ALL.a
-STGLB:= $(OBJDR)/Vfftstage_o2048__ALL.a
+STGLB:= $(OBJDR)/Vfftstage__ALL.a
 VSRCS:= $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_vcd_c.cpp
 
 mpy_tb: mpy_tb.cpp fftsize.h twoc.h $(MPYLB)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(MPYLB) $(VSRCS) -o $@
 
-dblrev_tb: dblrev_tb.cpp twoc.cpp twoc.h fftsize.h $(DBLRV)
+ifeq (($wildcard $(OBJDR)/Vsnglbrev___ALL.a),)
+bitreverse_tb: bitreverse_tb.cpp twoc.cpp twoc.h fftsize.h $(DBLRV)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLRV) $(VSRCS) -o $@
-
-snglbrev_tb: snglbrev_tb.cpp twoc.cpp twoc.h fftsize.h $(SGLRV)
+else
+bitreverse_tb: bitreverse_tb.cpp twoc.cpp twoc.h fftsize.h $(SGLRV)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(SGLRV) $(VSRCS) -o $@
+endif
 
 dblstage_tb: dblstage_tb.cpp twoc.cpp twoc.h $(DBLSG)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLSG) $(VSRCS) -o $@
@@ -91,7 +93,7 @@ butterfly_tb: butterfly_tb.cpp twoc.cpp twoc.h fftsize.h $(BFLYL)
 hwbfly_tb: hwbfly_tb.cpp twoc.cpp twoc.h $(HWBFY)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(HWBFY) $(VSRCS) -o $@
 
-fftstage_o2048_tb: fftstage_o2048_tb.cpp twoc.cpp twoc.h $(STGLB)
+fftstage_tb: fftstage_tb.cpp twoc.cpp twoc.h $(STGLB)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(STGLB) $(VSRCS) -o $@
 
 fft_tb: fft_tb.cpp twoc.cpp twoc.h fftsize.h $(FFTLB)
@@ -115,7 +117,7 @@ HEX:
 	ln -s $(VSRCD)/*.hex .
 
 .PHONY: test
-test: mpy_tb dblrev_tb dblstage_tb qtrstage_tb butterfly_tb fftstage_o2048_tb
+test: mpy_tb dblrev_tb dblstage_tb qtrstage_tb butterfly_tb fftstage_tb
 test: fft_tb ifft_tb hwbfly_tb
 	./mpy_tb
 	./dblrev_tb
@@ -123,14 +125,14 @@ test: fft_tb ifft_tb hwbfly_tb
 	./qtrstage_tb
 	./butterfly_tb
 	./hwbfly_tb
-	./fftstage_o2048_tb
+	./fftstage_tb
 	./fft_tb
 	./ifft_tb
 
 .PHONY: clean
 clean:
 	rm -f mpy_tb dblrev_tb dblstage_tb qtrstage_tb butterfly_tb
-	rm -f fftstage_o2048_tb fft_tb ifft_tb hwbfly_tb
+	rm -f fftstage_tb fft_tb ifft_tb hwbfly_tb
 	rm -rf fft_tb.dbl ifft_tb.dbl
 	rm -rf *cmem_*.hex
 

@@ -45,7 +45,14 @@
 #include "fftsize.h"
 #include "Vbutterfly.h"
 #include "verilated.h"
+#include "verilated_vcd_c.h"
 #include "twoc.h"
+
+#ifdef	NEW_VERILATOR
+#define	VVAR(A)	butterfly__DOT__ ## A
+#else
+#define	VVAR(A)	v__DOT_ ## A
+#endif
 
 #define	IWIDTH	TST_BUTTERFLY_IWIDTH
 #define	CWIDTH	TST_BUTTERFLY_CWIDTH
@@ -55,57 +62,108 @@
 class	BFLY_TB {
 public:
 	Vbutterfly	*m_bfly;
+	VerilatedVcdC	*m_trace;
 	unsigned long	m_left[64], m_right[64];
 	bool		m_aux[64];
 	int		m_addr, m_lastaux, m_offset;
 	bool		m_syncd, m_waiting_for_sync_input;
+	uint64_t	m_tickcount;
 
 	BFLY_TB(void) {
+		Verilated::traceEverOn(true);
+		m_trace = NULL;
+
 		m_bfly = new Vbutterfly;
 		m_addr = 0;
 		m_syncd = 0;
+		m_tickcount = 0;
 		m_waiting_for_sync_input = true;
 	}
 
+	void	opentrace(const char *vcdname) {
+		if (!m_trace) {
+			m_trace = new VerilatedVcdC;
+			m_bfly->trace(m_trace, 99);
+			m_trace->open(vcdname);
+		}
+	}
+
+	void	closetrace(void) {
+		if (m_trace) {
+			m_trace->close();
+			delete	m_trace;
+			m_trace = NULL;
+		}
+	}
+
 	void	tick(void) {
+		m_tickcount++;
+
 		m_lastaux = m_bfly->o_aux;
 		m_bfly->i_clk = 0;
 		m_bfly->eval();
+		if (m_trace) m_trace->dump((uint64_t)(10ul*m_tickcount-2));
 		m_bfly->i_clk = 1;
 		m_bfly->eval();
+		if (m_trace) m_trace->dump((uint64_t)(10ul*m_tickcount));
+		m_bfly->i_clk = 0;
+		m_bfly->eval();
+		if (m_trace) {
+			m_trace->dump((uint64_t)(10ul*m_tickcount+5));
+			m_trace->flush();
+		}
 
 		if ((!m_syncd)&&(m_bfly->o_aux))
 			m_offset = m_addr;
 		m_syncd = (m_syncd) || (m_bfly->o_aux);
 	}
 
+	void	cetick(void) {
+		int	ce = m_bfly->i_ce, nkce;
+
+		tick();
+
+		nkce = (rand()&1);
+#ifdef	FFT_CKPCE
+		nkce += FFT_CKPCE;
+#endif
+
+		if ((ce)&&(nkce > 0)) {
+			m_bfly->i_ce = 0;
+			for(int kce=0; kce<nkce-1; kce++)
+				tick();
+		}
+
+		m_bfly->i_ce = ce;
+	}
+
 	void	reset(void) {
 		m_bfly->i_ce    = 0;
-		m_bfly->i_rst   = 1;
+		m_bfly->i_reset = 1;
 		m_bfly->i_coef  = 0l;
 		m_bfly->i_left  = 0;
 		m_bfly->i_right = 0;
 		tick();
-		m_bfly->i_rst = 0;
+		m_bfly->i_reset = 0;
 		m_bfly->i_ce  = 1;
 		//
 		// Let's run a RESET test here, forcing the whole butterfly
 		// to be filled with aux=1.  If the reset works right,
 		// we'll never get an aux=1 output.
 		//
-		m_bfly->i_rst = 1;
+		m_bfly->i_reset = 1;
 		m_bfly->i_aux = 1;
+		m_bfly->i_ce = 1;
 		for(int i=0; i<200; i++) {
-			m_bfly->i_ce = 1;
-			tick();
+			cetick();
 		}
 
 		// Now here's the RESET line, so let's see what the test does
-		m_bfly->i_rst = 1;
+		m_bfly->i_reset = 1;
 		m_bfly->i_ce  = 1;
 		m_bfly->i_aux = 1;
-		tick();
-		m_bfly->i_rst = 0;
+		cetick();
+		m_bfly->i_reset = 0;
 		m_syncd = 0;
 
 		m_waiting_for_sync_input = true;
@@ -124,7 +182,7 @@ public:
 		}
 
 		m_bfly->i_ce = 1;
-		tick();
+		cetick();
 
 		if ((m_bfly->o_aux)&&(!m_lastaux))
 			printf("\n");
@@ -250,6 +308,8 @@ int	main(int argc, char **argv, char **envp) {
 	int		rnd = 0;
 
 	const int	TESTSZ = 256;
+
+	bfly->opentrace("butterfly.vcd");
 
 	bfly->reset();
 

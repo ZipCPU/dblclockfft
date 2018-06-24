@@ -54,7 +54,7 @@
 #define	VVAR(A)	v__DOT_ ## A
 #endif
 
-class	BFLY_TB {
+class	HWBFLY_TB {
 public:
 	Vhwbfly		*m_bfly;
 	VerilatedVcdC	*m_trace;
@@ -64,7 +64,7 @@ public:
 	bool		m_syncd;
 	uint64_t	m_tickcount;
 
-	BFLY_TB(void) {
+	HWBFLY_TB(void) {
 		Verilated::traceEverOn(true);
 		m_bfly = new Vhwbfly;
 		m_addr = 0;
@@ -116,9 +116,12 @@ public:
 	void	cetick(void) {
 		int	ce = m_bfly->i_ce, nkce;
 
-		nkce = FFT_CKPCE + (rand()&1);
 		tick();
 
+		nkce = (rand()&1);
+#ifdef	FFT_CKPCE
+		nkce += FFT_CKPCE;
+#endif
 		if ((ce)&&(nkce>0)) {
 			m_bfly->i_ce = 0;
 			for(int kce=0; kce<nkce-1; kce++)
@@ -181,14 +184,20 @@ public:
 			m_bfly->o_aux);
 #if (FFT_CKPCE == 1)
 		printf(", p1 = 0x%08lx p2 = 0x%08lx, p3 = 0x%08lx",
-			m_bfly->v__DOT__CKPCE_ONE__DOT__rp_one,
-			m_bfly->v__DOT__CKPCE_ONE__DOT__rp_two,
-			m_bfly->v__DOT__CKPCE_ONE__DOT__rp_three);
+#define	rp_one		VVAR(_CKPCE_ONE__DOT__rp_one)
+#define	rp_two		VVAR(_CKPCE_ONE__DOT__rp_two)
+#define	rp_three	VVAR(_CKPCE_ONE__DOT__rp_three)
+			m_bfly->rp_one,
+			m_bfly->rp_two,
+			m_bfly->rp_three);
 #elif (FFT_CKPCE == 2)
+#define	rp_one		VVAR(_genblk1__DOT__CKPCE_TWO__DOT__rp2_one)
+#define	rp_two		VVAR(_genblk1__DOT__CKPCE_TWO__DOT__rp_two)
+#define	rp_three	VVAR(_genblk1__DOT__CKPCE_TWO__DOT__rp_three)
 		printf(", p1 = 0x%08lx p2 = 0x%08lx, p3 = 0x%08lx",
-			m_bfly->v__DOT__genblk1__DOT__CKPCE_TWO__DOT__rp2_one,
-			m_bfly->v__DOT__genblk1__DOT__CKPCE_TWO__DOT__rp_two,
-			m_bfly->v__DOT__genblk1__DOT__CKPCE_TWO__DOT__rp_three);
+			m_bfly->rp_one,
+			m_bfly->rp_two,
+			m_bfly->rp_three);
 #else
 		printf("CKPCE = %d\n", CKPCE);
 #endif
@@ -295,7 +304,7 @@ public:
 
 int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
-	BFLY_TB	*bfly = new BFLY_TB;
+	HWBFLY_TB	*bfly = new HWBFLY_TB;
 	int16_t		ir0, ii0, lstr, lsti;
 	int32_t		sumr, sumi, difr, difi;
 	int32_t		smr, smi, dfr, dfi;

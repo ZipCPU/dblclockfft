@@ -5,19 +5,18 @@
 //
 // Purpose:	A test-bench for the main program, fftmain.v, of the double
 //		clocked FFT.  This file may be run autonomously  (when
-//		fully functional).  If so, the last line output will either
-//		read "SUCCESS" on success, or some other failure message
-//		otherwise.
+//	fully functional).  If so, the last line output will either read
+//	"SUCCESS" on success, or some other failure message otherwise.
 //
-//		This file depends upon verilator to both compile, run, and
-//		therefore test fftmain.v
+//	This file depends upon verilator to both compile, run, and therefore
+//	test fftmain.v
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2018, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -184,6 +183,23 @@ public:
 		}
 	}
 
+	void	cetick(void) {
+		int	ce = m_fft->i_ce, nkce;
+		tick();
+
+		nkce = (rand()&1);
+#ifdef	FFT_CKPCE
+		nkce += FFT_CKPCE;
+#endif
+		if ((ce)&&(nkce>0)) {
+			m_fft->i_ce = 0;
+			for(int kce=1; kce < nkce; kce++);
+				tick();
+		}
+
+		m_fft->i_ce = ce;
+	}
+
 	void	reset(void) {
 		m_fft->i_ce  = 0;
 		m_fft->i_reset = 1;
@@ -298,7 +314,7 @@ public:
 		m_log[(m_iaddr++)&(NFTLOG*FFTLEN-1)] = lft;
 		m_log[(m_iaddr++)&(NFTLOG*FFTLEN-1)] = rht;
 
-		tick();
+		cetick();
 
 		if (m_fft->o_sync) {
 			if (!m_syncd) {
@@ -373,14 +389,7 @@ public:
 
 		m_log[(m_iaddr++)&(NFTLOG*FFTLEN-1)] = data;
 
-		tick();
-		m_fft->i_ce = 0;
-#ifdef	FFT_CKPCE
-		for(int i=0; i<FFT_CKPCE-1; i++)
-			tick();
-#endif
-		if (rand()&1)
-			tick();
+		cetick();
 
 		if (m_fft->o_sync) {
 			if (!m_syncd) {

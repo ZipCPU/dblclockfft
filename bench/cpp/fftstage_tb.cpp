@@ -1,28 +1,26 @@
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	fftstage_o2048_tb.cpp
+// Filename: 	fftstage_tb.cpp
 //
-// Project:	A Doubletime Pipelined FFT
+// Project:	A General Purpose Pipelined FFT Implementation
 //
-// Purpose:	A test-bench for the generic FFT stage which has been
-//		instantiated by fftgen as fftstage_o2048.v.  Specifically,
-//		This is the stage with the odd half of the coefficients.
-//		This file may be run autonomously.  If so, the last line
-//		output will either read "SUCCESS" on success, or some other
-//		failure message otherwise.  Likewise the exit code will
-//		also indicate success (exit(0)) or failure (anything else).
+// Purpose:	A test-bench for a generic FFT stage which has been
+//		instantiated by fftgen.  Without loss of (much) generality,
+//	we'll examine the 2048 fftstage.v.  This file may be run autonomously.
+//	If so, the last line output will either read "SUCCESS" on success, or
+//	some other failure message otherwise.  Likewise the exit code will
+//	also indicate success (exit(0)) or failure (anything else).
 //
-//		This file depends upon verilator to both compile, run, and
-//		therefore test fftstage_o2048.v.  Also, you'll need to place
-//		a copy of the cmem_o2048 hex file into the directory where
-//		you run this test bench.
+//	This file depends upon verilator to both compile, run, and therefore
+//	test fftstage.v.  Also, you'll need to place a copy of the cmem_*2048
+//	hex file into the directory where you run this test bench.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015-2018, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -43,13 +41,17 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
-#include "Vfftstage_o2048.h"
+////////////////////////////////////////////////////////////////////////////////
+//
+//
+#include "Vfftstage.h"
 #include "verilated.h"
+#include "verilated_vcd_c.h"
+#include "fftsize.h"
 
 
 #ifdef	NEW_VERILATOR
-#define	VVAR(A)	fftstage_o2048__DOT_ ## A
+#define	VVAR(A)	fftstage__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A
 #endif
@@ -57,59 +59,110 @@
 #define	cmem	VVAR(_cmem)
 #define	iaddr	VVAR(_iaddr)
 
-#define	FFTBITS	11
+#define	FFTBITS	(FFT_LGWIDTH)
 #define	FFTLEN	(1<<FFTBITS)
 #define	FFTSIZE	FFTLEN
 #define	FFTMASK	(FFTLEN-1)
-#define	LGSPAN	9
+#define	IWIDTH	FFT_IWIDTH
+#define	CWIDTH	20
+#define	OWIDTH	(FFT_IWIDTH+1)
+#define	BFLYSHIFT	0
+#define	LGWIDTH	(FFT_LGWIDTH)
+#ifdef	DBLCLKFFT
+#define	LGSPAN	(LGWIDTH-2)
+#else
+#define	LGSPAN	(LGWIDTH-1)
+#endif
+#define	ROUND	true
+
 #define	SPANLEN	(1<<LGSPAN)
 #define	SPANMASK	(SPANLEN-1)
 #define	DBLSPANLEN	(1<<(LGSPAN+4))
 #define	DBLSPANMASK	(DBLSPANLEN-1)
-#define	IWIDTH	16
-#define	CWIDTH	20
-#define	OWIDTH	17
-#define	BFLYSHIFT	0
-#define	LGWIDTH	11
-#define	LGSPAN	9
-#define	ROUND	true
 
 class	FFTSTAGE_TB {
 public:
-	Vfftstage_o2048	*m_ftstage;
+	Vfftstage	*m_ftstage;
+	VerilatedVcdC	*m_trace;
 	long		m_oaddr, m_iaddr;
 	long		m_vals[SPANLEN], m_out[DBLSPANLEN];
 	bool		m_syncd;
 	int		m_offset;
+	uint64_t	m_tickcount;
 
 	FFTSTAGE_TB(void) {
-		m_ftstage = new Vfftstage_o2048;
+		Verilated::traceEverOn(true);
+		m_ftstage = new Vfftstage;
 		m_syncd = false;
 		m_iaddr = m_oaddr = 0;
 		m_offset = 0;
+		m_tickcount = 0;
+	}
+
+	void	opentrace(const char *vcdname) {
+		if (!m_trace) {
+			m_trace = new VerilatedVcdC;
+			m_ftstage->trace(m_trace, 99);
+			m_trace->open(vcdname);
+		}
+	}
+
+	void	closetrace(void) {
+		if (m_trace) {
+			m_trace->close();
+			delete	m_trace;
+			m_trace = NULL;
+		}
 	}
 
 	void	tick(void) {
+		m_tickcount++;
+
 		m_ftstage->i_clk = 0;
 		m_ftstage->eval();
+		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount-2));
 		m_ftstage->i_clk = 1;
 		m_ftstage->eval();
+		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount));
+		m_ftstage->i_clk = 0;
+		m_ftstage->eval();
+		if (m_trace) {
+			m_trace->dump((uint64_t)(10ul*m_tickcount+5));
+			m_trace->flush();
+		}
+	}
+
+	void	cetick(void) {
+		int	ce = m_ftstage->i_ce, nkce;
+
+		tick();
+		nkce = (rand()&1);
+#ifdef	FFT_CKPCE
+		nkce += FFT_CKPCE;
+#endif
+		if ((ce)&&(nkce > 0)) {
+			m_ftstage->i_ce = 0;
+			for(int kce = 1; kce < nkce; kce++)
+				tick();
+		}
+
+		m_ftstage->i_ce = ce;
 	}
 
 	void	reset(void) {
 		m_ftstage->i_ce  = 0;
-		m_ftstage->i_rst = 1;
+		m_ftstage->i_reset = 1;
 		tick();
 
 		// Let's give it several ticks with no sync
 		m_ftstage->i_ce = 0;
-		m_ftstage->i_rst = 0;
+		m_ftstage->i_reset = 0;
 		for(int i=0; i<8192; i++) {
 			m_ftstage->i_data = rand();
 			m_ftstage->i_sync = 0;
 			m_ftstage->i_ce = 1;
 
-			tick();
+			cetick();
 
 			assert(m_ftstage->o_sync == 0);
 		}
@@ -184,7 +237,7 @@ public:
 		int	raddr;
 		bool	failed = false;
 
-		m_ftstage->i_rst  = 0;
+		m_ftstage->i_reset  = 0;
 		m_ftstage->i_ce   = 1;
 		m_ftstage->i_sync = i_sync;
 		i_data &= (~(-1l<<(2*IWIDTH)));
@@ -210,7 +263,7 @@ public:
 			*/
 		}
 
-		tick();
+		cetick();
 
 		if ((!m_syncd)&&(m_ftstage->o_sync)) {
 			m_syncd = true;
@@ -265,6 +318,7 @@ int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	FFTSTAGE_TB	*ftstage = new FFTSTAGE_TB;
 
+	ftstage->opentrace("fftstage.vcd");
 	ftstage->reset();
 
 	// Medium real (constant) value ... just for starters
