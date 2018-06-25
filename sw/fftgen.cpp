@@ -1014,11 +1014,11 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize/2,  nbitsin+xtracbits, 1, 0, inverse);
-				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 					(inverse)?"i":"",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
-					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
+					lgsize, lgtmp-1, lgdelay(nbits,xtracbits),
 					(mpystage)?1:0, ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d%d, w_s%d%s);\n",
@@ -1118,7 +1118,7 @@ SLASHLINE
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
-						lgsize, lgtmp-2,
+						lgsize, lgtmp-1,
 						lgdelay(nbits+xtrapbits,xtracbits),
 						(dropbit)?0:0,
 						(mpystage)?1:0, ckpce,
@@ -1285,12 +1285,12 @@ SLASHLINE
 	if (bitreverse) {
 		if (single_clock) {
 			fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_o_result;\n");
-			fprintf(vmain, "\tsnglbrev\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
+			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
 			fprintf(vmain, "\t\t\t(i_ce & br_start), br_sample,\n");
 			fprintf(vmain, "\t\t\tbr_o_result, br_sync);\n");
 		} else {
 			fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_o_left, br_o_right;\n");
-			fprintf(vmain, "\tdblreverse\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
+			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
 			fprintf(vmain, "\t\t\t(i_ce & br_start), br_left, br_right,\n");
 			fprintf(vmain, "\t\t\tbr_o_left, br_o_right, br_sync);\n");
 		}
@@ -1380,13 +1380,11 @@ SLASHLINE
 		}
 
 		if (bitreverse) {
-			if (single_clock) {
-				fname = coredir + "/snglbrev.v";
+			fname = coredir + "/bitreverse.v";
+			if (single_clock)
 				build_snglbrev(fname.c_str(), async_reset);
-			} else {
-				fname = coredir + "/dblreverse.v";
+			else
 				build_dblreverse(fname.c_str(), async_reset);
-			}
 		}
 
 		const	char	*rnd_string = "";

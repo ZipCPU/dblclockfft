@@ -42,7 +42,8 @@
 ##
 ##
 ##########################################################################/
-all: mpy_tb dblrev_tb dblstage_tb qtrstage_tb fft_tb test snglrev_tb
+all: mpy_tb bitreverse_tb hwbfly_tb butterfly_tb fftstage_tb fft_tb
+# all: qtrstage_tb test
 
 OBJDR:= ../../rtl/obj_dir
 VSRCD = ../../rtl
@@ -59,9 +60,9 @@ VDEFS:= $(shell ./vversion.sh)
 VINC := -I$(VROOT)/include -I$(OBJDR)/ -I$(TBODR)/
 # MPYLB:= $(OBJDR)/Vshiftaddmpy__ALL.a
 MPYLB:= $(OBJDR)/Vlongbimpy__ALL.a
-DBLRV:= $(OBJDR)/Vdblreverse__ALL.a
+BTREV:= $(OBJDR)/Vbitreverse__ALL.a
 SGLRV:= $(OBJDR)/Vsnglbrev__ALL.a
-DBLSG:= $(OBJDR)/Vdblstage__ALL.a
+STAGE:= $(OBJDR)/Vfftstage__ALL.a
 QTRSG:= $(OBJDR)/Vqtrstage__ALL.a
 BFLYL:= $(OBJDR)/Vbutterfly__ALL.a
 HWBFY:= $(OBJDR)/Vhwbfly__ALL.a
@@ -73,16 +74,11 @@ VSRCS:= $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_vcd_c.cpp
 mpy_tb: mpy_tb.cpp fftsize.h twoc.h $(MPYLB)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(MPYLB) $(VSRCS) -o $@
 
-ifeq (($wildcard $(OBJDR)/Vsnglbrev___ALL.a),)
-bitreverse_tb: bitreverse_tb.cpp twoc.cpp twoc.h fftsize.h $(DBLRV)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLRV) $(VSRCS) -o $@
-else
-bitreverse_tb: bitreverse_tb.cpp twoc.cpp twoc.h fftsize.h $(SGLRV)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(SGLRV) $(VSRCS) -o $@
-endif
+bitreverse_tb: bitreverse_tb.cpp twoc.cpp twoc.h fftsize.h $(BTREV)
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(BTREV) $(VSRCS) -o $@
 
-dblstage_tb: dblstage_tb.cpp twoc.cpp twoc.h $(DBLSG)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLSG) $(VSRCS) -o $@
+# fftstage_tb: fftstage_tb.cpp twoc.cpp twoc.h $(DBLSG)
+#	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLSG) $(VSRCS) -o $@
 
 qtrstage_tb: qtrstage_tb.cpp twoc.cpp twoc.h $(QTRSG)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(QTRSG) $(VSRCS) -o $@
@@ -117,12 +113,12 @@ HEX:
 	ln -s $(VSRCD)/*.hex .
 
 .PHONY: test
-test: mpy_tb dblrev_tb dblstage_tb qtrstage_tb butterfly_tb fftstage_tb
+test: mpy_tb bitreverse_tb fftstage_tb qtrstage_tb butterfly_tb fftstage_tb
 test: fft_tb ifft_tb hwbfly_tb
 	./mpy_tb
-	./dblrev_tb
-	./dblstage_tb
-	./qtrstage_tb
+	./bitreverse_tb
+	./fftstage_tb
+	echo ./qtrstage_tb
 	./butterfly_tb
 	./hwbfly_tb
 	./fftstage_tb
@@ -131,7 +127,7 @@ test: fft_tb ifft_tb hwbfly_tb
 
 .PHONY: clean
 clean:
-	rm -f mpy_tb dblrev_tb dblstage_tb qtrstage_tb butterfly_tb
+	rm -f mpy_tb bitreverse_tb fftstage_tb qtrstage_tb butterfly_tb
 	rm -f fftstage_tb fft_tb ifft_tb hwbfly_tb
 	rm -rf fft_tb.dbl ifft_tb.dbl
 	rm -rf *cmem_*.hex

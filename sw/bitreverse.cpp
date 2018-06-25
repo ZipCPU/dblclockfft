@@ -73,10 +73,16 @@ void	build_snglbrev(const char *fname, const bool async_reset) {
 	if (async_reset)
 		resetw = std::string("i_areset_n");
 
+	char	*modulename = strdup(fname), *pslash;
+	modulename[strlen(modulename)-2] = '\0';
+	pslash = strrchr(modulename, '/');
+	if (pslash != NULL)
+		strcpy(modulename, pslash+1);
+
 	fprintf(fp,
 SLASHLINE
 "//\n"
-"// Filename:\tsnglbrev.v\n"
+"// Filename:\t%s.v\n"
 "//\n"
 "// Project:\t%s\n"
 "//\n"
@@ -86,16 +92,16 @@ SLASHLINE
 "//	words at once.\n"
 "//\n"
 "//\n%s"
-"//\n", prjname, creator);
+"//\n", modulename, prjname, creator);
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	snglbrev(i_clk, %s, i_ce, i_in, o_out, o_sync);\n"
+"module	%s(i_clk, %s, i_ce, i_in, o_out, o_sync);\n"
 	"\tparameter\t\t\tLGSIZE=%d, WIDTH=24;\n"
 	"\tinput\t\t\t\ti_clk, %s, i_ce;\n"
 	"\tinput\t\t[(2*WIDTH-1):0]\ti_in;\n"
 	"\toutput\twire\t[(2*WIDTH-1):0]\to_out;\n"
-	"\toutput\treg\t\t\to_sync;\n", resetw.c_str(),
+	"\toutput\treg\t\t\to_sync;\n", modulename, resetw.c_str(),
 		TST_DBLREVERSE_LGSIZE,
 		resetw.c_str());
 
@@ -154,6 +160,9 @@ SLASHLINE
 "			o_sync <= (wraddr[(LGSIZE-1):0] == 0);\n"
 "\n"
 "endmodule\n");
+
+	fclose(fp);
+	free(modulename);
 }
 
 void	build_dblreverse(const char *fname, const bool async_reset) {
@@ -168,10 +177,16 @@ void	build_dblreverse(const char *fname, const bool async_reset) {
 	if (async_reset)
 		resetw = std::string("i_areset_n");
 
+	char	*modulename = strdup(fname), *pslash;
+	modulename[strlen(modulename)-2] = '\0';
+	pslash = strrchr(modulename, '/');
+	if (pslash != NULL)
+		strcpy(modulename, pslash+1);
+
 	fprintf(fp,
 SLASHLINE
 "//\n"
-"// Filename:\tdblreverse.v\n"
+"// Filename:\t%s.v\n"
 "//\n"
 "// Project:\t%s\n"
 "//\n"
@@ -179,7 +194,7 @@ SLASHLINE
 "//		expected as follows:\n"
 "//\n"
 "//		i_clk	A running clock at whatever system speed is offered.\n",
-	prjname);
+	modulename, prjname);
 
 	if (async_reset)
 		fprintf(fp,
@@ -249,14 +264,14 @@ SLASHLINE
 "//\n"
 "//\n");
 	fprintf(fp,
-"module	dblreverse(i_clk, %s, i_ce, i_in_0, i_in_1,\n"
+"module	%s(i_clk, %s, i_ce, i_in_0, i_in_1,\n"
 	"\t\to_out_0, o_out_1, o_sync);\n"
 	"\tparameter\t\t\tLGSIZE=%d, WIDTH=24;\n"
 	"\tinput\t\t\t\ti_clk, %s, i_ce;\n"
 	"\tinput\t\t[(2*WIDTH-1):0]\ti_in_0, i_in_1;\n"
 	"\toutput\twire\t[(2*WIDTH-1):0]\to_out_0, o_out_1;\n"
-	"\toutput\treg\t\t\to_sync;\n", resetw.c_str(), TST_DBLREVERSE_LGSIZE,
-		resetw.c_str());
+	"\toutput\treg\t\t\to_sync;\n", modulename,
+		resetw.c_str(), TST_DBLREVERSE_LGSIZE, resetw.c_str());
 
 	fprintf(fp,
 "\n"
@@ -324,4 +339,5 @@ SLASHLINE
 "endmodule\n");
 
 	fclose(fp);
+	free(modulename);
 }

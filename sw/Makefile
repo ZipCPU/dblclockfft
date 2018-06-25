@@ -74,8 +74,8 @@ fftgen: $(OBJECTS)
 
 .PHONY: test
 test: fft ifft butterfly fftstage hwbfly shiftaddmpy longbimpy
-# test: dblreverse qtrstage dblstage
-test: snglbrev sngllast
+# test: qtrstage dblstage
+test: bitreverse sngllast
 
 #
 # Although these parameters, a 2048 point FFT of 16 bits input, aren't
@@ -160,25 +160,15 @@ $(VOBJDR)/Vhwbfly__ALL.a: $(VOBJDR)/Vhwbfly.h
 $(VOBJDR)/Vhwbfly__ALL.a: $(VOBJDR)/Vhwbfly.cpp
 	cd $(VOBJDR)/; make -f Vhwbfly.mk
 
-.PHONY: dblreverse
-dblreverse: $(VOBJDR)/Vdblreverse__ALL.a
+.PHONY: bitreverse
+bitreverse: $(VOBJDR)/Vbitreverse__ALL.a
 
-$(CORED)/dblreverse.v: fft
-$(VOBJDR)/Vdblreverse.cpp $(VOBJDR)/Vdblreverse.h: $(CORED)/dblreverse.v
-	cd $(CORED)/; $(VERILATOR) $(VFLAGS) dblreverse.v
-$(VOBJDR)/Vdblreverse__ALL.a: $(VOBJDR)/Vdblreverse.h
-$(VOBJDR)/Vdblreverse__ALL.a: $(VOBJDR)/Vdblreverse.cpp
-	cd $(VOBJDR)/; make -f Vdblreverse.mk
-
-.PHONY: snglbrev
-snglbrev: $(VOBJDR)/Vsnglbrev__ALL.a
-
-$(CORED)/snglbrev.v: fft
-$(VOBJDR)/Vsnglbrev.cpp $(VOBJDR)/Vsnglbrev.h: $(CORED)/snglbrev.v
-	cd $(CORED)/; $(VERILATOR) $(VFLAGS) snglbrev.v
-$(VOBJDR)/Vsnglbrev__ALL.a: $(VOBJDR)/Vsnglbrev.h
-$(VOBJDR)/Vsnglbrev__ALL.a: $(VOBJDR)/Vsnglbrev.cpp
-	cd $(VOBJDR)/; make -f Vsnglbrev.mk
+$(CORED)/bitreverse.v: fft
+$(VOBJDR)/Vbitreverse.cpp $(VOBJDR)/Vbitreverse.h: $(CORED)/bitreverse.v
+	cd $(CORED)/; $(VERILATOR) $(VFLAGS) bitreverse.v
+$(VOBJDR)/Vbitreverse__ALL.a: $(VOBJDR)/Vbitreverse.h
+$(VOBJDR)/Vbitreverse__ALL.a: $(VOBJDR)/Vbitreverse.cpp
+	cd $(VOBJDR)/; make -f Vbitreverse.mk
 
 .PHONY: qtrstage
 qtrstage: $(VOBJDR)/Vqtrstage__ALL.a

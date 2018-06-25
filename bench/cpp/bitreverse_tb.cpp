@@ -44,11 +44,7 @@
 #include "verilated_vcd_c.h"
 
 #include "fftsize.h"
-#ifdef	DBLCLKFFT
-#include "Vdblreverse.h"
-#else
-#include "Vsnglbrev.h"
-#endif
+#include "Vbitreverse.h"
 
 #define	FFTBITS	TST_DBLREVERSE_LGSIZE
 #define	FFTSIZE	(1<<(FFTBITS))
@@ -58,20 +54,12 @@
 #define	PAGEMSK	(FFTSIZE)
 
 #ifdef	NEW_VERILATOR
-#ifdef	DBLCLKFFT
-#define	VVAR(A)	dblreverse__DOT_ ## A
-#else
-#define	VVAR(A)	snglbrev__DOT_ ## A
-#endif
+#define	VVAR(A)	bitreverse__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A
 #endif
 
-#ifdef	DBLCLKFFT
-typedef	Vdblreverse	TSTCLASS;
-#else
-typedef	Vsnglbrev	TSTCLASS;
-#endif
+typedef	Vbitreverse	TSTCLASS;
 
 #define	iaddr		VVAR(_wraddr)
 #define	in_reset	VVAR(_in_reset)
