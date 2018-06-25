@@ -169,6 +169,7 @@ public:
 				(m_fft->i_reset)?"RST":"   ",
 				(m_fft->i_ce)?"CE":"  ");
 
+		m_fft->i_clk = 0;
 		m_fft->eval();
 		if (m_trace)
 			m_trace->dump((vluint64_t)(10*m_tickcount-2));
@@ -176,6 +177,7 @@ public:
 		m_fft->eval();
 		if (m_trace)
 			m_trace->dump((vluint64_t)(10*m_tickcount));
+		m_fft->i_clk = 0;
 		m_fft->eval();
 		if (m_trace) {
 			m_trace->dump((vluint64_t)(10*m_tickcount+5));
@@ -295,7 +297,7 @@ public:
 		printf("%3d : SCALE = %12.6f, WT = %18.1f, ISQ = %15.1f, ",
 			m_ntest, scale, wt, isq);
 		printf("OSQ = %18.1f, ", osq);
-		printf("XISQ = %18.1f\n", xisq);
+		printf("XISQ = %18.1f, sqrt = %9.2f\n", xisq, sqrt(xisq));
 		if (xisq > 1.4 * FFTLEN/2) {
 			printf("TEST FAIL!!  Result is out of bounds from ");
 			printf("expected result with FFTW3.\n");
@@ -526,6 +528,7 @@ int	main(int argc, char **argv, char **envp) {
 		exit(-1);
 	}
 
+	fft->opentrace("fft.vcd");
 	fft->reset();
 
 	{
@@ -843,7 +846,15 @@ int	main(int argc, char **argv, char **envp) {
 
 	fclose(fpout);
 
+	if (!fft->m_syncd) {
+		printf("FAIL -- NO SYNC\n");
+		goto test_failure;
+	}
+
 	printf("SUCCESS!!\n");
+	exit(0);
+test_failure:
+	printf("TEST FAILED!!\n");
 	exit(0);
 }
 
