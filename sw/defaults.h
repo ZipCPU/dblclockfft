@@ -76,4 +76,6 @@
 // Now for parameters matching the dblreverse stage
 #define	TST_DBLREVERSE_LGSIZE	5
 
+static	const	bool	formal_property_flag = false;
+
 #endif

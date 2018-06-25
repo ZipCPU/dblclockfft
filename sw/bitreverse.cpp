@@ -115,7 +115,7 @@ SLASHLINE
 "	generate for(k=0; k<LGSIZE; k=k+1)\n"
 "		assign rdaddr[k] = wraddr[LGSIZE-1-k];\n"
 "	endgenerate\n"
-"	assign	rdaddr[LGSIZE] = ~wraddr[LGSIZE];\n"
+"	assign	rdaddr[LGSIZE] = !wraddr[LGSIZE];\n"
 "\n"
 "	reg	in_reset;\n"
 "\n"
@@ -158,7 +158,115 @@ SLASHLINE
 "			o_sync <= 1'b0;\n"
 "		else if ((i_ce)&&(!in_reset))\n"
 "			o_sync <= (wraddr[(LGSIZE-1):0] == 0);\n"
+"\n");
+
+
+	if (formal_property_flag) {
+		fprintf(fp,
+"`ifdef\tFORMAL\n"
+"`ifdef	BITREVERSE\n"
+"`define\t`ASSUME	assume\n"
+"`define\t`ASSERT	assert\n");
+		if (async_reset)
+			fprintf(fp,
+		"\n\talways @($global_clock)\n"
+			"\t\tassume(i_clk != $past(i_clk));\n\n");
+
+		fprintf(fp,
+"`else\n"
+"`define\t`ASSUME	assert\n"
+"`define\t`ASSERT	assume\n"
+"`endif\n"
 "\n"
+	"\treg	f_past_valid;\n"
+	"\tinitial	f_past_valid = 1'b0;\n"
+	"\talways @(posedge i_clk)\n"
+		"\t\tf_past_valid <= 1'b1;\n\n");
+	
+		if (async_reset)
+			fprintf(fp,
+	"\tinitial	`ASSUME(!i_areset_n);\n"
+	"\talways @($global_clock)\n"
+	"\tif (!$rose(i_clk)))\n"
+		"\t\t`ASSERT(!$rose(i_areset_n));\n\n"
+	"\talways @($global_clock)\n"
+	"\tif (!$rose(i_clk))\n"
+	"\tbegin\n"
+		"\t\t`ASSUME($stable(i_ce));\n"
+		"\t\t`ASSUME($stable(i_in));\n"
+		"\t\t//\n"
+		"\t\tif (i_areset_n)\n"
+		"\t\tbegin\n"
+		"\t\t\t`ASSERT($stable(o_out));\n"
+		"\t\t\t`ASSERT($stable(o_sync));\n"
+		"\t\tend\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+		"\tif ((!f_past_valid)||(!i_areset_n))\n"
+		"\tbegin\n");
+		else
+			fprintf(fp,
+	"\tinitial	`ASSUME(i_reset);\n"
+	"\talways @(posedge i_clk)\n"
+		"\tif ((!f_past_valid)||($pasti_reset))\n"
+		"\tbegin\n");
+
+		fprintf(fp,
+		"\t\t`ASSERT(iaddr == 0);\n"
+		"\t\t`ASSERT(in_reset);\n"
+		"\t\t`ASSERT(!o_sync);\n");
+		fprintf(fp, "\tend\n");
+
+
+		fprintf(fp, "`ifdef	BITREVERSE\n"
+				"\talways @(posedge i_clk)\n"
+				"\t\tassume((i_ce)||($past(i_ce))||($past(i_ce,2)));\n"
+				"`endif // BITREVERSE\n\n");
+
+		fprintf(fp,
+"		(* anyconst *) reg	[LGSIZE:0]	f_const_addr;\n"
+"		wire	[LGSIZE:0]	f_reversed_addr;\n"
+"		// reg	[LGSIZE:0]	f_now;\n"
+"		reg			f_addr_loaded;\n"
+"		reg	[(2*WIDTH-1):0]	f_addr_value;\n"
+"\n"
+"		generate for(k=0; k<LGSIZE; k=k+1)\n"
+"			assign	f_reversed_addr[k] = f_const_addr[LGSIZE-1-k];\n"
+"		endgenerate\n"
+"		assign	f_reversed_addr[LGSIZE] = f_const_addr[LGSIZE];\n"
+"\n"
+"		always @(posedge i_clk)\n"
+"		if ((i_ce)&&(wraddr == f_const_addr))\n"
+"		begin\n"
+"			f_addr_loaded <= 1'b1;\n"
+"			f_addr_value <= i_in;\n"
+"			`ASSERT(!f_addr_loaded);\n"
+"		end else if (rdaddr == f_reversed_addr)\n"
+"		begin\n"
+"			f_addr_loaded <= 1'b0;\n"
+"		end\n"
+"\n"
+"		always @(posedge i_clk)\n"
+"		if ((f_past_valid)&&($past(f_addr_loaded))&&(!f_addr_loaded))\n"
+"			assert(o_out == f_addr_value);\n"
+"\n"
+"		always @(posedge i_clk)\n"
+"		if (o_sync)\n"
+"			assert(wraddr[LGSIZE-1:0] == 1);\n"
+"\n"
+"		always @(posedge i_clk)\n"
+"		if ((wraddr[LGSIZE]==f_const_addr[LGSIZE])&&(wraddr <= f_const_addr))\n"
+"			assert(!f_addr_loaded);\n"
+"		always @(posedge i_clk)\n"
+"		if ((rdaddr[LGSIZE]==f_const_addr[LGSIZE])&&(f_addr_loaded))\n"
+"			`ASSERT(rdaddr <= f_reversed_addr);\n\n");
+
+		fprintf(fp,
+"`endif\t// FORMAL\n");
+	}
+
+	fprintf(fp,
 "endmodule\n");
 
 	fclose(fp);
@@ -335,7 +443,77 @@ SLASHLINE
 "\n"
 	"\tassign\to_out_0 = (adrz)?odd_out_0:evn_out_0;\n"
 	"\tassign\to_out_1 = (adrz)?odd_out_1:evn_out_1;\n"
+"\n");
+
+	if (formal_property_flag) {
+		fprintf(fp,
+"`ifdef\tFORMAL\n"
+"`ifdef	BITREVERSE\n"
+"`define\t`ASSUME	assume\n"
+"`define\t`ASSERT	assert\n");
+		if (async_reset)
+			fprintf(fp,
+		"\n\talways @($global_clock)\n"
+			"\t\tassume(i_clk != $past(i_clk));\n\n");
+
+		fprintf(fp,
+"`else\n"
+"`define\t`ASSUME	assert\n"
+"`define\t`ASSERT	assume\n"
+"`endif\n"
 "\n"
+	"\treg	f_past_valid;\n"
+	"\tinitial	f_past_valid = 1'b0;\n"
+	"\talways @(posedge i_clk)\n"
+		"\t\tf_past_valid <= 1'b1;\n\n");
+	
+		if (async_reset)
+			fprintf(fp,
+	"\tinitial	`ASSUME(!i_areset_n);\n"
+	"\talways @($global_clock)\n"
+	"\tif (!$rose(i_clk)))\n"
+		"\t\t`ASSERT(!$rose(i_areset_n));\n\n"
+	"\talways @($global_clock)\n"
+	"\tif (!$rose(i_clk))\n"
+	"\tbegin\n"
+		"\t\t`ASSUME($stable(i_ce));\n"
+		"\t\t`ASSUME($stable(i_in_0));\n"
+		"\t\t`ASSUME($stable(i_in_1));\n"
+		"\t\t//\n"
+		"\t\tif (i_areset_n)\n"
+		"\t\tbegin\n"
+		"\t\t\t`ASSERT($stable(o_out_0));\n"
+		"\t\t\t`ASSERT($stable(o_out_1));\n"
+		"\t\t\t`ASSERT($stable(o_sync));\n"
+		"\t\tend\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+		"\tif ((!f_past_valid)||(!i_areset_n))\n"
+		"\tbegin\n");
+		else
+			fprintf(fp,
+	"\tinitial	`ASSUME(i_reset);\n"
+	"\talways @(posedge i_clk)\n"
+		"\tif ((!f_past_valid)||($pasti_reset))\n"
+		"\tbegin\n");
+
+		fprintf(fp,
+		"\t\t`ASSERT(iaddr == 0);\n"
+		"\t\t`ASSERT(in_reset);\n"
+		"\t\t`ASSERT(!o_sync);\n");
+		fprintf(fp, "\tend\n");
+
+
+		fprintf(fp, "`ifdef	BITREVERSE\n"
+				"\talways @(posedge i_clk)\n"
+				"\t\tassume((i_ce)||($past(i_ce))||($past(i_ce,2)));\n"
+				"`endif // BITREVERSE\n");
+		fprintf(fp,
+"`endif\t// FORMAL\n");
+	}
+
+	fprintf(fp,
 "endmodule\n");
 
 	fclose(fp);
