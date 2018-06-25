@@ -2,7 +2,7 @@
 //
 // Filename: 	mpy_tb.cpp
 //
-// Project:	A Doubletime Pipelined FFT
+// Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A test-bench for the shift and add shiftaddmpy.v subfile of
 //		the double clocked FFT.  This file may be run autonomously. 
@@ -17,7 +17,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015-2018, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -39,7 +39,11 @@
 //
 //
 ///////////////////////////////////////////////////////////////////////////
+#include "verilated.h"
+#include "verilated_vcd_c.h"
+
 #include "fftsize.h"
+
 #ifdef	USE_OLD_MULTIPLY
 #include "Vshiftaddmpy.h"
 typedef	Vshiftaddmpy	Vmpy;
@@ -54,41 +58,88 @@ typedef	Vlongbimpy	Vmpy;
 #define	DELAY	((AW/2)+(AW&1)+2)
 #endif
 
-#include "verilated.h"
 #include "twoc.h"
 
 class	MPYTB {
 public:
-	Vmpy	*mpy;
-	long	vals[32];
-	int	m_addr;
+	Vmpy		*m_mpy;
+	VerilatedVcdC	*m_trace;
+	long		vals[32];
+	int		m_addr;
+	uint64_t	m_tickcount;
 
 	MPYTB(void) {
-		mpy = new Vmpy;
+		Verilated::traceEverOn(true);
+		m_mpy = new Vmpy;
+		m_tickcount = 0;
 
 		for(int i=0; i<32; i++)
 			vals[i] = 0;
 		m_addr = 0;
 	}
 	~MPYTB(void) {
-		delete mpy;
+		closetrace();
+		delete m_mpy;
 	}
 
-	void	tick(void) {
-		mpy->i_clk = 0;
-		mpy->eval();
-		mpy->i_clk = 1;
-		mpy->eval();
+	void    opentrace(const char *vcdname) {
+		if (!m_trace) {
+			m_trace = new VerilatedVcdC;
+			m_mpy->trace(m_trace, 99);
+			m_trace->open(vcdname);
+		}
+	}
+
+        void    closetrace(void) {
+                if (m_trace) {
+                        m_trace->close();
+                        delete  m_trace;
+                        m_trace = NULL;
+                }
+        }
+
+        void    tick(void) {
+                m_tickcount++;
+
+		m_mpy->i_clk = 0;
+		m_mpy->eval();
+		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount-2));
+		m_mpy->i_clk = 1;
+		m_mpy->eval();
+		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount));
+		m_mpy->i_clk = 0;
+		m_mpy->eval();
+		if (m_trace)	{
+			m_trace->dump((uint64_t)(10ul*m_tickcount+5));
+			m_trace->flush();
+		}
+	}
+
+	void	cetick(void) {
+		int	ce = m_mpy->i_ce, nkce;
+
+		tick();
+		nkce = (rand()&1);
+#ifdef	FFT_CKPCE
+		nkce += FFT_CKPCE;
+#endif
+		if ((ce)&&(nkce>0)) {
+			m_mpy->i_ce = 0;
+			for(int kce=1; kce<nkce; kce++)
+				tick();
+		}
+
+		m_mpy->i_ce = ce;
 	}
 
 	void	reset(void) {
-		mpy->i_clk = 0;
-		mpy->i_ce = 1;
-		mpy->i_a = 0;
-		mpy->i_b = 0;
+		m_mpy->i_clk = 0;
+		m_mpy->i_ce = 1;
+		m_mpy->i_a_unsorted = 0;
+		m_mpy->i_b_unsorted = 0;
 
 		for(int k=0; k<20; k++)
-			tick();
+			cetick();
 	}
 
 	bool	test(const int ia, const int ib) {
@@ -97,23 +148,19 @@ public:
 
 		a = sbits(ia, AW);
 		b = sbits(ib, BW);
-		mpy->i_ce = 1;
-		mpy->i_a = ubits(a, AW);
-		mpy->i_b = ubits(b, BW);
+		m_mpy->i_ce = 1;
+		m_mpy->i_a_unsorted = ubits(a, AW);
+		m_mpy->i_b_unsorted = ubits(b, BW);
 
 		vals[m_addr&31] = a * b;
 
-		tick();
-		if (rand()&1) {
-			mpy->i_ce = 0;
-			tick();
-		}
+		cetick();
 
 		printf("k=%3d: A =%04x, B =%05x -> O = %9lx (ANS=%10lx)\n",
 			m_addr, (int)ubits(a,AW), (int)ubits(b,BW),
-			(long)mpy->o_r, ubits(vals[m_addr&31], AW+BW+4));
+			(long)m_mpy->o_r, ubits(vals[m_addr&31], AW+BW+4));
 
-		out = sbits(mpy->o_r, AW+BW);
+		out = sbits(m_mpy->o_r, AW+BW);
 
 		m_addr++;
 
@@ -131,6 +178,7 @@ int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	MPYTB		*tb = new MPYTB;
 
+	tb->opentrace("mpy.vcd");
 	tb->reset();
 
 	for(int k=0; k<15; k++) {
