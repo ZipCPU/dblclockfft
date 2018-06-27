@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth	12
+
+[engines]
+smtbmc
+
+[script]
+read_verilog -formal -DBITREVERSE bitreverse.v
+prep -top bitreverse
+
+[files]
+../../rtl/bitreverse.v
