@@ -103,7 +103,7 @@ int lstat(const char *filename, struct stat *buf) { return 1; };
 #include "softmpy.h"
 #include "butterfly.h"
 
-void	build_quarters(const char *fname, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
+void	build_dblquarters(const char *fname, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -235,7 +235,7 @@ SLASHLINE
 		"\t\tbegin\n"
 			"\t\t\tiaddr <= iaddr + { {(LGWIDTH-1){1\'b0}}, 1\'b1 };\n"
 			"\t\t\twait_for_sync <= 1\'b0;\n"
-		"\t\tend\n"
+		"\t\tend\n\n"
 	"\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 			"\t\t\timem <= i_data;\n"
@@ -327,6 +327,411 @@ SLASHLINE
 	fprintf(fp, "endmodule\n");
 }
 
+void	build_snglquarters(const char *fname, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
+	FILE	*fp = fopen(fname, "w");
+	if (NULL == fp) {
+		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
+		perror("O/S Err was:");
+		return;
+	}
+	const	char	*rnd_string;
+	if (rounding == RND_TRUNCATE)
+		rnd_string = "truncate";
+	else if (rounding == RND_FROMZERO)
+		rnd_string = "roundfromzero";
+	else if (rounding == RND_HALFUP)
+		rnd_string = "roundhalfup";
+	else
+		rnd_string = "convround";
+
+
+	fprintf(fp,
+SLASHLINE
+"//\n"
+"// Filename:\tqtrstage%s.v\n"
+"//\n"
+"// Project:\t%s\n"
+"//\n"
+"// Purpose:	This file encapsulates the 4 point stage of a decimation in\n"
+"//		frequency FFT.  This particular implementation is optimized\n"
+"//	so that all of the multiplies are accomplished by additions and\n"
+"//	multiplexers only.\n"
+"//\n"
+"// Operation:\n"
+"// 	The operation of this stage is identical to the regular stages of\n"
+"// 	the FFT (see them for details), with one additional and critical\n"
+"// 	difference: this stage doesn't require any hardware multiplication.\n"
+"// 	The multiplies within it may all be accomplished using additions and\n"
+"// 	subtractions.\n"
+"//\n"
+"// 	Let's see how this is done.  Given x[n] and x[n+2], cause thats the\n"
+"// 	stage we are working on, with i_sync true for x[0] being input,\n"
+"// 	produce the output:\n"
+"//\n"
+"// 	y[n  ] = x[n] + x[n+2]\n"
+"// 	y[n+2] = (x[n] - x[n+2]) * e^{-j2pi n/2}	(forward transform)\n"
+"// 	       = (x[n] - x[n+2]) * -j^n\n"
+"//\n"
+"// 	y[n].r = x[n].r + x[n+2].r	(This is the easy part)\n"
+"// 	y[n].i = x[n].i + x[n+2].i\n"
+"//\n"
+"// 	y[2].r = x[0].r - x[2].r\n"
+"// 	y[2].i = x[0].i - x[2].i\n"
+"//\n"
+"// 	y[3].r =   (x[1].i - x[3].i)		(forward transform)\n"
+"// 	y[3].i = - (x[1].r - x[3].r)\n"
+"//\n"
+"// 	y[3].r = - (x[1].i - x[3].i)		(inverse transform)\n"
+"// 	y[3].i =   (x[1].r - x[3].r)		(INVERSE = 1)\n"
+// "//\n"
+// "//	When the FFT is run in the two samples per clock mode, this quarter\n"
+// "//	stage will operate on either x[0] and x[2] (ODD = 0), or x[1] and\n"
+// "//	x[3] (ODD = 1).  In all other cases, it will operate on all four\n"
+// "//	values.\n"
+"//\n%s"
+"//\n",
+		(dbg)?"_dbg":"", prjname, creator);
+	fprintf(fp, "%s", cpyleft);
+	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
+
+	std::string	resetw("i_reset");
+	if (async_reset)
+		resetw = std::string("i_areset_n");
+
+	fprintf(fp,
+"module\tqtrstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n"
+	"\tparameter	IWIDTH=%d, OWIDTH=IWIDTH+1;\n"
+	"\tparameter\tLGWIDTH=%d, INVERSE=0,SHIFT=0;\n"
+	"\tinput\t				i_clk, %s, i_ce, i_sync;\n"
+	"\tinput\t	[(2*IWIDTH-1):0]	i_data;\n"
+	"\toutput\treg	[(2*OWIDTH-1):0]	o_data;\n"
+	"\toutput\treg				o_sync;\n"
+		"\t\n", (dbg)?"_dbg":"", resetw.c_str(),
+		(dbg)?", o_dbg":"", TST_QTRSTAGE_IWIDTH,
+		TST_QTRSTAGE_LGWIDTH, resetw.c_str());
+	if (dbg) { fprintf(fp, "\toutput\twire\t[33:0]\t\t\to_dbg;\n"
+		"\tassign\to_dbg = { ((o_sync)&&(i_ce)), i_ce, o_data[(2*OWIDTH-1):(2*OWIDTH-16)],\n"
+			"\t\t\t\t\to_data[(OWIDTH-1):(OWIDTH-16)] };\n"
+"\n");
+	}
+
+	fprintf(fp,
+	"\treg\t	wait_for_sync;\n"
+	"\treg\t[2:0]	pipeline;\n"
+"\n"
+	"\treg\tsigned [(IWIDTH):0]	sum_r, sum_i, diff_r, diff_i;\n"
+"\n"
+	"\treg\t[(2*OWIDTH-1):0]\tob_a;\n"
+	"\twire\t[(2*OWIDTH-1):0]\tob_b;\n"
+	"\treg\t[(OWIDTH-1):0]\t\tob_b_r, ob_b_i;\n"
+	"\tassign\tob_b = { ob_b_r, ob_b_i };\n"
+"\n"
+	"\treg\t[(LGWIDTH-1):0]\t\tiaddr;\n"
+	"\treg\t[(2*IWIDTH-1):0]\timem\t[0:1];\n"
+"\n"
+	"\twire\tsigned\t[(IWIDTH-1):0]\timem_r, imem_i;\n"
+	"\tassign\timem_r = imem[1][(2*IWIDTH-1):(IWIDTH)];\n"
+	"\tassign\timem_i = imem[1][(IWIDTH-1):0];\n"
+"\n"
+	"\twire\tsigned\t[(IWIDTH-1):0]\ti_data_r, i_data_i;\n"
+	"\tassign\ti_data_r = i_data[(2*IWIDTH-1):(IWIDTH)];\n"
+	"\tassign\ti_data_i = i_data[(IWIDTH-1):0];\n"
+"\n"
+	"\treg	[(2*OWIDTH-1):0]	omem [0:1];\n"
+"\n");
+
+	fprintf(fp, "\t//\n"
+	"\t// Round our output values down to OWIDTH bits\n"
+	"\t//\n");
+
+	fprintf(fp,
+	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_sum_r, rnd_sum_i,\n"
+	"\t\t\trnd_diff_r, rnd_diff_i, n_rnd_diff_r, n_rnd_diff_i;\n"
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_r(i_clk, i_ce,\n"
+	"\t\t\t\tsum_r, rnd_sum_r);\n\n", rnd_string);
+	fprintf(fp,
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_i(i_clk, i_ce,\n"
+	"\t\t\t\tsum_i, rnd_sum_i);\n\n", rnd_string);
+	fprintf(fp,
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_r(i_clk, i_ce,\n"
+	"\t\t\t\tdiff_r, rnd_diff_r);\n\n", rnd_string);
+	fprintf(fp,
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_i(i_clk, i_ce,\n"
+	"\t\t\t\tdiff_i, rnd_diff_i);\n\n", rnd_string);
+	fprintf(fp, "\tassign n_rnd_diff_r = - rnd_diff_r;\n"
+		"\tassign n_rnd_diff_i = - rnd_diff_i;\n");
+	fprintf(fp,
+	"\tinitial wait_for_sync = 1\'b1;\n"
+	"\tinitial iaddr = 0;\n");
+	if (async_reset)
+		fprintf(fp,
+			"\talways @(posedge i_clk, negedge i_areset_n)\n"
+				"\t\tif (!i_reset)\n");
+	else
+		fprintf(fp,
+	"\talways @(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+
+	fprintf(fp, "\t\tbegin\n"
+			"\t\t\twait_for_sync <= 1\'b1;\n"
+			"\t\t\tiaddr <= 0;\n"
+		"\t\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
+		"\t\tbegin\n"
+			"\t\t\tiaddr <= iaddr + 1\'b1;\n"
+			"\t\t\twait_for_sync <= 1\'b0;\n"
+		"\t\tend\n\n"
+	"\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+		"\t\tbegin\n"
+			"\t\t\timem[0] <= i_data;\n"
+			"\t\t\timem[1] <= imem[0];\n"
+		"\t\tend\n"
+		"\n\n");
+	fprintf(fp,
+	"\t// Note that we don\'t check on wait_for_sync or i_sync here.\n"
+	"\t// Why not?  Because iaddr will always be zero until after the\n"
+	"\t// first i_ce, so we are safe.\n"
+	"\tinitial pipeline = 3\'h0;\n");
+
+	if (async_reset)
+		fprintf(fp,
+	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_reset)\n");
+	else
+		fprintf(fp,
+	"\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+
+	fprintf(fp,
+			"\t\t\tpipeline <= 3\'h0;\n"
+		"\t\telse if (i_ce) // is our pipeline process full?  Which stages?\n"
+			"\t\t\tpipeline <= { pipeline[1:0], iaddr[1] };\n\n");
+	fprintf(fp,
+	"\t// This is the pipeline[-1] stage, pipeline[0] will be set next.\n"
+	"\talways\t@(posedge i_clk)\n"
+		"\t\tif ((i_ce)&&(iaddr[1]))\n"
+		"\t\tbegin\n"
+			"\t\t\tsum_r  <= imem_r + i_data_r;\n"
+			"\t\t\tsum_i  <= imem_i + i_data_i;\n"
+			"\t\t\tdiff_r <= imem_r - i_data_r;\n"
+			"\t\t\tdiff_i <= imem_i - i_data_i;\n"
+		"\t\tend\n\n");
+	fprintf(fp,
+	"\t// pipeline[1] takes sum_x and diff_x and produces rnd_x\n\n");
+
+	fprintf(fp,
+	"\t// Now for pipeline[2].  We can actually do this at all i_ce\n"
+	"\t// clock times, since nothing will listen unless pipeline[3]\n"
+	"\t// on the next clock.  Thus, we simplify this logic and do\n"
+	"\t// it independent of pipeline[2].\n"
+	"\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+		"\t\tbegin\n"
+			"\t\t\tob_a <= { rnd_sum_r, rnd_sum_i };\n"
+			"\t\t\t// on Even, W = e^{-j2pi 1/4 0} = 1\n"
+			"\t\t\tif (!iaddr[0])\n"
+			"\t\t\tbegin\n"
+			"\t\t\t\tob_b_r <= rnd_diff_r;\n"
+			"\t\t\t\tob_b_i <= rnd_diff_i;\n"
+			"\t\t\tend else if (INVERSE==0) begin\n"
+			"\t\t\t\t// on Odd, W = e^{-j2pi 1/4} = -j\n"
+			"\t\t\t\tob_b_r <=   rnd_diff_i;\n"
+			"\t\t\t\tob_b_i <= n_rnd_diff_r;\n"
+			"\t\t\tend else begin\n"
+			"\t\t\t\t// on Odd, W = e^{j2pi 1/4} = j\n"
+			"\t\t\t\tob_b_r <= n_rnd_diff_i;\n"
+			"\t\t\t\tob_b_i <=   rnd_diff_r;\n"
+			"\t\t\tend\n"
+		"\t\tend\n\n");
+	fprintf(fp,
+	"\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+		"\t\tbegin // In sequence, clock = 3\n"
+			"\t\t\tomem[0] <= ob_b;\n"
+			"\t\t\tomem[1] <= omem[0];\n"
+			"\t\t\tif (pipeline[2])\n"
+				"\t\t\t\to_data <= ob_a;\n"
+			"\t\t\telse\n"
+				"\t\t\t\to_data <= omem[1];\n"
+		"\t\tend\n\n");
+
+	fprintf(fp,
+	"\tinitial\to_sync = 1\'b0;\n");
+
+	if (async_reset)
+		fprintf(fp,
+	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+	else
+		fprintf(fp,
+	"\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+	fprintf(fp,
+		"\t\t\to_sync <= 1\'b0;\n"
+		"\t\telse if (i_ce)\n"
+			"\t\t\to_sync <= (iaddr[2:0] == 3'b101);\n\n");
+
+	if (formal_property_flag) {
+		fprintf(fp,
+"`ifdef	FORMAL\n"
+	"\treg	f_past_valid;\n"
+	"\tinitial	f_past_valid = 1'b0;\n"
+	"\talways @(posedge i_clk)\n"
+	"\t	f_past_valid = 1'b1;\n"
+"\n"
+"`ifdef	QTRSTAGE\n"
+	"\talways @(posedge i_clk)\n"
+	"\t	assume((i_ce)||($past(i_ce))||($past(i_ce,2)));\n"
+"`endif\n"
+"\n"
+	"\t// The below logic only works if the rounding stage does nothing\n"
+	"\tinitial	assert(IWIDTH+1 == OWIDTH);\n"
+"\n"
+	"\treg	signed [IWIDTH-1:0]	f_piped_real	[0:7];\n"
+	"\treg	signed [IWIDTH-1:0]	f_piped_imag	[0:7];\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+	"\t	f_piped_real[0] <= i_data[2*IWIDTH-1:IWIDTH];\n"
+	"\t	f_piped_imag[0] <= i_data[  IWIDTH-1:0];\n"
+"\n"
+	"\t	f_piped_real[1] <= f_piped_real[0];\n"
+	"\t	f_piped_imag[1] <= f_piped_imag[0];\n"
+"\n"
+	"\t	f_piped_real[2] <= f_piped_real[1];\n"
+	"\t	f_piped_imag[2] <= f_piped_imag[1];\n"
+"\n"
+	"\t	f_piped_real[3] <= f_piped_real[2];\n"
+	"\t	f_piped_imag[3] <= f_piped_imag[2];\n"
+"\n"
+	"\t	f_piped_real[4] <= f_piped_real[3];\n"
+	"\t	f_piped_imag[4] <= f_piped_imag[3];\n"
+"\n"
+	"\t	f_piped_real[5] <= f_piped_real[4];\n"
+	"\t	f_piped_imag[5] <= f_piped_imag[4];\n"
+"\n"
+	"\t	f_piped_real[6] <= f_piped_real[5];\n"
+	"\t	f_piped_imag[6] <= f_piped_imag[5];\n"
+"\n"
+	"\t	f_piped_real[7] <= f_piped_real[6];\n"
+	"\t	f_piped_imag[7] <= f_piped_imag[6];\n"
+	"\tend\n"
+"\n"
+	"\treg	f_rsyncd;\n"
+	"\twire	f_syncd;\n"
+"\n"
+	"\tinitial	f_rsyncd = 0;\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif(i_reset)\n"
+	"\t	f_rsyncd <= 1'b0;\n"
+	"\telse if (!f_rsyncd)\n"
+	"\t	f_rsyncd <= (o_sync);\n"
+	"\tassign	f_syncd = (f_rsyncd)||(o_sync);\n"
+"\n"
+	"\treg	[1:0]	f_state;\n"
+"\n"
+"\n"
+	"\tinitial	f_state = 0;\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (i_reset)\n"
+	"\t	f_state <= 0;\n"
+	"\telse if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
+	"\t	f_state <= f_state + 1;\n"
+"\n"
+	"\talways @(*)\n"
+	"\tif (f_state != 0)\n"
+	"\t	assume(!i_sync);\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\t	assert(f_state[1:0] == iaddr[1:0]);\n"
+"\n"
+	"\twire	signed [2*IWIDTH-1:0]	f_i_real, f_i_imag;\n"
+	"\tassign			f_i_real = i_data[2*IWIDTH-1:IWIDTH];\n"
+	"\tassign			f_i_imag = i_data[  IWIDTH-1:0];\n"
+"\n"
+	"\twire	signed [OWIDTH-1:0]	f_o_real, f_o_imag;\n"
+	"\tassign			f_o_real = o_data[2*OWIDTH-1:OWIDTH];\n"
+	"\tassign			f_o_imag = o_data[  OWIDTH-1:0];\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (f_state == 2'b11)\n"
+	"\tbegin\n"
+	"\t	assume(f_piped_real[0] != 3'sb100);\n"
+	"\t	assume(f_piped_real[2] != 3'sb100);\n"
+	"\t	assert(sum_r  == f_piped_real[2] + f_piped_real[0]);\n"
+	"\t	assert(sum_i  == f_piped_imag[2] + f_piped_imag[0]);\n"
+"\n"
+	"\t	assert(diff_r == f_piped_real[2] - f_piped_real[0]);\n"
+	"\t	assert(diff_i == f_piped_imag[2] - f_piped_imag[0]);\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_state == 2'b00)&&((f_syncd)||(iaddr >= 4)))\n"
+	"\tbegin\n"
+	"\t	assert(rnd_sum_r  == f_piped_real[3]+f_piped_real[1]);\n"
+	"\t	assert(rnd_sum_i  == f_piped_imag[3]+f_piped_imag[1]);\n"
+	"\t	assert(rnd_diff_r == f_piped_real[3]-f_piped_real[1]);\n"
+	"\t	assert(rnd_diff_i == f_piped_imag[3]-f_piped_imag[1]);\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_state == 2'b10)&&(f_syncd))\n"
+	"\tbegin\n"
+	"\t	// assert(o_sync);\n"
+	"\t	assert(f_o_real == f_piped_real[5] + f_piped_real[3]);\n"
+	"\t	assert(f_o_imag == f_piped_imag[5] + f_piped_imag[3]);\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_state == 2'b11)&&(f_syncd))\n"
+	"\tbegin\n"
+	"\t	assert(!o_sync);\n"
+	"\t	assert(f_o_real == f_piped_real[5] + f_piped_real[3]);\n"
+	"\t	assert(f_o_imag == f_piped_imag[5] + f_piped_imag[3]);\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_state == 2'b00)&&(f_syncd))\n"
+	"\tbegin\n"
+	"\t	assert(!o_sync);\n"
+	"\t	assert(f_o_real == f_piped_real[7] - f_piped_real[5]);\n"
+	"\t	assert(f_o_imag == f_piped_imag[7] - f_piped_imag[5]);\n"
+	"\tend\n"
+"\n"
+	"\talways @(*)\n"
+	"\tif ((iaddr[2:0] == 0)&&(!wait_for_sync))\n"
+	"\t	assume(i_sync);\n"
+"\n"
+	"\talways @(*)\n"
+	"\tif (wait_for_sync)\n"
+	"\t	assert((iaddr == 0)&&(f_state == 2'b00)&&(!o_sync)&&(!f_rsyncd));\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_past_valid)&&($past(i_ce))&&($past(i_sync))&&(!$past(i_reset)))\n"
+	"\t	assert(!wait_for_sync);\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_state == 2'b01)&&(f_syncd))\n"
+	"\tbegin\n"
+	"\t	assert(!o_sync);\n"
+	"\t	if (INVERSE)\n"
+	"\t	begin\n"
+	"\t		assert(f_o_real == -f_piped_imag[7]+f_piped_imag[5]);\n"
+	"\t		assert(f_o_imag ==  f_piped_real[7]-f_piped_real[5]);\n"
+	"\t	end else begin\n"
+	"\t		assert(f_o_real ==  f_piped_imag[7]-f_piped_imag[5]);\n"
+	"\t		assert(f_o_imag == -f_piped_real[7]+f_piped_real[5]);\n"
+	"\t	end\n"
+	"\tend\n"
+"\n"
+"`endif\n");
+	}
+
+	fprintf(fp, "endmodule\n");
+}
+
+
 void	build_sngllast(const char *fname, const bool async_reset = false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -342,7 +747,7 @@ void	build_sngllast(const char *fname, const bool async_reset = false) {
 	fprintf(fp,
 SLASHLINE
 "//\n"
-"// Filename:\tsngllast.v\n"
+"// Filename:\tlaststage.v\n"
 "//\n"
 "// Project:	%s\n"
 "//\n"
@@ -356,7 +761,7 @@ SLASHLINE
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 
 	fprintf(fp,
-"module	sngllast(i_clk, %s, i_ce, i_sync, i_val, o_val, o_sync);\n"
+"module	laststage(i_clk, %s, i_ce, i_sync, i_val, o_val, o_sync);\n"
 "	parameter	IWIDTH=16,OWIDTH=IWIDTH+1, SHIFT=0;\n"
 "	input					i_clk, %s, i_ce, i_sync;\n"
 "	input		[(2*IWIDTH-1):0]	i_val;\n"
@@ -375,10 +780,9 @@ SLASHLINE
 "	// together. Therefore our intermediate value must have one more\n"
 "	// bit than the two originals.\n"
 "	reg	signed	[(IWIDTH):0]	rnd_r, rnd_i, sto_r, sto_i;\n"
-"	reg				wait_for_sync, rnd_sync, stage, pre_sync;\n"
+"	reg				wait_for_sync, stage;\n"
+"	reg		[2:0]		sync_pipe;\n"
 "\n"
-"	initial	rnd_sync      = 1'b0;\n"
-"	initial	o_sync        = 1'b0;\n"
 "	initial	wait_for_sync = 1'b1;\n"
 "	initial	stage         = 1'b0;\n");
 
@@ -388,8 +792,6 @@ SLASHLINE
 		fprintf(fp, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
 	fprintf(fp,
 "		begin\n"
-"			rnd_sync      <= 1'b0;\n"
-"			o_sync        <= 1'b0;\n"
 "			wait_for_sync <= 1'b1;\n"
 "			stage         <= 1'b0;\n"
 "		end else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))\n"
@@ -398,24 +800,40 @@ SLASHLINE
 "			//\n"
 "			stage <= 1'b1;\n"
 "			//\n"
-"			o_sync <= rnd_sync;\n"
 "		end else if (i_ce)\n"
-"		begin\n"
-"			rnd_sync <= pre_sync;\n"
-"			//\n"
-"			stage <= 1'b0;\n"
-"		end\n");
+"			stage <= 1'b0;\n\n");
 
+	fprintf(fp, "\tinitial\tsync_pipe = 0;\n");
 	if (async_reset)
 		fprintf(fp,
-		"\talways @(posedge i_clk)\n"
-		"\t\tpre_sync <= (i_areset_n)&&(i_ce)&&(i_sync);\n");
+		"\talways @(posedge i_clk, negedge i_areset_n)\n"
+		"\tif (!i_areset_n)\n");
 	else
 		fprintf(fp,
 		"\talways @(posedge i_clk)\n"
-		"\t\tpre_sync <= (!i_reset)&&(i_ce)&&(i_sync);\n");
+		"\tif (i_reset)\n");
 
-	fprintf(fp, "\n\n"
+	fprintf(fp,
+		"\t\tsync_pipe <= 0;\n"
+		"\telse if (i_ce)\n"
+		"\t\tsync_pipe <= { sync_pipe[1:0], i_sync };\n\n");
+
+	fprintf(fp, "\tinitial\to_sync = 1\'b0;\n");
+	if (async_reset)
+		fprintf(fp,
+		"\talways @(posedge i_clk, negedge i_areset_n)\n"
+		"\tif (!i_areset_n)\n");
+	else
+		fprintf(fp,
+		"\talways @(posedge i_clk)\n"
+		"\tif (i_reset)\n");
+
+	fprintf(fp,
+		"\t\to_sync <= 1\'b0;\n"
+		"\telse if (i_ce)\n"
+		"\t\to_sync <= sync_pipe[2];\n\n");
+
+	fprintf(fp,
 "	always @(posedge i_clk)\n"
 "	if (i_ce)\n"
 "	begin\n"
@@ -446,7 +864,94 @@ SLASHLINE
 "	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_i(i_clk, i_ce, rnd_i, o_i);\n"
 "\n"
 "	assign	o_val  = { o_r, o_i };\n"
-"\n"
+"\n");
+
+
+	if (formal_property_flag) {
+		fprintf(fp,
+	"`ifdef	FORMAL\n"
+		"\treg	f_past_valid;\n"
+		"\tinitial	f_past_valid = 1'b0;\n"
+		"\talways @(posedge i_clk)\n"
+		"\t	f_past_valid <= 1'b1;\n"
+	"\n"
+	"`ifdef	LASTSTAGE\n"
+		"\talways @(posedge i_clk)\n"
+		"\t	assume((i_ce)||($past(i_ce))||($past(i_ce,2)));\n"
+	"`endif\n"
+	"\n"
+		"\tinitial	assert(IWIDTH+1 == OWIDTH);\n"
+	"\n"
+		"\treg	signed	[IWIDTH-1:0]	f_piped_real	[0:3];\n"
+		"\treg	signed	[IWIDTH-1:0]	f_piped_imag	[0:3];\n"
+		"\talways @(posedge i_clk)\n"
+		"\tif (i_ce)\n"
+		"\tbegin\n"
+		"\t	f_piped_real[0] <= i_val[2*IWIDTH-1:IWIDTH];\n"
+		"\t	f_piped_imag[0] <= i_val[  IWIDTH-1:0];\n"
+	"\n"
+		"\t	f_piped_real[1] <= f_piped_real[0];\n"
+		"\t	f_piped_imag[1] <= f_piped_imag[0];\n"
+	"\n"
+		"\t	f_piped_real[2] <= f_piped_real[1];\n"
+		"\t	f_piped_imag[2] <= f_piped_imag[1];\n"
+	"\n"
+		"\t	f_piped_real[3] <= f_piped_real[2];\n"
+		"\t	f_piped_imag[3] <= f_piped_imag[2];\n"
+		"\tend\n"
+	"\n"
+		"\twire	f_syncd;\n"
+		"\treg	f_rsyncd;\n"
+	"\n"
+		"\tinitial	f_rsyncd	= 0;\n"
+		"\talways @(posedge i_clk)\n"
+		"\tif (i_reset)\n"
+		"\t	f_rsyncd <= 1'b0;\n"
+		"\telse if (!f_rsyncd)\n"
+		"\t	f_rsyncd <= o_sync;\n"
+		"\tassign	f_syncd = (f_rsyncd)||(o_sync);\n"
+	"\n"
+		"\treg	f_state;\n"
+		"\tinitial	f_state = 0;\n"
+		"\talways @(posedge i_clk)\n"
+		"\tif (i_reset)\n"
+		"\t	f_state <= 0;\n"
+		"\telse if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
+		"\t	f_state <= f_state + 1;\n"
+	"\n"
+		"\talways @(*)\n"
+		"\tif (f_state != 0)\n"
+		"\t	assume(!i_sync);\n"
+	"\n"
+		"\talways @(*)\n"
+		"\t	assert(stage == f_state[0]);\n"
+	"\n"
+		"\talways @(posedge i_clk)\n"
+		"\tif ((f_state == 1'b1)&&(f_syncd))\n"
+		"\tbegin\n"
+		"\t	assert(o_r == f_piped_real[2] + f_piped_real[1]);\n"
+		"\t	assert(o_i == f_piped_imag[2] + f_piped_imag[1]);\n"
+		"\tend\n"
+	"\n"
+		"\talways @(posedge i_clk)\n"
+		"\tif ((f_state == 1'b0)&&(f_syncd))\n"
+		"\tbegin\n"
+		"\t	// assert(!o_sync);\n"
+		"\t	assert(o_r == f_piped_real[3] - f_piped_real[2]);\n"
+		"\t	assert(o_i == f_piped_imag[3] - f_piped_imag[2]);\n"
+		"\tend\n"
+	"\n"
+		"\talways @(*)\n"
+		"\tif (wait_for_sync)\n"
+		"\tbegin\n"
+		"\t	assert(!f_rsyncd);\n"
+		"\t	assert(!o_sync);\n"
+		"\t	assert(f_state == 0);\n"
+		"\tend\n\n");
+	}
+
+	fprintf(fp,
+"`endif // FORMAL\n"
 "endmodule\n");
 
 	fclose(fp);
@@ -984,7 +1489,7 @@ SLASHLINE
 			fprintf(vmain, "\t\t\tbr_start <= 1\'b1;\n");
 		}
 		fprintf(vmain, "\n\n");
-		fprintf(vmain, "\tdblstage\t#(IWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
+		fprintf(vmain, "\tlaststage\t#(IWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
 		fprintf(vmain, "\t\t\t(%s%s), i_left, i_right, br_left, br_right);\n",
 			(async_reset)?"":"!", resetw.c_str());
 		fprintf(vmain, "\n\n");
@@ -1191,7 +1696,7 @@ SLASHLINE
 			if (single_clock) {
 				fprintf(vmain, "\twire\t[%d:0]\tw_d4;\n",
 					2*(obits+xtrapbits)-1);
-				fprintf(vmain, "\tqtrstage%s\t#(%d,%d,%d,0,%d,%d)\tstage_4(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tqtrstage%s\t#(%d,%d,%d,%d,%d)\tstage_4(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage==4))?"_dbg":"",
 					nbits+xtrapbits, obits+xtrapbits, lgsize,
 					(inverse)?1:0, (dropbit)?0:0,
@@ -1210,7 +1715,6 @@ SLASHLINE
 					((dbg)&&(dbgstage==4))?", o_dbg":"");
 				fprintf(vmain, "\tqtrstage\t#(%d,%d,%d,1,%d,%d)\tstage_o4(i_clk, %s, i_ce,\n",
 					nbits+xtrapbits, obits+xtrapbits, lgsize, (inverse)?1:0, (dropbit)?0:0,
-	
 					resetw.c_str());
 				fprintf(vmain, "\t\t\t\t\t\tw_s8, w_o8, w_o4, w_os4);\n");
 			}
@@ -1237,12 +1741,12 @@ SLASHLINE
 				printf("WARNING: SCALING OFF BY A FACTOR OF TWO--should\'ve dropped a bit in the last stage.\n");
 
 			if (single_clock) {
-				fprintf(vmain, "\tsngllast\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tlaststage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
 					nbits+xtrapbits, obits,(dropbit)?0:1,
 					resetw.c_str());
 				fprintf(vmain, "\t\t\t\t\tw_s4, w_d4, w_d2, w_s2);\n");
 			} else {
-				fprintf(vmain, "\tdblstage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tlaststage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
 					nbits+xtrapbits, obits,(dropbit)?0:1,
 					resetw.c_str());
 				fprintf(vmain, "\t\t\t\t\tw_s4, w_e4, w_o4, w_e2, w_o2, w_s2);\n");
@@ -1362,20 +1866,26 @@ SLASHLINE
 
 		if ((dbg)&&(dbgstage == 4)) {
 			fname = coredir + "/qtrstage_dbg.v";
-			build_quarters(fname.c_str(), rounding, async_reset, true);
+			if (single_clock)
+				build_snglquarters(fname.c_str(), rounding, async_reset, true);
+			else
+				build_dblquarters(fname.c_str(), rounding, async_reset, true);
 		}
 		fname = coredir + "/qtrstage.v";
-		build_quarters(fname.c_str(), rounding, async_reset, false);
+		if (single_clock)
+			build_snglquarters(fname.c_str(), rounding, async_reset, false);
+		else
+			build_dblquarters(fname.c_str(), rounding, async_reset, false);
 
 
 		if (single_clock) {
-			fname = coredir + "/sngllast.v";
+			fname = coredir + "/laststage.v";
 			build_sngllast(fname.c_str(), async_reset);
 		} else {
 			if ((dbg)&&(dbgstage == 2))
-				fname = coredir + "/dblstage_dbg.v";
+				fname = coredir + "/laststage_dbg.v";
 			else
-				fname = coredir + "/dblstage.v";
+				fname = coredir + "/laststage.v";
 			build_dblstage(fname.c_str(), rounding, async_reset, (dbg)&&(dbgstage==2));
 		}
 

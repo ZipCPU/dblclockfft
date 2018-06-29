@@ -6,18 +6,18 @@
 //
 // Purpose:	A test-bench for the qtrstage.v subfile of the double
 //		clocked FFT.  This file may be run autonomously.  If so,
-//		the last line output will either read "SUCCESS" on success,
-//		or some other failure message otherwise.
+//	the last line output will either read "SUCCESS" on success, or some
+//	other failure message otherwise.
 //
-//		This file depends upon verilator to both compile, run, and
-//		therefore test qtrstage.v
+//	This file depends upon verilator to both compile, run, and therefore
+//	test qtrstage.v
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2018, Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -42,8 +42,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "Vqtrstage.h"
 #include "verilated.h"
+#include "verilated_vcd_c.h"
+#include "Vqtrstage.h"
 #include "twoc.h"
 #include "fftsize.h"
 
@@ -72,30 +73,78 @@
 class	QTRTEST_TB {
 public:
 	Vqtrstage	*m_qstage;
-	unsigned long	m_data[ASIZ];
+	VerilatedVcdC	*m_trace;
+	unsigned long	m_data[ASIZ], m_tickcount;
 	int		m_addr, m_offset;
 	bool		m_syncd;
 
 	QTRTEST_TB(void) {
+		Verilated::traceEverOn(true);
+		m_trace = NULL;
 		m_qstage = new Vqtrstage;
-		m_addr = 0; m_offset = 6; m_syncd = false;
+		m_addr = 0;
+		m_offset = 6;
+		m_syncd = false;
+		m_tickcount = 0;
+	}
+
+	void	opentrace(const char *vcdname) {
+		if (!m_trace) {
+			m_trace = new VerilatedVcdC;
+			m_qstage->trace(m_trace, 99);
+			m_trace->open(vcdname);
+		}
+	}
+
+	void	closetrace(void) {
+		if (m_trace) {
+			m_trace->close();
+			delete	m_trace;
+			m_trace = NULL;
+		}
 	}
 
 	void	tick(void) {
+		m_tickcount++;
+
 		m_qstage->i_clk = 0;
 		m_qstage->eval();
+		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount-2));
 		m_qstage->i_clk = 1;
 		m_qstage->eval();
+		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount));
+		m_qstage->i_clk = 0;
+		m_qstage->eval();
+		if (m_trace) {
+			m_trace->dump((uint64_t)(10ul*m_tickcount+5));
+			m_trace->flush();
+		}
 
 		m_qstage->i_sync = 0;
 	}
 
+	void	cetick(void) {
+		int	nkce;
+
+		tick();
+		nkce = (rand()&1);
+#ifdef	FFT_CKPCE
+		nkce += FFT_CKPCE;
+#endif
+		if ((m_qstage->i_ce)&&(nkce>0)) {
+			m_qstage->i_ce = 0;
+			for(int kce = 1; kce < nkce; kce++)
+				tick();
+			m_qstage->i_ce = 1;
+		}
+	}
+
 	void	reset(void) {
 		m_qstage->i_ce  = 0;
-		m_qstage->i_rst = 1;
+		m_qstage->i_reset = 1;
 		tick();
 		m_qstage->i_ce  = 0;
-		m_qstage->i_rst = 0;
+		m_qstage->i_reset = 0;
 		tick();
 
 		m_addr = 0; m_offset = 6; m_syncd = false;
@@ -108,12 +157,15 @@ public:
 
 		if ((!m_syncd)&&(m_qstage->o_sync)) {
 			m_syncd = true;
+			assert(m_addr == m_offset);
 			m_offset = m_addr;
+			printf("VALID-SYNC!!\n");
 		}
 
 		if (!m_syncd)
 			return;
 
+#ifdef	DBLCLKFFT
 		ir0 = sbits(m_data[(m_addr-m_offset-1)&AMSK]>>IWIDTH, IWIDTH);
 		ii0 = sbits(m_data[(m_addr-m_offset-1)&AMSK], IWIDTH);
 		ir1 = sbits(m_data[(m_addr-m_offset  )&AMSK]>>IWIDTH, IWIDTH);
@@ -140,10 +192,61 @@ public:
 			if (oi0 != difi)	{
 				printf("FAIL 4: oi0 != difi (%x(exp) != %x(sut))\n", difi, oi0); fail = true;}
 		}
+#else
+		int	locn = (m_addr-m_offset)&AMSK;
+		int	ir3, ii3, ir4, ii4,ir5,ii5;
 
-		if (m_qstage->o_sync != ((((m_addr-m_offset)&127) == 0)?1:0)) {
-			printf("BAD O-SYNC, m_addr = %d, m_offset = %d\n", m_addr, m_offset); fail = true;
+		ir5 = sbits(m_data[(m_addr-m_offset-2)&AMSK]>>IWIDTH, IWIDTH);
+		ii5 = sbits(m_data[(m_addr-m_offset-2)&AMSK], IWIDTH);
+		ir4 = sbits(m_data[(m_addr-m_offset-1)&AMSK]>>IWIDTH, IWIDTH);
+		ii4 = sbits(m_data[(m_addr-m_offset-1)&AMSK], IWIDTH);
+		ir3 = sbits(m_data[(m_addr-m_offset  )&AMSK]>>IWIDTH, IWIDTH);
+		ii3 = sbits(m_data[(m_addr-m_offset  )&AMSK], IWIDTH);
+		ir2 = sbits(m_data[(m_addr-m_offset+1)&AMSK]>>IWIDTH, IWIDTH);
+		ii2 = sbits(m_data[(m_addr-m_offset+1)&AMSK], IWIDTH);
+		ir1 = sbits(m_data[(m_addr-m_offset+2)&AMSK]>>IWIDTH, IWIDTH);
+		ii1 = sbits(m_data[(m_addr-m_offset+2)&AMSK], IWIDTH);
+		ir0 = sbits(m_data[(m_addr-m_offset+3)&AMSK]>>IWIDTH, IWIDTH);
+		ii0 = sbits(m_data[(m_addr-m_offset+3)&AMSK], IWIDTH);
+
+		sumr = ir3 + ir1;
+		sumi = ii3 + ii1;
+		difr = ir5 - ir3;
+		difi = ii5 - ii3;
+
+		or0 = sbits(m_qstage->o_data >> OWIDTH, OWIDTH);
+		oi0 = sbits(m_qstage->o_data, OWIDTH);
+
+		printf("L=%d, or0 = %4d, oi0 = %4d, ", (locn&3), or0, oi0);
+		printf("sumr= %4d, sumi= %4d, ", sumr, sumi);
+		printf("difr= %4d, difi= %4d\n", difr, difi);
+		printf("IR0 = %08x, IR1 = %08x, IR2 = %08x, IR3 = %08x, IR4 = %08x, IR5 = %08x\n",
+				ir0, ir1, ir2, ir3, ir4, ir5);
+		printf("II0 = %08x, II1 = %08x, II2 = %08x, II3 = %08x, II4 = %08x, II5 = %08x\n",
+				ii0, ii1, ii2, ii3, ii4, ii5);
+		if (0==((locn)&2)) {
+			if (or0 != sumr)	{
+				printf("FAIL 1: or0 != sumr (%x(exp) != %x(sut))\n", sumr, or0); fail = true;
+			}
+			if (oi0 != sumi)	{
+				printf("FAIL 2: oi0 != sumi (%x(exp) != %x(sut))\n", sumi, oi0); fail = true;}
+		} else if (2==((m_addr-m_offset)&3)) {
+			if (or0 != difr)	{
+				printf("FAIL 3: or0 != difr (%x(exp) != %x(sut))\n", difr, or0); fail = true;}
+			if (oi0 != difi)	{
+				printf("FAIL 4: oi0 != difi (%x(exp) != %x(sut))\n", difi, oi0); fail = true;}
+		} else if (3==((m_addr-m_offset)&3)) {
+			if (or0 != difi)	{
+				printf("FAIL 3: or0 != difr (%x(exp) != %x(sut))\n", difr, or0); fail = true;}
+			if (oi0 != -difr)	{
+				printf("FAIL 4: oi0 != difi (%x(exp) != %x(sut))\n", difi, oi0); fail = true;}
 		}
+
+//		if (m_qstage->o_sync != ((((m_addr-m_offset)&127) == 0)?1:0)) {
+//			printf("BAD O-SYNC, m_addr = %d, m_offset = %d\n", m_addr, m_offset); fail = true;
+//		}
+#endif
+
 
 		if (fail)
 			exit(-1);
@@ -159,6 +262,7 @@ public:
 		m_qstage->i_ce = 1;
 		m_qstage->i_data = data;
 		// m_qstage->i_sync = (((m_addr&127)==2)?1:0);
+		printf("DATA[%08x] = %08x ... ", m_addr, data);
 		m_data[ (m_addr++)&AMSK] = data;
 		tick();
 
@@ -172,7 +276,11 @@ public:
 			m_qstage->diff_i,
 			m_qstage->pipeline,
 			m_qstage->iaddr,
+#ifdef	DBLCLKFFT
 			m_qstage->imem,
+#else
+			m_qstage->imem[1],
+#endif
 			m_qstage->wait_for_sync);
 
 		check_results();
@@ -202,17 +310,57 @@ int	main(int argc, char **argv, char **envp) {
 	int16_t		ir0, ii0, ir1, ii1, ir2, ii2;
 	int32_t		sumr, sumi, difr, difi;
 
+	tb->opentrace("qtrstage.vcd");
 	tb->reset();
 
 	tb->test( 16, 0);
 	tb->test( 16, 0);
 	tb->sync();
+
+	tb->test(  8,  0);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+
+	tb->test(  0, 4);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+
+	tb->test(  0,  0);
+	tb->test( 32,  0);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+
+	tb->test(  0,  0);
+	tb->test(  0, 64);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(128,  0);
+	tb->test(  0,  0);
+
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(  0,256);
+	tb->test(  0,  0);
+
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(  2,  0);
+
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(  0,  0);
+	tb->test(  0,  1);
+
 	tb->test(  0, 16);
 	tb->test(  0, 16);
 	tb->test( 16,  0);
 	tb->test(-16,  0);
-	tb->test(  0, 16);
-	tb->test(  0,-16);
 
 	for(int k=0; k<1060; k++) {
 		tb->random_test();

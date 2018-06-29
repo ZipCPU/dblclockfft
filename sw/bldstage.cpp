@@ -90,7 +90,7 @@ void	build_dblstage(const char *fname, ROUND_T rounding,
 	fprintf(fp,
 SLASHLINE
 "//\n"
-"// Filename:\tdblstage%s.v\n"
+"// Filename:\tlaststage%s.v\n"
 "//\n"
 "// Project:\t%s\n"
 "//\n"
@@ -101,6 +101,20 @@ SLASHLINE
 "//	used at the same time is in this stage.  Therefore, other than this\n"
 "//	stage and these twiddles, all of the other stages can run two stages\n"
 "//	at a time at one sample per clock.\n"
+"//\n"
+"// Operation:\n"
+"// 	Given a stream of values, operate upon them as though they were\n"
+"// 	value pairs, x[2n] and x[2n+1].  The stream begins when n=0, and ends\n"
+"// 	when n=1.  When the first x[0] value enters, the synchronization\n"
+"//	input, i_sync, must be true as well.\n"
+"//\n"
+"// 	For this stream, produce outputs\n"
+"// 	y[2n  ] = x[2n] + x[2n+1], and\n"
+"// 	y[2n+1] = x[2n] - x[2n+1]\n"
+"//\n"
+"// 	When y[0] is output, a synchronization bit o_sync will be true as\n"
+"// 	well, otherwise it will be zero.\n"
+"//\n"
 "//\n"
 "//	In this implementation, the output is valid one clock after the input\n"
 "//	is valid.  The output also accumulates one bit above and beyond the\n"
@@ -131,7 +145,7 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module\tdblstage%s(i_clk, %s, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
+"module\tlaststage%s(i_clk, %s, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
 	"\tparameter\tIWIDTH=%d,OWIDTH=IWIDTH+1, SHIFT=%d;\n"
 	"\tinput\t\ti_clk, %s, i_ce, i_sync;\n"
 	"\tinput\t\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
@@ -282,6 +296,24 @@ SLASHLINE
 "//	used as part of an FFT core.  Specifically, this file encapsulates\n"
 "//	the options of an FFT-stage.  For any 2^N length FFT, there shall be\n"
 "//	(N-1) of these stages.\n"
+"//\n"
+"//\n"
+"// Operation:\n"
+"// 	Given a stream of values, operate upon them as though they were\n"
+"// 	value pairs, x[n] and x[n+N/2].  The stream begins when n=0, and ends\n"
+"// 	when n=N/2-1 (i.e. there's a full set of N values).  When the value\n"
+"// 	x[0] enters, the synchronization input, i_sync, must be true as well.\n"
+"//\n"
+"// 	For this stream, produce outputs\n"
+"// 	y[n    ] = x[n] + x[n+N/2], and\n"
+"// 	y[n+N/2] = (x[n] - x[n+N/2]) * c[n],\n"
+"// 			where c[n] is a complex coefficient found in the\n"
+"// 			external memory file COEFFILE.\n"
+"// 	When y[0] is output, a synchronization bit o_sync will be true as\n"
+"// 	well, otherwise it will be zero.\n"
+"//\n"
+"// 	Most of the work to do this is done within the butterfly, whether the\n"
+"// 	hardware accelerated butterfly (uses a DSP) or not.\n"
 "//\n%s"
 "//\n",
 		(inv)?"i":"", (dbg)?"_dbg":"", prjname, creator);
@@ -299,7 +331,7 @@ SLASHLINE
 "\t// Parameters specific to the core that should be changed when this\n"
 "\t// core is built ... Note that the minimum LGSPAN (the base two log\n"
 "\t// of the span, or the base two log of the current FFT size) is 3.\n"
-"\t// Smaller spans (i.e. the span of 2) must use the dblstage module.\n"
+"\t// Smaller spans (i.e. the span of 2) must use the dbl laststage module.\n"
 "\tparameter\tLGWIDTH=%d, LGSPAN=%d, LGBDLY=%d, BFLYSHIFT=0;\n"
 "\tparameter\t[0:0]	OPT_HWMPY = 1\'b1;\n",
 		lgval(stage), (nwide <= 1) ? lgval(stage)-1 : lgval(stage)-2,
