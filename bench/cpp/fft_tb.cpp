@@ -136,8 +136,6 @@ public:
 				FFTW_FORWARD, FFTW_MEASURE);
 		m_syncd = false;
 		m_ntest = 0;
-
-		m_tickcount = 0l;
 	}
 
 	~FFT_TB(void) {
@@ -301,7 +299,7 @@ public:
 		if (xisq > 1.4 * FFTLEN/2) {
 			printf("TEST FAIL!!  Result is out of bounds from ");
 			printf("expected result with FFTW3.\n");
-			// exit(-2);
+			exit(EXIT_FAILURE);
 		}
 		m_ntest++;
 	}
