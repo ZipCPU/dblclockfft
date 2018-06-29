@@ -936,7 +936,7 @@ SLASHLINE
 		"\talways @(posedge i_clk)\n"
 		"\tif ((f_state == 1'b0)&&(f_syncd))\n"
 		"\tbegin\n"
-		"\t	// assert(!o_sync);\n"
+		"\t	assert(!o_sync);\n"
 		"\t	assert(o_r == f_piped_real[3] - f_piped_real[2]);\n"
 		"\t	assert(o_i == f_piped_imag[3] - f_piped_imag[2]);\n"
 		"\tend\n"
