@@ -56,7 +56,7 @@ module	bitreverse(i_clk, i_reset, i_ce, i_in, o_out, o_sync);
 	generate for(k=0; k<LGSIZE; k=k+1)
 		assign rdaddr[k] = wraddr[LGSIZE-1-k];
 	endgenerate
-	assign	rdaddr[LGSIZE] = ~wraddr[LGSIZE];
+	assign	rdaddr[LGSIZE] = !wraddr[LGSIZE];
 
 	reg	in_reset;
 
@@ -88,4 +88,87 @@ module	bitreverse(i_clk, i_reset, i_ce, i_in, o_out, o_sync);
 		else if ((i_ce)&&(!in_reset))
 			o_sync <= (wraddr[(LGSIZE-1):0] == 0);
 
+`ifdef	FORMAL
+`ifdef	BITREVERSE
+`define	ASSUME	assume
+`define	ASSERT	assert
+`else
+`define	ASSUME	assert
+`define	ASSERT	assume
+`endif
+
+	reg	f_past_valid;
+	initial	f_past_valid = 1'b0;
+	always @(posedge i_clk)
+		f_past_valid <= 1'b1;
+
+	initial	`ASSUME(i_reset);
+	always @(posedge i_clk)
+	if ((!f_past_valid)||($past(i_reset)))
+	begin
+		`ASSERT(wraddr == 0);
+		`ASSERT(in_reset);
+		`ASSERT(!o_sync);
+	end
+`ifdef	BITREVERSE
+	always @(posedge i_clk)
+		assume((i_ce)||($past(i_ce))||($past(i_ce,2)));
+`endif // BITREVERSE
+
+		(* anyconst *) reg	[LGSIZE:0]	f_const_addr;
+		wire	[LGSIZE:0]	f_reversed_addr;
+		reg			f_addr_loaded;
+		reg	[(2*WIDTH-1):0]	f_addr_value;
+
+		generate for(k=0; k<LGSIZE; k=k+1)
+			assign	f_reversed_addr[k] = f_const_addr[LGSIZE-1-k];
+		endgenerate
+		assign	f_reversed_addr[LGSIZE] = f_const_addr[LGSIZE];
+
+		initial	f_addr_loaded = 1'b0;
+		always @(posedge i_clk)
+		if (i_reset)
+			f_addr_loaded <= 1'b0;
+		else if (i_ce)
+		begin
+			if (wraddr == f_const_addr)
+				f_addr_loaded <= 1'b1;
+			else if (rdaddr == f_const_addr)
+				f_addr_loaded <= 1'b0;
+		end
+
+		always @(posedge i_clk)
+		if ((i_ce)&&(wraddr == f_const_addr))
+		begin
+			f_addr_value <= i_in;
+			`ASSERT(!f_addr_loaded);
+		end
+
+		always @(posedge i_clk)
+		if ((f_past_valid)&&(!$past(i_reset))
+				&&($past(f_addr_loaded))&&(!f_addr_loaded))
+			assert(o_out == f_addr_value);
+
+		always @(*)
+		if (o_sync)
+			assert(wraddr[LGSIZE-1:0] == 1);
+
+		always @(*)
+		if ((wraddr[LGSIZE]==f_const_addr[LGSIZE])
+				&&(wraddr[LGSIZE-1:0]
+						<= f_const_addr[LGSIZE-1:0]))
+			`ASSERT(!f_addr_loaded);
+
+		always @(*)
+		if ((rdaddr[LGSIZE]==f_const_addr[LGSIZE])&&(f_addr_loaded))
+			`ASSERT(wraddr[LGSIZE-1:0]
+					<= f_reversed_addr[LGSIZE-1:0]+1);
+
+		always @(*)
+		if (f_addr_loaded)
+			`ASSERT(brmem[f_const_addr] == f_addr_value);
+
+
+
+`endif	// FORMAL
 endmodule

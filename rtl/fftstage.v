@@ -10,6 +10,24 @@
 //	the options of an FFT-stage.  For any 2^N length FFT, there shall be
 //	(N-1) of these stages.
 //
+//
+// Operation:
+// 	Given a stream of values, operate upon them as though they were
+// 	value pairs, x[n] and x[n+N/2].  The stream begins when n=0, and ends
+// 	when n=N/2-1 (i.e. there's a full set of N values).  When the value
+// 	x[0] enters, the synchronization input, i_sync, must be true as well.
+//
+// 	For this stream, produce outputs
+// 	y[n    ] = x[n] + x[n+N/2], and
+// 	y[n+N/2] = (x[n] - x[n+N/2]) * c[n],
+// 			where c[n] is a complex coefficient found in the
+// 			external memory file COEFFILE.
+// 	When y[0] is output, a synchronization bit o_sync will be true as
+// 	well, otherwise it will be zero.
+//
+// 	Most of the work to do this is done within the butterfly, whether the
+// 	hardware accelerated butterfly (uses a DSP) or not.
+//
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
@@ -46,7 +64,7 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	// Parameters specific to the core that should be changed when this
 	// core is built ... Note that the minimum LGSPAN (the base two log
 	// of the span, or the base two log of the current FFT size) is 3.
-	// Smaller spans (i.e. the span of 2) must use the dblstage module.
+	// Smaller spans (i.e. the span of 2) must use the dbl laststage module.
 	parameter	LGWIDTH=11, LGSPAN=10, LGBDLY=4, BFLYSHIFT=0;
 	parameter	[0:0]	OPT_HWMPY = 1'b1;
 	// Clocks per CE.  If your incoming data rate is less than 50% of your

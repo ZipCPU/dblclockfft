@@ -90,7 +90,7 @@ module fftmain(i_clk, i_reset, i_ce,
 	wire	[33:0]	w_d2048;
 	fftstage	#(IWIDTH,IWIDTH+4,17,11,10,4,0,
 			1'b0, 2, "cmem_2048.hex")
-		stage_e2048(i_clk, i_reset, i_ce,
+		stage_2048(i_clk, i_reset, i_ce,
 			(!i_reset), i_sample, w_d2048, w_s2048);
 
 
@@ -165,11 +165,11 @@ module fftmain(i_clk, i_reset, i_ce,
 
 	wire		w_s4;
 	wire	[43:0]	w_d4;
-	qtrstage	#(21,22,11,0,0,0)	stage_4(i_clk, i_reset, i_ce,
+	qtrstage	#(21,22,11,0,0)	stage_4(i_clk, i_reset, i_ce,
 						w_s8, w_d8, w_d4, w_s4);
 	wire		w_s2;
 	wire	[43:0]	w_d2;
-	sngllast	#(22,22,0)	stage_2(i_clk, i_reset, i_ce,
+	laststage	#(22,22,0)	stage_2(i_clk, i_reset, i_ce,
 					w_s4, w_d4, w_d2, w_s2);
 
 

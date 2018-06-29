@@ -151,7 +151,6 @@ public:
 	}
 
 	void	check_results(void) {
-		int	ir0, ii0, ir1, ii1, ir2, ii2;
 		int	sumr, sumi, difr, difi, or0, oi0;
 		bool	fail = false;
 
@@ -166,6 +165,8 @@ public:
 			return;
 
 #ifdef	DBLCLKFFT
+		int	ir0, ii0, ir1, ii1, ir2, ii2;
+
 		ir0 = sbits(m_data[(m_addr-m_offset-1)&AMSK]>>IWIDTH, IWIDTH);
 		ii0 = sbits(m_data[(m_addr-m_offset-1)&AMSK], IWIDTH);
 		ir1 = sbits(m_data[(m_addr-m_offset  )&AMSK]>>IWIDTH, IWIDTH);
@@ -194,20 +195,14 @@ public:
 		}
 #else
 		int	locn = (m_addr-m_offset)&AMSK;
-		int	ir3, ii3, ir4, ii4,ir5,ii5;
+		int	ir1, ii1, ir3, ii3, ir5, ii5;
 
 		ir5 = sbits(m_data[(m_addr-m_offset-2)&AMSK]>>IWIDTH, IWIDTH);
 		ii5 = sbits(m_data[(m_addr-m_offset-2)&AMSK], IWIDTH);
-		ir4 = sbits(m_data[(m_addr-m_offset-1)&AMSK]>>IWIDTH, IWIDTH);
-		ii4 = sbits(m_data[(m_addr-m_offset-1)&AMSK], IWIDTH);
 		ir3 = sbits(m_data[(m_addr-m_offset  )&AMSK]>>IWIDTH, IWIDTH);
 		ii3 = sbits(m_data[(m_addr-m_offset  )&AMSK], IWIDTH);
-		ir2 = sbits(m_data[(m_addr-m_offset+1)&AMSK]>>IWIDTH, IWIDTH);
-		ii2 = sbits(m_data[(m_addr-m_offset+1)&AMSK], IWIDTH);
 		ir1 = sbits(m_data[(m_addr-m_offset+2)&AMSK]>>IWIDTH, IWIDTH);
 		ii1 = sbits(m_data[(m_addr-m_offset+2)&AMSK], IWIDTH);
-		ir0 = sbits(m_data[(m_addr-m_offset+3)&AMSK]>>IWIDTH, IWIDTH);
-		ii0 = sbits(m_data[(m_addr-m_offset+3)&AMSK], IWIDTH);
 
 		sumr = ir3 + ir1;
 		sumi = ii3 + ii1;
@@ -217,13 +212,6 @@ public:
 		or0 = sbits(m_qstage->o_data >> OWIDTH, OWIDTH);
 		oi0 = sbits(m_qstage->o_data, OWIDTH);
 
-		printf("L=%d, or0 = %4d, oi0 = %4d, ", (locn&3), or0, oi0);
-		printf("sumr= %4d, sumi= %4d, ", sumr, sumi);
-		printf("difr= %4d, difi= %4d\n", difr, difi);
-		printf("IR0 = %08x, IR1 = %08x, IR2 = %08x, IR3 = %08x, IR4 = %08x, IR5 = %08x\n",
-				ir0, ir1, ir2, ir3, ir4, ir5);
-		printf("II0 = %08x, II1 = %08x, II2 = %08x, II3 = %08x, II4 = %08x, II5 = %08x\n",
-				ii0, ii1, ii2, ii3, ii4, ii5);
 		if (0==((locn)&2)) {
 			if (or0 != sumr)	{
 				printf("FAIL 1: or0 != sumr (%x(exp) != %x(sut))\n", sumr, or0); fail = true;
@@ -262,7 +250,7 @@ public:
 		m_qstage->i_ce = 1;
 		m_qstage->i_data = data;
 		// m_qstage->i_sync = (((m_addr&127)==2)?1:0);
-		printf("DATA[%08x] = %08x ... ", m_addr, data);
+		// printf("DATA[%08x] = %08x ... ", m_addr, data);
 		m_data[ (m_addr++)&AMSK] = data;
 		tick();
 

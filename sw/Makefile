@@ -73,9 +73,8 @@ fftgen: $(OBJECTS)
 	$(CXX) $(CFLAGS) $^ -o $@
 
 .PHONY: test
-test: fft ifft butterfly fftstage hwbfly shiftaddmpy longbimpy
-# test: qtrstage dblstage
-test: bitreverse sngllast
+test: fft ifft butterfly fftstage hwbfly shiftaddmpy longbimpy qtrstage
+test: bitreverse laststage
 
 #
 # Although these parameters, a 2048 point FFT of 16 bits input, aren't
@@ -190,15 +189,15 @@ $(VOBJDR)/Vdblstage__ALL.a: $(VOBJDR)/Vdblstage.h
 $(VOBJDR)/Vdblstage__ALL.a: $(VOBJDR)/Vdblstage.cpp
 	cd $(VOBJDR)/; make -f Vdblstage.mk
 
-.PHONY: sngllast
-sngllast: $(VOBJDR)/Vsngllast__ALL.a
+.PHONY: laststage
+laststage: $(VOBJDR)/Vlaststage__ALL.a
 
-$(CORED)/sngllast.v: fft
-$(VOBJDR)/Vsngllast.cpp $(VOBJDR)/Vsngllast.h: $(CORED)/sngllast.v
-	cd $(CORED)/; $(VERILATOR) $(VFLAGS) sngllast.v
-$(VOBJDR)/Vsngllast__ALL.a: $(VOBJDR)/Vsngllast.h
-$(VOBJDR)/Vsngllast__ALL.a: $(VOBJDR)/Vsngllast.cpp
-	cd $(VOBJDR)/; make -f Vsngllast.mk
+$(CORED)/laststage.v: fft
+$(VOBJDR)/Vlaststage.cpp $(VOBJDR)/Vlaststage.h: $(CORED)/laststage.v
+	cd $(CORED)/; $(VERILATOR) $(VFLAGS) laststage.v
+$(VOBJDR)/Vlaststage__ALL.a: $(VOBJDR)/Vlaststage.h
+$(VOBJDR)/Vlaststage__ALL.a: $(VOBJDR)/Vlaststage.cpp
+	cd $(VOBJDR)/; make -f Vlaststage.mk
 
 .PHONY: fftstage
 fftstage: $(VOBJDR)/Vfftstage__ALL.a

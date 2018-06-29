@@ -43,7 +43,7 @@
 ##
 ##########################################################################/
 all: mpy_tb bitreverse_tb hwbfly_tb butterfly_tb fftstage_tb fft_tb
-# all: qtrstage_tb test
+all: qtrstage_tb laststage_tb test
 
 OBJDR:= ../../rtl/obj_dir
 VSRCD = ../../rtl
@@ -61,9 +61,9 @@ VINC := -I$(VROOT)/include -I$(OBJDR)/ -I$(TBODR)/
 # MPYLB:= $(OBJDR)/Vshiftaddmpy__ALL.a
 MPYLB:= $(OBJDR)/Vlongbimpy__ALL.a
 BTREV:= $(OBJDR)/Vbitreverse__ALL.a
-SGLRV:= $(OBJDR)/Vsnglbrev__ALL.a
 STAGE:= $(OBJDR)/Vfftstage__ALL.a
 QTRSG:= $(OBJDR)/Vqtrstage__ALL.a
+LSTSG:= $(OBJDR)/Vlaststage__ALL.a
 BFLYL:= $(OBJDR)/Vbutterfly__ALL.a
 HWBFY:= $(OBJDR)/Vhwbfly__ALL.a
 FFTLB:= $(OBJDR)/Vfftmain__ALL.a
@@ -77,8 +77,8 @@ mpy_tb: mpy_tb.cpp fftsize.h twoc.h $(MPYLB)
 bitreverse_tb: bitreverse_tb.cpp twoc.cpp twoc.h fftsize.h $(BTREV)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(BTREV) $(VSRCS) -o $@
 
-# fftstage_tb: fftstage_tb.cpp twoc.cpp twoc.h $(DBLSG)
-#	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(DBLSG) $(VSRCS) -o $@
+laststage_tb: laststage_tb.cpp twoc.cpp twoc.h $(LSTSG)
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(LSTSG) $(VSRCS) -o $@
 
 qtrstage_tb: qtrstage_tb.cpp twoc.cpp twoc.h $(QTRSG)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(QTRSG) $(VSRCS) -o $@

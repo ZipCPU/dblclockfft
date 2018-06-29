@@ -781,7 +781,7 @@ SLASHLINE
 "	// bit than the two originals.\n"
 "	reg	signed	[(IWIDTH):0]	rnd_r, rnd_i, sto_r, sto_i;\n"
 "	reg				wait_for_sync, stage;\n"
-"	reg		[2:0]		sync_pipe;\n"
+"	reg		[1:0]		sync_pipe;\n"
 "\n"
 "	initial	wait_for_sync = 1'b1;\n"
 "	initial	stage         = 1'b0;\n");
@@ -816,7 +816,7 @@ SLASHLINE
 	fprintf(fp,
 		"\t\tsync_pipe <= 0;\n"
 		"\telse if (i_ce)\n"
-		"\t\tsync_pipe <= { sync_pipe[1:0], i_sync };\n\n");
+		"\t\tsync_pipe <= { sync_pipe[0], i_sync };\n\n");
 
 	fprintf(fp, "\tinitial\to_sync = 1\'b0;\n");
 	if (async_reset)
@@ -831,7 +831,7 @@ SLASHLINE
 	fprintf(fp,
 		"\t\to_sync <= 1\'b0;\n"
 		"\telse if (i_ce)\n"
-		"\t\to_sync <= sync_pipe[2];\n\n");
+		"\t\to_sync <= sync_pipe[1];\n\n");
 
 	fprintf(fp,
 "	always @(posedge i_clk)\n"
