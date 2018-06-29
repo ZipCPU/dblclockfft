@@ -65,7 +65,7 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	// core is built ... Note that the minimum LGSPAN (the base two log
 	// of the span, or the base two log of the current FFT size) is 3.
 	// Smaller spans (i.e. the span of 2) must use the dbl laststage module.
-	parameter	LGWIDTH=11, LGSPAN=10, LGBDLY=4, BFLYSHIFT=0;
+	parameter	LGWIDTH=4, LGSPAN=3, LGBDLY=4, BFLYSHIFT=0;
 	parameter	[0:0]	OPT_HWMPY = 1'b1;
 	// Clocks per CE.  If your incoming data rate is less than 50% of your
 	// clock speed, you can set CKPCE to 2'b10, make sure there's at least
@@ -77,7 +77,7 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	parameter	[1:0]	CKPCE = 2'h2;
 	// The COEFFILE parameter contains the name of the file containing the
 	// FFT twiddle factors
-	parameter	COEFFILE="cmem_2048.hex";
+	parameter	COEFFILE="cmem_16.hex";
 	input					i_clk, i_reset, i_ce, i_sync;
 	input		[(2*IWIDTH-1):0]	i_data;
 	output	reg	[(2*OWIDTH-1):0]	o_data;
