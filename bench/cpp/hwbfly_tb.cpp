@@ -4,8 +4,8 @@
 //
 // Project:	A Doubletime Pipelined FFT
 //
-// Purpose:	A test-bench for the hardware butterfly subfile of the double
-//		clocked FFT.  This file may be run autonomously.  If so,
+// Purpose:	A test-bench for the hardware butterfly subfile of the generic
+//		pipelined FFT.  This file may be run autonomously.  If so,
 //	the last line output will either read "SUCCESS" on success, or some
 //	other failure message otherwise.
 //
@@ -42,9 +42,9 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "Vhwbfly.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
+#include "Vhwbfly.h"
 #include "twoc.h"
 #include "fftsize.h"
 
@@ -53,6 +53,10 @@
 #else
 #define	VVAR(A)	v__DOT_ ## A
 #endif
+
+#define	IWIDTH	TST_BUTTERFLY_IWIDTH
+#define	CWIDTH	TST_BUTTERFLY_CWIDTH
+#define	OWIDTH	TST_BUTTERFLY_OWIDTH
 
 class	HWBFLY_TB {
 public:
@@ -66,6 +70,7 @@ public:
 
 	HWBFLY_TB(void) {
 		Verilated::traceEverOn(true);
+		m_trace = NULL;
 		m_bfly = new Vhwbfly;
 		m_addr = 0;
 		m_syncd = 0;
@@ -96,6 +101,7 @@ public:
 		m_tickcount++;
 
 		m_lastaux = m_bfly->o_aux;
+		m_bfly->i_clk = 0;
 		m_bfly->eval();
 		if (m_trace) m_trace->dump((uint64_t)(10ul*m_tickcount-2));
 		m_bfly->i_clk = 1;
@@ -122,7 +128,8 @@ public:
 #ifdef	FFT_CKPCE
 		nkce += FFT_CKPCE;
 #endif
-		if ((ce)&&(nkce>0)) {
+
+		if ((ce)&&(nkce > 0)) {
 			m_bfly->i_ce = 0;
 			for(int kce=0; kce<nkce-1; kce++)
 				tick();
@@ -146,8 +153,8 @@ public:
 		// we'll never get an aux=1 output.
 		//
 		m_bfly->i_reset = 1;
-		m_bfly->i_ce  = 1;
 		m_bfly->i_aux = 1;
+		m_bfly->i_ce  = 1;
 		for(int i=0; i<200; i++)
 			cetick();
 
@@ -163,9 +170,9 @@ public:
 	void	test(const int n, const int k, const unsigned long cof,
 			const unsigned lft, const unsigned rht, const int aux) {
 
-		m_bfly->i_coef  = cof & (~(-1l << 40));
-		m_bfly->i_left  = lft;
-		m_bfly->i_right = rht;
+		m_bfly->i_coef  = ubits(cof, 2*TST_BUTTERFLY_CWIDTH);
+		m_bfly->i_left  = ubits(lft, 2*TST_BUTTERFLY_IWIDTH);
+		m_bfly->i_right = ubits(rht, 2*TST_BUTTERFLY_IWIDTH);
 		m_bfly->i_aux   = aux & 1;
 
 		m_bfly->i_ce = 1;
@@ -205,47 +212,46 @@ public:
 		printf("\n");
 
 		if ((m_syncd)&&(m_left[(m_addr-m_offset)&(64-1)] != m_bfly->o_left)) {
-			fprintf(stderr, "WRONG O_LEFT! (%lx(exp) != %lx(sut)\n",
+			printf("WRONG O_LEFT! (%lx(exp) != %lx(sut)\n",
 				m_left[(m_addr-m_offset)&(64-1)],
 				m_bfly->o_left);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		if ((m_syncd)&&(m_right[(m_addr-m_offset)&(64-1)] != m_bfly->o_right)) {
-			fprintf(stderr, "WRONG O_RIGHT! (%lx(exp) != %lx(sut))\n",
-				m_right[(m_addr-m_offset)&(64-1)],
-				m_bfly->o_right);
-			exit(-1);
+			printf("WRONG O_RIGHT! (%lx(exp) != %lx(sut))\n",
+				m_right[(m_addr-m_offset)&(64-1)], m_bfly->o_right);
+			exit(EXIT_FAILURE);
 		}
 
 		if ((m_syncd)&&(m_aux[(m_addr-m_offset)&(64-1)] != m_bfly->o_aux)) {
-			fprintf(stderr, "FAILED AUX CHANNEL TEST (i.e. the SYNC)\n");
-			exit(-1);
+			printf("FAILED AUX CHANNEL TEST (i.e. the SYNC)\n");
+			exit(EXIT_FAILURE);
 		}
 
 		if ((m_addr > 22)&&(!m_syncd)) {
-			fprintf(stderr, "NO SYNC PULSE!\n");
-			exit(-1);
+			printf("NO SYNC PULSE!\n");
+			exit(EXIT_FAILURE);
 		}
 
 		// Now, let's calculate an "expected" result ...
 		long	rlft, ilft;
 
 		// Extract left and right values ...
-		rlft = sbits(m_bfly->i_left >> 16, 16);
-		ilft = sbits(m_bfly->i_left      , 16);
+		rlft = sbits(m_bfly->i_left >> IWIDTH, IWIDTH);
+		ilft = sbits(m_bfly->i_left          , IWIDTH);
 
 		// Now repeat for the right hand value ...
 		long	rrht, irht;
 		// Extract left and right values ...
-		rrht = sbits(m_bfly->i_right >> 16, 16);
-		irht = sbits(m_bfly->i_right      , 16);
+		rrht = sbits(m_bfly->i_right >> IWIDTH, IWIDTH);
+		irht = sbits(m_bfly->i_right          , IWIDTH);
 
 		// and again for the coefficients
 		long	rcof, icof;
 		// Extract left and right values ...
-		rcof = sbits(m_bfly->i_coef >> 20, 20);
-		icof = sbits(m_bfly->i_coef      , 20);
+		rcof = sbits(m_bfly->i_coef >> CWIDTH, CWIDTH);
+		icof = sbits(m_bfly->i_coef          , CWIDTH);
 
 		// Now, let's do the butterfly ourselves ...
 		long sumi, sumr, difi, difr;
@@ -270,8 +276,11 @@ public:
 		p2 = difi * icof;
 		p3 = (difr + difi) * (rcof + icof);
 
-		mpyr = p1-p2 + (1<<17);
-		mpyi = p3-p1-p2 + (1<<17);
+		mpyr = p1-p2;
+		mpyi = p3-p1-p2;
+
+		mpyr = rndbits(mpyr, (IWIDTH+2)+(CWIDTH+1), OWIDTH+4);
+		mpyi = rndbits(mpyi, (IWIDTH+2)+(CWIDTH+1), OWIDTH+4);
 
 	/*
 		printf("RC=%lx, IC=%lx, ", rcof, icof);
@@ -283,12 +292,15 @@ public:
 		long	o_left_r, o_left_i, o_right_r, o_right_i;
 		unsigned long	o_left, o_right;
 
-		o_left_r = sumr & 0x01ffff; o_left_i = sumi & 0x01ffff;
-		o_left = (o_left_r << 17) | (o_left_i);
+		o_left_r = rndbits(sumr<<(CWIDTH-2), CWIDTH+IWIDTH+3, OWIDTH+4);
+			o_left_r = ubits(o_left_r, OWIDTH);
+		o_left_i = rndbits(sumi<<(CWIDTH-2), CWIDTH+IWIDTH+3, OWIDTH+4);
+			o_left_i = ubits(o_left_i, OWIDTH);
+		o_left = (o_left_r << OWIDTH) | (o_left_i);
 
-		o_right_r = (mpyr>>18) & 0x01ffff;
-		o_right_i = (mpyi>>18) & 0x01ffff;
-		o_right = (o_right_r << 17) | (o_right_i);
+		o_right_r = ubits(mpyr, OWIDTH);
+		o_right_i = ubits(mpyi, OWIDTH);
+		o_right = (o_right_r << OWIDTH) | (o_right_i);
 	/*
 		printf("oR_r = %lx, ", o_right_r);
 		printf("oR_i = %lx\n", o_right_i);

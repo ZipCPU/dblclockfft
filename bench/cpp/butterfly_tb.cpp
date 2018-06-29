@@ -4,20 +4,20 @@
 //
 // Project:	A Doubletime Pipelined FFT
 //
-// Purpose:	A test-bench for the butterfly.v subfile of the double
-//		clocked FFT.  This file may be run autonomously.  If so,
-//		the last line output will either read "SUCCESS" on success,
-//		or some other failure message otherwise.
+// Purpose:	A test-bench for the butterfly.v subfile of the generic
+//		pipelined FFT.  This file may be run autonomously.  If so,
+//	the last line output will either read "SUCCESS" on success, or some
+//	other failure message otherwise.
 //
-//		This file depends upon verilator to both compile, run, and
-//		therefore test butterfly.v
+//	This file depends upon verilator to both compile, run, and therefore
+//	test butterfly.v
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
 ///////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015, Gisselquist Technology, LLC
+// Copyright (C) 2015,2018 Gisselquist Technology, LLC
 //
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -42,11 +42,11 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "fftsize.h"
-#include "Vbutterfly.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
+#include "Vbutterfly.h"
 #include "twoc.h"
+#include "fftsize.h"
 
 #ifdef	NEW_VERILATOR
 #define	VVAR(A)	butterfly__DOT__ ## A
@@ -72,7 +72,6 @@ public:
 	BFLY_TB(void) {
 		Verilated::traceEverOn(true);
 		m_trace = NULL;
-
 		m_bfly = new Vbutterfly;
 		m_addr = 0;
 		m_syncd = 0;
@@ -153,10 +152,9 @@ public:
 		//
 		m_bfly->i_reset = 1;
 		m_bfly->i_aux = 1;
-		m_bfly->i_ce = 1;
-		for(int i=0; i<200; i++) {
+		m_bfly->i_ce  = 1;
+		for(int i=0; i<200; i++)
 			cetick();
-		}
 
 		// Now here's the RESET line, so let's see what the test does
 		m_bfly->i_reset = 1;
@@ -197,26 +195,26 @@ public:
 			m_bfly->o_aux);
 
 		if ((m_syncd)&&(m_left[(m_addr-m_offset)&(64-1)] != m_bfly->o_left)) {
-			printf("WRONG O_LEFT! (%lx(exp) != %lx(sut))\n",
+			printf("WRONG O_LEFT! (%lx(exp) != %lx(sut)\n",
 				m_left[(m_addr-m_offset)&(64-1)],
 				m_bfly->o_left);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		if ((m_syncd)&&(m_right[(m_addr-m_offset)&(64-1)] != m_bfly->o_right)) {
-			printf("WRONG O_RIGHT (%10lx(exp) != (%10lx(sut))!\n",
+			printf("WRONG O_RIGHT! (%lx(exp) != %lx(sut))\n",
 				m_right[(m_addr-m_offset)&(64-1)], m_bfly->o_right);
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		if ((m_syncd)&&(m_aux[(m_addr-m_offset)&(64-1)] != m_bfly->o_aux)) {
 			printf("FAILED AUX CHANNEL TEST (i.e. the SYNC)\n");
-			exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		if ((m_addr > TST_BUTTERFLY_MPYDELAY+6)&&(!m_syncd)) {
 			printf("NO SYNC PULSE!\n");
-			// exit(-1);
+			exit(EXIT_FAILURE);
 		}
 
 		// Now, let's calculate an "expected" result ...
