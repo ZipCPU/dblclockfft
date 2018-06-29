@@ -153,14 +153,37 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			p2d_in <= r_dif_i;
 			p3c_in <= ir_coef_i + ir_coef_r;
 			p3d_in <= r_dif_r + r_dif_i;
+		end
 
-
+`ifndef	FORMAL
+		always @(posedge i_clk)
+		if (i_ce)
+		begin
 			// Third clock, pipeline = 3
 			//   As desired, each of these lines infers a DSP48
 			rp_one   <= p1c_in * p1d_in;
 			rp_two   <= p2c_in * p2d_in;
 			rp_three <= p3c_in * p3d_in;
 		end
+`else
+		wire	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	pre_rp_one, pre_rp_two;
+		wire	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]	pre_rp_three;
+
+		abs_mpy #(CWIDTH,IWIDTH+1,1'b1)
+			onei(p1c_in, p1d_in, pre_rp_one);
+		abs_mpy #(CWIDTH,IWIDTH+1,1'b1)
+			twoi(p2c_in, p2d_in, pre_rp_two);
+		abs_mpy #(CWIDTH+1,IWIDTH+2,1'b1)
+			threei(p3c_in, p3d_in, pre_rp_three);
+
+		always @(posedge i_clk)
+		if (i_ce)
+		begin
+			rp_one   = pre_rp_one;
+			rp_two   = pre_rp_two;
+			rp_three = pre_rp_three;
+		end
+`endif // FORMAL
 
 		assign	p_one   = rp_one;
 		assign	p_two   = rp_two;
@@ -175,8 +198,8 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		wire	signed	[(CWIDTH-1):0]	mpy_pipe_vc;
 		wire	signed	[(IWIDTH):0]	mpy_pipe_vd;
 		//
-		reg	signed	[(CWIDTH)-1:0]		mpy_cof_sum;
-		reg	signed	[(IWIDTH+1)-1:0]	mpy_dif_sum;
+		reg	signed	[(CWIDTH+1)-1:0]	mpy_cof_sum;
+		reg	signed	[(IWIDTH+2)-1:0]	mpy_dif_sum;
 
 		assign	mpy_pipe_vc =  mpy_pipe_c[2*(CWIDTH)-1:CWIDTH];
 		assign	mpy_pipe_vd =  mpy_pipe_d[2*(IWIDTH+1)-1:IWIDTH+1];
@@ -221,6 +244,7 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 				mpy_pipe_d[(IWIDTH+1)-1:0], {(IWIDTH+1){1'b0}} };
 		end
 
+`ifndef	FORMAL
 		always @(posedge i_clk)
 		if (i_ce) // First clock
 			longmpy <= mpy_cof_sum * mpy_dif_sum;
@@ -228,6 +252,25 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		always @(posedge i_clk)
 		if (mpy_pipe_v)
 			mpy_pipe_out <= mpy_pipe_vc * mpy_pipe_vd;
+`else
+		wire	signed [IWIDTH+CWIDTH+3-1:0]	pre_longmpy;
+		wire	signed	[(CWIDTH+IWIDTH+1)-1:0]	pre_mpy_pipe_out;
+
+		abs_mpy	#(CWIDTH+1,IWIDTH+2,1)
+			longmpyi(mpy_cof_sum, mpy_dif_sum, pre_longmpy);
+
+		always @(posedge i_clk)
+		if (i_ce)
+			longmpy <= pre_longmpy;
+
+
+		abs_mpy #(CWIDTH,IWIDTH+1,1)
+			mpy_pipe_outi(mpy_pipe_vc, mpy_pipe_vd, pre_mpy_pipe_out);
+
+		always @(posedge i_clk)
+		if (mpy_pipe_v)
+			mpy_pipe_out <= pre_mpy_pipe_out;
+`endif
 
 		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one;
 		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one,
@@ -301,9 +344,20 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 					mpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1'b0}} };
 			end
 
+`ifndef	FORMAL
 		always @(posedge i_clk)
 			if (mpy_pipe_v)
 				mpy_pipe_out <= mpy_pipe_vc * mpy_pipe_vd;
+
+`else	// FORMAL
+		wire	signed	[  (CWIDTH+IWIDTH+3)-1:0] pre_mpy_pipe_out;
+
+		abs_mpy #(CWIDTH+1,IWIDTH+2,1)
+			mpy_pipe_outi(mpy_pipe_vc, mpy_pipe_vd, pre_mpy_pipe_out);
+		always @(posedge i_clk)
+			if (mpy_pipe_v)
+				mpy_pipe_out <= pre_mpy_pipe_out;
+`endif	// FORMAL
 
 		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one, rp_two;
 		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one, rp2_two;
@@ -403,4 +457,146 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	o_left = { rnd_left_r, rnd_left_i };
 	assign	o_right= { rnd_right_r,rnd_right_i};
 
+`ifdef	FORMAL
+	parameter	F_DEPTH = 6;
+	localparam	F_D = F_DEPTH-2;
+
+	reg	signed	[IWIDTH-1:0]	f_dlyleft_r  [0:F_DEPTH-1];
+	reg	signed	[IWIDTH-1:0]	f_dlyleft_i  [0:F_DEPTH-1];
+	reg	signed	[IWIDTH-1:0]	f_dlyright_r [0:F_DEPTH-1];
+	reg	signed	[IWIDTH-1:0]	f_dlyright_i [0:F_DEPTH-1];
+	reg	signed	[CWIDTH-1:0]	f_dlycoeff_r [0:F_DEPTH-1];
+	reg	signed	[CWIDTH-1:0]	f_dlycoeff_i [0:F_DEPTH-1];
+	reg	signed	[F_DEPTH-1:0]	f_dlyaux;
+
+	always @(posedge i_clk)
+	if (i_ce)
+	begin
+		f_dlyleft_r[0]   <= i_left[ (2*IWIDTH-1):IWIDTH];
+		f_dlyleft_i[0]   <= i_left[ (  IWIDTH-1):0];
+		f_dlyright_r[0]  <= i_right[(2*IWIDTH-1):IWIDTH];
+		f_dlyright_i[0]  <= i_right[(  IWIDTH-1):0];
+		f_dlycoeff_r[0]  <= i_coef[ (2*CWIDTH-1):CWIDTH];
+		f_dlycoeff_i[0]  <= i_coef[ (  CWIDTH-1):0];
+		f_dlyaux[0]      <= i_aux;
+	end
+
+	genvar	k;
+	generate for(k=1; k<F_DEPTH; k=k+1)
+
+		always @(posedge i_clk)
+		if (i_ce)
+		begin
+			f_dlyleft_r[k]  <= f_dlyleft_r[ k-1];
+			f_dlyleft_i[k]  <= f_dlyleft_i[ k-1];
+			f_dlyright_r[k] <= f_dlyright_r[k-1];
+			f_dlyright_i[k] <= f_dlyright_i[k-1];
+			f_dlycoeff_r[k] <= f_dlycoeff_r[k-1];
+			f_dlycoeff_i[k] <= f_dlycoeff_i[k-1];
+			f_dlyaux[k]     <= f_dlyaux[    k-1];
+		end
+
+	endgenerate
+
+	always @(posedge i_clk)
+	if ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))
+			&&(!$past(i_ce,4)))
+		assume(i_ce);
+
+	generate if (CKPCE <= 1)
+	begin
+
+		// i_ce is allowed to be anything in this mode
+
+	end else if (CKPCE == 2)
+	begin : F_CKPCE_TWO
+
+		always @(posedge i_clk)
+			if ($past(i_ce))
+				assume(!i_ce);
+
+	end else if (CKPCE == 3)
+	begin : F_CKPCE_THREE
+
+		always @(posedge i_clk)
+			if (($past(i_ce))||($past(i_ce,2)))
+				assume(!i_ce);
+
+	end endgenerate
+
+	reg	[4:0]	f_startup_counter;
+	initial	f_startup_counter = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		f_startup_counter = 0;
+	else if ((i_ce)&&(!(&f_startup_counter)))
+		f_startup_counter <= f_startup_counter + 1;
+
+	wire	signed	[IWIDTH:0]	f_sumr, f_sumi;
+	always @(*)
+	begin
+		f_sumr = f_dlyleft_r[F_D] + f_dlyright_r[F_D];
+		f_sumi = f_dlyleft_i[F_D] + f_dlyright_i[F_D];
+	end
+
+	wire	signed	[IWIDTH+CWIDTH-1:0]	f_sumrx, f_sumix;
+	assign	f_sumrx = { {(2){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };
+	assign	f_sumix = { {(2){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };
+
+	wire	signed	[IWIDTH:0]	f_difr, f_difi;
+	always @(*)
+	begin
+		f_difr = f_dlyleft_r[F_D] - f_dlyright_r[F_D];
+		f_difi = f_dlyleft_i[F_D] - f_dlyright_i[F_D];
+	end
+
+	wire	signed	[IWIDTH+CWIDTH-1:0]	f_difrx, f_difix;
+	assign	f_difrx = { {(CWIDTH){f_difr[IWIDTH]}}, f_difr };
+	assign	f_difix = { {(CWIDTH){f_difi[IWIDTH]}}, f_difi };
+
+
+	always @(posedge i_clk)
+	if (f_startup_counter > F_D)
+	begin
+		assert(left_sr == f_sumrx);
+		assert(left_si == f_sumix);
+		assert(aux_s == f_dlyaux[F_D]);
+
+		if ((f_difr == 0)&&(f_difi == 0))
+		begin
+			assert(mpy_r == 0);
+			assert(mpy_i == 0);
+		end else if ((f_dlycoeff_r[F_D] == 0)
+				&&(f_dlycoeff_i[F_D] == 0))
+		begin
+			assert(mpy_r == 0);
+			assert(mpy_i == 0);
+		end
+
+		if ((f_dlycoeff_r[F_D] == 1)&&(f_dlycoeff_i[F_D] == 0))
+		begin
+			assert(mpy_r == f_difrx);
+			assert(mpy_i == f_difix);
+		end
+
+		if ((f_dlycoeff_r[F_D] == 0)&&(f_dlycoeff_i[F_D] == 1))
+		begin
+			assert(mpy_r == -f_difix);
+			assert(mpy_i ==  f_difrx);
+		end
+
+		if ((f_difr == 1)&&(f_difi == 0))
+		begin
+			assert(mpy_r == f_dlycoeff_r[F_D]);
+			assert(mpy_i == f_dlycoeff_i[F_D]);
+		end
+
+		if ((f_difr == 0)&&(f_difi == 1))
+		begin
+			assert(mpy_r == -f_dlycoeff_i[F_D]);
+			assert(mpy_i ==  f_dlycoeff_r[F_D]);
+		end
+	end
+
+`endif // FORMAL
 endmodule

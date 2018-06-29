@@ -1,0 +1,34 @@
+[tasks]
+one
+two
+three
+
+[options]
+mode prove
+depth	30
+
+[engines]
+smtbmc
+
+[script]
+read_verilog -formal -DHWBFLY abs_mpy.v
+read_verilog -formal -DHWBFLY convround.v
+read_verilog -formal -DHWBFLY longbimpy.v
+read_verilog -formal -DHWBFLY bimpy.v
+read_verilog -formal -DHWBFLY butterfly.v
+
+# While I'd love to change the width of the inputs and the coefficients,
+# doing so would adjust the width of the firmware multiplies, and so defeat
+# our purpose here.
+one:   chparam -set CKPCE 1 butterfly
+two:   chparam -set CKPCE 2 butterfly
+three: chparam -set CKPCE 3 butterfly
+
+prep -top butterfly
+
+[files]
+abs_mpy.v
+../../rtl/convround.v
+../../rtl/bimpy.v
+../../rtl/longbimpy.v
+../../rtl/butterfly.v
