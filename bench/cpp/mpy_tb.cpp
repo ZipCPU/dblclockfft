@@ -156,9 +156,11 @@ public:
 
 		cetick();
 
-		printf("k=%3d: A =%04x, B =%05x -> O = %9lx (ANS=%10lx)\n",
-			m_addr, (int)ubits(a,AW), (int)ubits(b,BW),
-			(long)m_mpy->o_r, ubits(vals[m_addr&31], AW+BW+4));
+		printf("k=%3d: A =%0*x, B =%0*x -> O = %*lx (ANS=%*lx)\n",
+			m_addr, (AW+3)/4, (int)ubits(a,AW),
+			(BW+3)/4, (int)ubits(b,BW),
+			(AW+BW+3)/4, (long)m_mpy->o_r,
+			(AW+BW+7)/4, ubits(vals[m_addr&31], AW+BW+4));
 
 		out = sbits(m_mpy->o_r, AW+BW);
 
@@ -197,10 +199,16 @@ int	main(int argc, char **argv, char **envp) {
 		tb->test(a, b);
 	}
 
-	for(int k=0; k<2048; k++) {
-		int	a, b, out;
-
-		tb->test(rand(), rand());
+	if (AW+BW <= 20) {
+		// Exhaustive test
+		for(int a=0; a< (1<<AW); a++)
+		for(int b=0; b< (1<<BW); b++)
+			tb->test(a, b);
+		printf("Exhaust complete\n");
+	} else {
+		// Pseudorandom test
+		for(int k=0; k<2048; k++)
+			tb->test(rand(), rand());
 	}
 
 	delete	tb;

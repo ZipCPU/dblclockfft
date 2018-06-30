@@ -53,8 +53,8 @@
 // in order to find problems.
 // First, parameters for the new multiply based upon the bi-multiply structure
 // (2-bits/2-tableau rows at a time).
-#define	TST_LONGBIMPY_AW	16
-#define	TST_LONGBIMPY_BW	20	// Leave undefined to match AW
+#define	TST_LONGBIMPY_AW	8
+#define	TST_LONGBIMPY_BW	12	// Leave undefined to match AW
 
 //  We also include parameters for the shift add multiply
 #define	TST_SHIFTADDMPY_AW	16
@@ -76,6 +76,6 @@
 // Now for parameters matching the dblreverse stage
 #define	TST_DBLREVERSE_LGSIZE	5
 
-static	const	bool	formal_property_flag = false;
+static	const	bool	formal_property_flag = true;
 
 #endif
