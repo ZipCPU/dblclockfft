@@ -113,21 +113,20 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	initial iaddr = 0;
 	always @(posedge i_clk)
 		if (i_reset)
-		begin
+	begin
 			wait_for_sync <= 1'b1;
 			iaddr <= 0;
-		end
-		else if ((i_ce)&&((!wait_for_sync)||(i_sync)))
-		begin
-			//
-			// First step: Record what we're not ready to use yet
-			//
-			iaddr <= iaddr + { {(LGSPAN){1'b0}}, 1'b1 };
-			wait_for_sync <= 1'b0;
-		end
+	end else if ((i_ce)&&((!wait_for_sync)||(i_sync)))
+	begin
+		//
+		// First step: Record what we're not ready to use yet
+		//
+		iaddr <= iaddr + { {(LGSPAN){1'b0}}, 1'b1 };
+		wait_for_sync <= 1'b0;
+	end
 	always @(posedge i_clk) // Need to make certain here that we don't read
-		if ((i_ce)&&(!iaddr[LGSPAN])) // and write the same address on
-			imem[iaddr[(LGSPAN-1):0]] <= i_data; // the same clk
+	if ((i_ce)&&(!iaddr[LGSPAN])) // and write the same address on
+		imem[iaddr[(LGSPAN-1):0]] <= i_data; // the same clk
 
 	//
 	// Now, we have all the inputs, so let's feed the butterfly
@@ -135,24 +134,24 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	initial ib_sync = 1'b0;
 	always @(posedge i_clk)
 		if (i_reset)
-			ib_sync <= 1'b0;
-		else if ((i_ce)&&(iaddr[LGSPAN]))
-			begin
-				// Set the sync to true on the very first
-				// valid input in, and hence on the very
-				// first valid data out per FFT.
-				ib_sync <= (iaddr==(1<<(LGSPAN)));
+		ib_sync <= 1'b0;
+	else if (i_ce)
+	begin
+		// Set the sync to true on the very first
+		// valid input in, and hence on the very
+		// first valid data out per FFT.
+		ib_sync <= (iaddr==(1<<(LGSPAN)));
 			end
 	always	@(posedge i_clk)
-		if ((i_ce)&&(iaddr[LGSPAN]))
-			begin
-				// One input from memory, ...
-				ib_a <= imem[iaddr[(LGSPAN-1):0]];
-				// One input clocked in from the top
-				ib_b <= i_data;
-				// and the coefficient or twiddle factor
-				ib_c <= cmem[iaddr[(LGSPAN-1):0]];
-			end
+	if (i_ce)
+	begin
+			// One input from memory, ...
+	ib_a <= imem[iaddr[(LGSPAN-1):0]];
+		// One input clocked in from the top
+		ib_b <= i_data;
+		// and the coefficient or twiddle factor
+		ib_c <= cmem[iaddr[(LGSPAN-1):0]];
+	end
 
 	generate if (OPT_HWMPY)
 	begin : HWBFLY

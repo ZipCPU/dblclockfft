@@ -34,7 +34,7 @@
 // Arguments:	This file was computer generated using the following command
 //		line:
 //
-//		% ./fftgen -v -d ../rtl -k 1 -f 16 -n 16 -p 0 -a ../bench/cpp/fftsize.h
+//		% ./fftgen -v -d ../rtl -f 16 -k 1 -p 0 -n 16 -a ../bench/cpp/fftsize.h
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
