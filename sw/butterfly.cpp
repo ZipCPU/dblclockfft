@@ -200,26 +200,51 @@ SLASHLINE
 	fprintf(fp,
 "module\tbutterfly(i_clk, %s, i_ce, i_coef, i_left, i_right, i_aux,\n"
 		"\t\to_left, o_right, o_aux);\n"
-	"\t// Public changeable parameters ...\n"
-	"\tparameter IWIDTH=%d,", resetw.c_str(), TST_BUTTERFLY_IWIDTH);
+	"\t// Public changeable parameters ...\n", resetw.c_str());
+
+	int	IWIDTH = TST_BUTTERFLY_IWIDTH,
+			CWIDTH = IWIDTH+xtracbits; // OWIDTH = IWIDTH+1;
+	if (formal_property_flag)
+		fprintf(fp,
+"`ifdef\tFORMAL\n"
+	"\tparameter IWIDTH=4, CWIDTH=4, OWIDTH=6;\n"
+	"\tparameter	MPYDELAY=%d'd%d,\n"
+			"\t\t\tSHIFT=0, AUXLEN=(MPYDELAY+3);\n"
+	"\tparameter\tLGDELAY=%d;\n"
+"`else\n",
+		lgdelay(4,0), bflydelay(4, 0),lgdelay(4,0));
+
+	fprintf(fp,
+	"\tparameter IWIDTH=%d,", TST_BUTTERFLY_IWIDTH);
 #ifdef	TST_BUTTERFLY_CWIDTH
 	fprintf(fp, "CWIDTH=%d,", TST_BUTTERFLY_CWIDTH);
+	CWIDTH = TST_BUTTERFLY_CWIDTH;
 #else
 	fprintf(fp, "CWIDTH=IWIDTH+%d,", xtracbits);
 #endif
 #ifdef	TST_BUTTERFLY_OWIDTH
 	fprintf(fp, "OWIDTH=%d;\n", TST_BUTTERFLY_OWIDTH);
+	// OWIDTH = TST_BUTTERFLY_OWIDTH;
 #else
 	fprintf(fp, "OWIDTH=IWIDTH+1;\n");
 #endif
 	fprintf(fp,
-	"\t// Parameters specific to the core that should not be changed.\n"
-	"\tparameter	MPYDELAY=%d'd%d,\n"
-			"\t\t\tSHIFT=0, AUXLEN=(MPYDELAY+3);\n"
 	"\t// The LGDELAY should be the base two log of the MPYDELAY.  If\n"
 	"\t// this value is fractional, then round up to the nearest\n"
 	"\t// integer: LGDELAY=ceil(log(MPYDELAY)/log(2));\n"
-	"\tparameter\tLGDELAY=%d;\n"
+	"\tparameter\tLGDELAY=%d;\n",
+		lgdelay(IWIDTH,CWIDTH-IWIDTH));
+	fprintf(fp,
+	"\t// Parameters specific to the core that should not be changed.\n"
+	"\tparameter [LGDELAY-1:0] MPYDELAY=%d;\n"
+	"\tparameter 	SHIFT=0, AUXLEN=(MPYDELAY+3);\n",
+		bflydelay(IWIDTH, CWIDTH-IWIDTH));
+
+	if (formal_property_flag)
+		fprintf(fp,
+"`endif\t// FORMAL\n");
+
+	fprintf(fp,
 	"\tparameter\tCKPCE=%d;\n"
 	"\tinput\t\ti_clk, %s, i_ce;\n"
 	"\tinput\t\t[(2*CWIDTH-1):0] i_coef;\n"
@@ -227,8 +252,7 @@ SLASHLINE
 	"\tinput\t\ti_aux;\n"
 	"\toutput\twire	[(2*OWIDTH-1):0] o_left, o_right;\n"
 	"\toutput\treg\to_aux;\n"
-	"\n", lgdelay(16,xtracbits), bflydelay(16, xtracbits),
-		lgdelay(16,xtracbits), ckpce, resetw.c_str());
+	"\n", ckpce, resetw.c_str());
 	fprintf(fp,
 	"\treg\t[(2*IWIDTH-1):0]\tr_left, r_right;\n"
 	"\treg\t[(2*CWIDTH-1):0]\tr_coef, r_coef_2;\n"

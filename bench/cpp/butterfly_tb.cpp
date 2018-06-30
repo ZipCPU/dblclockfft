@@ -184,26 +184,27 @@ public:
 
 		if ((m_bfly->o_aux)&&(!m_lastaux))
 			printf("\n");
-		printf("n,k=%d,%3d: COEF=%010lx, LFT=%08x, RHT=%08x, A=%d, OLFT =%09lx, ORHT=%09lx, AUX=%d\n",
+		printf("n,k=%d,%3d: COEF=%0*lx, LFT=%0*x, RHT=%0*x, A=%d, OLFT =%0*lx, ORHT=%0*lx, AUX=%d\n",
 			n,k,
-			m_bfly->i_coef & (~(-1l<<40)),
-			m_bfly->i_left,
-			m_bfly->i_right,
+			(2*CWIDTH+3)/4, ubits(m_bfly->i_coef, 2*CWIDTH),
+			(2*IWIDTH+3)/4, m_bfly->i_left,
+			(2*IWIDTH+3)/4, m_bfly->i_right,
 			m_bfly->i_aux,
-			m_bfly->o_left,
-			m_bfly->o_right,
+			(2*OWIDTH+3)/4, (long)m_bfly->o_left,
+			(2*OWIDTH+3)/4, (long)m_bfly->o_right,
 			m_bfly->o_aux);
 
 		if ((m_syncd)&&(m_left[(m_addr-m_offset)&(64-1)] != m_bfly->o_left)) {
 			printf("WRONG O_LEFT! (%lx(exp) != %lx(sut)\n",
 				m_left[(m_addr-m_offset)&(64-1)],
-				m_bfly->o_left);
+				(long)m_bfly->o_left);
 			exit(EXIT_FAILURE);
 		}
 
 		if ((m_syncd)&&(m_right[(m_addr-m_offset)&(64-1)] != m_bfly->o_right)) {
 			printf("WRONG O_RIGHT! (%lx(exp) != %lx(sut))\n",
-				m_right[(m_addr-m_offset)&(64-1)], m_bfly->o_right);
+				m_right[(m_addr-m_offset)&(64-1)],
+				(long)m_bfly->o_right);
 			exit(EXIT_FAILURE);
 		}
 
@@ -297,6 +298,18 @@ public:
 	}
 };
 
+long gentestword(int w, int al, int ar) {
+	unsigned long	lo, hi, r;
+	hi  = ((unsigned long)(al&0x0c))<<(w-4);
+	hi += (al&3)-2ul;
+
+	lo  = ((unsigned long)(ar&0x0c))<<(w-4);
+	lo += (ar&3)-2ul;
+
+	r = (ubits(hi, w) << w) | (ubits(lo, w));
+	return r;
+}
+
 int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	BFLY_TB	*bfly = new BFLY_TB;
@@ -307,7 +320,7 @@ int	main(int argc, char **argv, char **envp) {
 
 	const int	TESTSZ = 256;
 
-	bfly->opentrace("butterfly.vcd");
+	// bfly->opentrace("butterfly.vcd");
 
 	bfly->reset();
 
@@ -394,6 +407,30 @@ int	main(int argc, char **argv, char **envp) {
 
 		bfly->test(n,k, cof, lft, rht, aux);
 	}
+
+	int	k = TESTSZ;
+	// Exhaustively test
+#if (4*IWIDTH+2*CWIDTH <= 24)
+		for(int a=0; a<(1<<(2*IWIDTH)); a++)
+		for(int b=0; b<(1<<(2*IWIDTH)); b++)
+		for(int c=0; c<(1<<(2*CWIDTH)); c++)
+			bfly->test(0, k++, c, a, b, 0);
+
+		printf("Exhaust complete\n");
+#else
+		for(int al=0; al<16; al++)
+		for(int ar=0; ar<16; ar++)
+		for(int bl=0; bl<16; bl++)
+		for(int br=0; br<16; br++)
+		for(int cl=0; cl<16; cl++)
+		for(int cr=0; cr<16; cr++) {
+			long a = gentestword(IWIDTH, al, ar);
+			long b = gentestword(IWIDTH, bl, br);
+			long c = gentestword(CWIDTH, cl, cr);
+			bfly->test(0, k++, c, a, b, 0);
+		}
+		printf("Partial exhaust complete\n");
+#endif
 
 	delete	bfly;
 
