@@ -50,7 +50,7 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	parameter IWIDTH=16,CWIDTH=IWIDTH+4,OWIDTH=IWIDTH+1;
 	// Parameters specific to the core that should not be changed.
 	parameter	SHIFT=0;
-	parameter	[1:0]	CKPCE=2;
+	parameter	[1:0]	CKPCE=3;
 	input		i_clk, i_reset, i_ce;
 	input		[(2*CWIDTH-1):0]	i_coef;
 	input		[(2*IWIDTH-1):0]	i_left, i_right;
@@ -272,9 +272,8 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			mpy_pipe_out <= pre_mpy_pipe_out;
 `endif
 
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one;
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one,
-								rp_two;
+		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one,
+							rp2_one, rp_two;
 		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;
 
 		always @(posedge i_clk)
@@ -290,9 +289,9 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		if (i_ce)
 			rp2_one<= rp_one;
 
-		assign	p_one	= rp2_one;
-		assign	p_two	= rp_two;
-		assign	p_three	= rp_three;
+		assign	p_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};
+		assign	p_two  ={{(2){rp_two[IWIDTH+CWIDTH]}},rp_two};
+		assign	p_three= rp_three;
 
 	end else if (CKPCE <= 2'b11)
 	begin : CKPCE_THREE
@@ -359,16 +358,16 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 				mpy_pipe_out <= pre_mpy_pipe_out;
 `endif	// FORMAL
 
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one, rp_two;
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one, rp2_two;
+		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one, rp_two,
+						rp2_one, rp2_two;
 		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three, rp2_three;
 
 		always @(posedge i_clk)
 		if(i_ce)
-			rp_one <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];
+			rp_one <= mpy_pipe_out[(CWIDTH+IWIDTH):0];
 		always @(posedge i_clk)
 		if(ce_phase == 3'b000)
-			rp_two <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];
+			rp_two <= mpy_pipe_out[(CWIDTH+IWIDTH):0];
 		always @(posedge i_clk)
 		if(ce_phase == 3'b001)
 			rp_three <= mpy_pipe_out;

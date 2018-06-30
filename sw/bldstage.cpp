@@ -406,21 +406,20 @@ SLASHLINE
 		fprintf(fstage, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
 
 	fprintf(fstage,
-	"\t\tbegin\n"
+	"\tbegin\n"
 		"\t\t\twait_for_sync <= 1\'b1;\n"
 		"\t\t\tiaddr <= 0;\n"
-	"\t\tend\n"
-	"\t\telse if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
-	"\t\tbegin\n"
-		"\t\t\t//\n"
-		"\t\t\t// First step: Record what we\'re not ready to use yet\n"
-		"\t\t\t//\n"
-		"\t\t\tiaddr <= iaddr + { {(LGSPAN){1\'b0}}, 1\'b1 };\n"
-		"\t\t\twait_for_sync <= 1\'b0;\n"
-	"\t\tend\n"
-"\talways @(posedge i_clk) // Need to make certain here that we don\'t read\n"
-	"\t\tif ((i_ce)&&(!iaddr[LGSPAN])) // and write the same address on\n"
-		"\t\t\timem[iaddr[(LGSPAN-1):0]] <= i_data; // the same clk\n"
+	"\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
+	"\tbegin\n"
+		"\t\t//\n"
+		"\t\t// First step: Record what we\'re not ready to use yet\n"
+		"\t\t//\n"
+		"\t\tiaddr <= iaddr + { {(LGSPAN){1\'b0}}, 1\'b1 };\n"
+		"\t\twait_for_sync <= 1\'b0;\n"
+	"\tend\n"
+	"\talways @(posedge i_clk) // Need to make certain here that we don\'t read\n"
+	"\tif ((i_ce)&&(!iaddr[LGSPAN])) // and write the same address on\n"
+		"\t\timem[iaddr[(LGSPAN-1):0]] <= i_data; // the same clk\n"
 	"\n");
 
 	fprintf(fstage,
@@ -433,24 +432,24 @@ SLASHLINE
 	else
 		fprintf(fstage, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
 	fprintf(fstage,
-			"\t\t\tib_sync <= 1\'b0;\n"
-		"\t\telse if ((i_ce)&&(iaddr[LGSPAN]))\n"
-			"\t\t\tbegin\n"
-				"\t\t\t\t// Set the sync to true on the very first\n"
-				"\t\t\t\t// valid input in, and hence on the very\n"
-				"\t\t\t\t// first valid data out per FFT.\n"
-				"\t\t\t\tib_sync <= (iaddr==(1<<(LGSPAN)));\n"
+			"\t\tib_sync <= 1\'b0;\n"
+		"\telse if (i_ce)\n"
+		"\tbegin\n"
+			"\t\t// Set the sync to true on the very first\n"
+				"\t\t// valid input in, and hence on the very\n"
+				"\t\t// first valid data out per FFT.\n"
+				"\t\tib_sync <= (iaddr==(1<<(LGSPAN)));\n"
 			"\t\t\tend\n"
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif ((i_ce)&&(iaddr[LGSPAN]))\n"
-		"\t\t\tbegin\n"
-			"\t\t\t\t// One input from memory, ...\n"
-			"\t\t\t\tib_a <= imem[iaddr[(LGSPAN-1):0]];\n"
-			"\t\t\t\t// One input clocked in from the top\n"
-			"\t\t\t\tib_b <= i_data;\n"
-			"\t\t\t\t// and the coefficient or twiddle factor\n"
-			"\t\t\t\tib_c <= cmem[iaddr[(LGSPAN-1):0]];\n"
-		"\t\t\tend\n\n");
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\t\t// One input from memory, ...\n"
+		"\tib_a <= imem[iaddr[(LGSPAN-1):0]];\n"
+		"\t\t// One input clocked in from the top\n"
+		"\t\tib_b <= i_data;\n"
+		"\t\t// and the coefficient or twiddle factor\n"
+		"\t\tib_c <= cmem[iaddr[(LGSPAN-1):0]];\n"
+	"\tend\n\n");
 
 	fprintf(fstage,
 "\tgenerate if (OPT_HWMPY)\n"

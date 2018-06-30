@@ -104,14 +104,21 @@
 module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		o_left, o_right, o_aux);
 	// Public changeable parameters ...
-	parameter IWIDTH=16,CWIDTH=20,OWIDTH=17;
-	// Parameters specific to the core that should not be changed.
-	parameter	MPYDELAY=4'd11,
+`ifdef	FORMAL
+	parameter IWIDTH=4, CWIDTH=4, OWIDTH=6;
+	parameter	MPYDELAY=3'd5,
 			SHIFT=0, AUXLEN=(MPYDELAY+3);
+	parameter	LGDELAY=3;
+`else
+	parameter IWIDTH=16,CWIDTH=20,OWIDTH=17;
 	// The LGDELAY should be the base two log of the MPYDELAY.  If
 	// this value is fractional, then round up to the nearest
 	// integer: LGDELAY=ceil(log(MPYDELAY)/log(2));
 	parameter	LGDELAY=4;
+	// Parameters specific to the core that should not be changed.
+	parameter [LGDELAY-1:0] MPYDELAY=11;
+	parameter 	SHIFT=0, AUXLEN=(MPYDELAY+3);
+`endif	// FORMAL
 	parameter	CKPCE=1;
 	input		i_clk, i_reset, i_ce;
 	input		[(2*CWIDTH-1):0] i_coef;
@@ -382,8 +389,8 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			rp2_two<= rp_two;
 			rp2_three<= rp_three;
 		end
-		assign	p_one	= rp2_one;
-		assign	p_two	= rp2_two;
+		assign	p_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};
+		assign	p_two  ={{(2){rp2_two[IWIDTH+CWIDTH]}},rp2_two};
 		assign	p_three	= rp2_three;
 
 	end endgenerate

@@ -47,8 +47,8 @@
 `default_nettype	none
 //
 module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
-	parameter	IAW=16,	// The width of i_a, min width is 5
-			IBW=20,	// The width of i_b, can be anything
+	parameter	IAW=8,	// The width of i_a, min width is 5
+			IBW=12,	// The width of i_b, can be anything
 			// The following three parameters should not be changed
 			// by any implementation, but are based upon hardware
 			// and the above values:

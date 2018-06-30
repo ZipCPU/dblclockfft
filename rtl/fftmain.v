@@ -34,7 +34,7 @@
 // Arguments:	This file was computer generated using the following command
 //		line:
 //
-//		% ./fftgen -v -d ../rtl -k 2 -f 16 -n 16 -p 50 -a ../bench/cpp/fftsize.h
+//		% ./fftgen -v -d ../rtl -k 1 -f 16 -n 16 -p 0 -a ../bench/cpp/fftsize.h
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -84,24 +84,22 @@ module fftmain(i_clk, i_reset, i_ce,
 	wire	[(2*OWIDTH-1):0]	br_sample;
 
 
-	// A hardware optimized FFT stage
 
 
 	wire		w_s16;
 	wire	[33:0]	w_d16;
 	fftstage	#(IWIDTH,IWIDTH+4,17,4,3,4,0,
-			1'b1, 2, "cmem_16.hex")
+			0, 11, 1, "cmem_16.hex")
 		stage_16(i_clk, i_reset, i_ce,
 			(!i_reset), i_sample, w_d16, w_s16);
 
 
 
 
-	// A hardware optimized FFT stage
 	wire		w_s8;
 	wire	[35:0]	w_d8;
 	fftstage	#(17,21,18,4,2,4,0,
-			1'b1, 2, "cmem_8.hex")
+			0, 12, 1, "cmem_8.hex")
 		stage_8(i_clk, i_reset, i_ce,
 			w_s16, w_d16, w_d8, w_s8);
 

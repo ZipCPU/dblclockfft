@@ -206,7 +206,7 @@ public:
 			m_bfly->rp_two,
 			m_bfly->rp_three);
 #else
-		printf("CKPCE = %d\n", CKPCE);
+		printf("CKPCE = %d\n", FFT_CKPCE);
 #endif
 
 		printf("\n");
