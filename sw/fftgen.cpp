@@ -1518,13 +1518,15 @@ SLASHLINE
 				fprintf(vmain, "\twire\t[%d:0]\tw_d%d;\n", 2*(obits+xtrapbits)-1, fftsize);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
-				gen_coeffs(cmemfp, fftsize/2,  nbitsin+xtracbits, 1, 0, inverse);
-				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
+				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 					(inverse)?"i":"",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-1, lgdelay(nbits,xtracbits),
-					(mpystage)?1:0, ckpce, cmem.c_str(),
+					(mpystage)?1:0,
+					bflydelay(nbits,xtracbits),
+					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d%d, w_s%d%s);\n",
 					(async_reset)?"":"!", resetw.c_str(),
@@ -1536,13 +1538,15 @@ SLASHLINE
 				fprintf(vmain, "\twire\t[%d:0]\tw_e%d, w_o%d;\n", 2*(obits+xtrapbits)-1, fftsize, fftsize);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
-				gen_coeffs(cmemfp, fftsize/4,  nbitsin+xtracbits, 2, 0, inverse);
-				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
+				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 					(inverse)?"i":"",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
-					(mpystage)?1:0, ckpce, cmem.c_str(),
+					(mpystage)?1:0,
+					bflydelay(nbits,xtracbits),
+					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_left, w_e%d, w_s%d%s);\n",
 					(async_reset)?"":"!", resetw.c_str(),
@@ -1550,12 +1554,14 @@ SLASHLINE
 					((dbg)&&(dbgstage == fftsize))?", o_dbg":"");
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
-				gen_coeffs(cmemfp, fftsize/4,  nbitsin+xtracbits, 2, 1, inverse);
-				fprintf(vmain, "\t%sfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
+				fprintf(vmain, "\t%sfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 					(inverse)?"i":"",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
-					(mpystage)?1:0, ckpce, cmem.c_str(),
+					(mpystage)?1:0,
+					bflydelay(nbits,xtracbits),
+					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_right, w_o%d, w_os%d);\n",
 					(async_reset)?"":"!",resetw.c_str(),
@@ -1616,8 +1622,9 @@ SLASHLINE
 						tmp_size);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
-					gen_coeffs(cmemfp, tmp_size/2,  nbitsin+xtracbits, 1, 0, inverse);
-					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+					gen_coeffs(cmemfp, tmp_size,
+						nbits+xtracbits+xtrapbits, 1, 0, inverse);
+					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 						(inverse)?"i":"",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
@@ -1625,8 +1632,9 @@ SLASHLINE
 						obits+xtrapbits,
 						lgsize, lgtmp-1,
 						lgdelay(nbits+xtrapbits,xtracbits),
-						(dropbit)?0:0,
-						(mpystage)?1:0, ckpce,
+						(dropbit)?0:0, (mpystage)?1:0,
+						bflydelay(nbits+xtrapbits,xtracbits),
+						ckpce,
 						cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_d%d, w_d%d, w_s%d%s);\n",
@@ -1642,8 +1650,9 @@ SLASHLINE
 						tmp_size, tmp_size);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
-					gen_coeffs(cmemfp, tmp_size/4,  nbitsin+xtracbits, 2, 0, inverse);
-					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+					gen_coeffs(cmemfp, tmp_size,
+						nbits+xtracbits+xtrapbits, 2, 0, inverse);
+					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 						(inverse)?"i":"",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
@@ -1651,8 +1660,9 @@ SLASHLINE
 						obits+xtrapbits,
 						lgsize, lgtmp-2,
 						lgdelay(nbits+xtrapbits,xtracbits),
-						(dropbit)?0:0,
-						(mpystage)?1:0, ckpce,
+						(dropbit)?0:0, (mpystage)?1:0,
+						bflydelay(nbits+xtrapbits,xtracbits),
+						ckpce,
 						cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_e%d, w_e%d, w_s%d%s);\n",
@@ -1660,10 +1670,13 @@ SLASHLINE
 						tmp_size, tmp_size,
 						((dbg)&&(dbgstage == tmp_size))
 							?", o_dbg":"");
-					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 1, inverse);
+					cmem = gen_coeff_fname(EMPTYSTR,
+						tmp_size, 2, 1, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
-					gen_coeffs(cmemfp, tmp_size/4,  nbitsin+xtracbits, 2, 1, inverse);
-					fprintf(vmain, "\t%sfftstage\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t1\'b%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+					gen_coeffs(cmemfp, tmp_size,
+						nbits+xtracbits+xtrapbits,
+						2, 1, inverse);
+					fprintf(vmain, "\t%sfftstage\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 						(inverse)?"i":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -1671,6 +1684,7 @@ SLASHLINE
 						lgsize, lgtmp-2,
 						lgdelay(nbits+xtrapbits,xtracbits),
 						(dropbit)?0:0, (mpystage)?1:0,
+						bflydelay(nbits+xtrapbits,xtracbits),
 						ckpce, cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_o%d, w_o%d, w_os%d);\n",

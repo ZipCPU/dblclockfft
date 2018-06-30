@@ -333,9 +333,11 @@ SLASHLINE
 "\t// of the span, or the base two log of the current FFT size) is 3.\n"
 "\t// Smaller spans (i.e. the span of 2) must use the dbl laststage module.\n"
 "\tparameter\tLGWIDTH=%d, LGSPAN=%d, LGBDLY=%d, BFLYSHIFT=0;\n"
-"\tparameter\t[0:0]	OPT_HWMPY = 1\'b1;\n",
+"\tparameter\t[0:0]	OPT_HWMPY = 1;\n",
 		lgval(stage), (nwide <= 1) ? lgval(stage)-1 : lgval(stage)-2,
 		lgdelay(nbits,cbits-nbits));
+	fprintf(fstage,
+"\tparameter\t\tMPYDELAY = %d;\n", bflydelay(nbits,cbits-nbits));
 	fprintf(fstage,
 "\t// Clocks per CE.  If your incoming data rate is less than 50%% of your\n"
 "\t// clock speed, you can set CKPCE to 2\'b10, make sure there's at least\n"
@@ -459,14 +461,12 @@ SLASHLINE
 			"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
 "\tend else begin : FWBFLY\n"
 "\t\tbutterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
-		"\t\t\t\t.MPYDELAY(%d\'d%d),.LGDELAY(LGBDLY),\n"
+		"\t\t\t\t.LGDELAY(LGBDLY),.MPYDELAY(MPYDELAY),\n"
 		"\t\t\t\t.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))\n"
 	"\t\t\tbfly(i_clk, %s, i_ce, ib_c,\n"
 		"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
 "\tend endgenerate\n\n",
-			resetw.c_str(), lgdelay(nbits, xtra),
-			bflydelay(nbits, xtra),
-			resetw.c_str());
+			resetw.c_str(), resetw.c_str());
 
 	fprintf(fstage,
 	"\t//\n"
