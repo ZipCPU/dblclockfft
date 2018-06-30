@@ -47,11 +47,16 @@ all: fftgen
 CORED := ../rtl
 VOBJDR  := $(CORED)/obj_dir
 OBJDIR   := obj-pc
-TESTSZ  := 2048
 BENCHD  := ../bench/cpp
 SOURCES := bitreverse.cpp bldstage.cpp butterfly.cpp fftgen.cpp fftlib.cpp \
 		legal.cpp rounding.cpp softmpy.cpp
-CKPCE   := -k 2
+TESTSZ  := -f 16
+# CKPCE 2 is broken
+# CKPCE 3 is broken
+CKPCE   := -k 1
+MPYS    := -p 0
+IWID    := -n 16
+FFTPARAMS := -d $(CORED) $(TESTSZ) $(CKPCE) $(MPYS) $(IWID)
 OBJECTS := $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SOURCES)))
 HEADERS := $(wildcard *.h)
 ifneq ($(VERILATOR_ROOT),)
@@ -86,9 +91,9 @@ test: bitreverse laststage
 .PHONY: fft forcedfft
 fft: $(VOBJDR)/Vfftmain__ALL.so
 $(CORED)/fftmain.v: fftgen
-	./fftgen -v -d $(CORED) $(CKPCE) -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
+	./fftgen -v $(FFTPARAMS) -a $(BENCHD)/fftsize.h
 forcedfft: fftgen
-	./fftgen -v -d $(CORED) $(CKPCE) -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
+	./fftgen -v $(FFTPARAMS) -a $(BENCHD)/fftsize.h
 $(VOBJDR)/Vfftmain.h: $(CORED)/fftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftmain.v
 $(VOBJDR)/Vfftmain__ALL.so: $(VOBJDR)/Vfftmain.h
@@ -97,7 +102,7 @@ $(VOBJDR)/Vfftmain__ALL.so: $(VOBJDR)/Vfftmain.h
 .PHONY: dblfft
 dblfft: $(VOBJDR)/Vdblfftmain__ALL.so
 $(CORED)/dblfftmain.v: fftgen
-	./fftgen -v -d $(CORED) -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/dblfftsize.h
+	./fftgen -v $(FFTPARAMS) -a $(BENCHD)/dblfftsize.h
 $(VOBJDR)/Vdblfftmain.h: $(CORED)/dblfftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) dblfftmain.v
 $(VOBJDR)/Vdblfftmain__ALL.so: $(VOBJDR)/Vdblfftmain.h
@@ -106,7 +111,7 @@ $(VOBJDR)/Vdblfftmain__ALL.so: $(VOBJDR)/Vdblfftmain.h
 .PHONY: idblfft
 idblfft: $(VOBJDR)/Vidblfftmain__ALL.so
 $(CORED)/idblfftmain.v: fftgen
-	./fftgen -d $(CORED) -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/idblfftsize.h
+	./fftgen -d $(CORED) $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/idblfftsize.h
 $(VOBJDR)/Vidblfftmain.h: $(CORED)/idblfftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) idblfftmain.v
 $(VOBJDR)/Vidblfftmain__ALL.so: $(VOBJDR)/Vidblfftmain.h
@@ -115,7 +120,7 @@ $(VOBJDR)/Vidblfftmain__ALL.so: $(VOBJDR)/Vidblfftmain.h
 .PHONY: ifft
 ifft: $(VOBJDR)/Vifftmain__ALL.so
 $(CORED)/ifftmain.v: fftgen
-	./fftgen -d $(CORED) $(CKPCE) -f $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/ifftsize.h
+	./fftgen -i $(FFTPARAMS) -a $(BENCHD)/ifftsize.h
 $(VOBJDR)/Vifftmain.h: $(CORED)/ifftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) ifftmain.v
 $(VOBJDR)/Vifftmain__ALL.so: $(VOBJDR)/Vifftmain.h
