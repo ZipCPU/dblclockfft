@@ -114,14 +114,21 @@ int	lgdelay(int nbits, int xtra) {
 
 void	gen_coeffs(FILE *cmem, int stage, int cbits,
 			int nwide, int offset, bool inv) {
-
+	//
+	// For an FFT stage of 2^n elements, we need 2^(n-1) butterfly
+	// coefficients, sometimes called twiddle factors.  Stage captures the
+	// width of the FFT at this point.  If thiss is a 2x at a time FFT,
+	// nwide will be equal to 2, and offset will be one or two.
+	//
 	assert(nwide > 0);
+	assert(offset < nwide);
 	assert(stage / nwide >  1);
 	assert(stage % nwide == 0);
-
-	for(int i=0; i<stage/nwide; i++) {
+printf("GEN-COEFFS(): stage =%4d, bits =%2d, nwide = %d, offset = %d, nverse = %d\n", stage, cbits, nwide, offset, inv);
+	int	ncoeffs = stage/nwide/2;
+	for(int i=0; i<ncoeffs; i++) {
 		int k = nwide*i+offset;
-		double	W = ((inv)?1:-1)*2.0*M_PI*k/(double)(nwide*stage);
+		double	W = ((inv)?1:-1)*2.0*M_PI*k/(double)(stage);
 		double	c, s;
 		long long ic, is, vl;
 
