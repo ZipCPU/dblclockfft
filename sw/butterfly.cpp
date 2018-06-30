@@ -559,8 +559,8 @@ SLASHLINE
 	"\t\tend\n");
 	fprintf(fp,
 
-	"\t\tassign\tp_one\t= rp2_one;\n"
-	"\t\tassign\tp_two\t= rp2_two;\n"
+	"\t\tassign\tp_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};\n"
+	"\t\tassign\tp_two  ={{(2){rp2_two[IWIDTH+CWIDTH]}},rp2_two};\n"
 	"\t\tassign\tp_three\t= rp2_three;\n"
 "\n");
 
@@ -1150,9 +1150,8 @@ SLASHLINE
 "`endif\n");
 
 	fprintf(fp,"\n"
-		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one;\n"
-		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one,\n"
-				"\t\t\t\t\t\t\t\trp_two;\n"
+		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one,\n"
+				"\t\t\t\t\t\t\trp2_one, rp_two;\n"
 		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
 "\n"
 		"\t\talways @(posedge i_clk)\n"
@@ -1168,9 +1167,9 @@ SLASHLINE
 		"\t\tif (i_ce)\n"
 			"\t\t\trp2_one<= rp_one;\n"
 "\n"
-		"\t\tassign	p_one	= rp2_one;\n"
-		"\t\tassign	p_two	= rp_two;\n"
-		"\t\tassign	p_three	= rp_three;\n"
+		"\t\tassign	p_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};\n"
+		"\t\tassign	p_two  ={{(2){rp_two[IWIDTH+CWIDTH]}},rp_two};\n"
+		"\t\tassign	p_three= rp_three;\n"
 "\n");
 
 	/////////////////////////
@@ -1255,8 +1254,8 @@ SLASHLINE
 
 
 	fprintf(fp,
-	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp_one, rp_two;\n"
-	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp2_one, rp2_two;\n"
+	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp_one, rp_two,\n"
+					"\t\t\t\t\t\trp2_one, rp2_two;\n"
 	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\trp_three, rp2_three;\n"
 
 "\n");
@@ -1264,10 +1263,10 @@ SLASHLINE
 	fprintf(fp,
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif(i_ce)\n"
-		"\t\t\trp_one <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
+		"\t\t\trp_one <= mpy_pipe_out[(CWIDTH+IWIDTH):0];\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif(ce_phase == 3'b000)\n"
-		"\t\t\trp_two <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
+		"\t\t\trp_two <= mpy_pipe_out[(CWIDTH+IWIDTH):0];\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif(ce_phase == 3'b001)\n"
 		"\t\t\trp_three <= mpy_pipe_out;\n"
@@ -1279,9 +1278,8 @@ SLASHLINE
 		"\t\t\trp2_three<= rp_three;\n"
 	"\t\tend\n");
 	fprintf(fp,
-
-	"\t\tassign\tp_one\t= rp2_one;\n"
-	"\t\tassign\tp_two\t= rp2_two;\n"
+	"\t\tassign	p_one\t= rp2_one;\n"
+	"\t\tassign	p_two\t= rp2_two;\n"
 	"\t\tassign\tp_three\t= rp2_three;\n"
 "\n");
 
