@@ -83,9 +83,11 @@ test: bitreverse laststage
 # you may need to adjust the test benches if you wish to prove that your
 # changes work.
 #
-.PHONY: fft
+.PHONY: fft forcedfft
 fft: $(VOBJDR)/Vfftmain__ALL.so
 $(CORED)/fftmain.v: fftgen
+	./fftgen -v -d $(CORED) $(CKPCE) -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
+forcedfft: fftgen
 	./fftgen -v -d $(CORED) $(CKPCE) -f $(TESTSZ) -n 16 -p 6 -a $(BENCHD)/fftsize.h
 $(VOBJDR)/Vfftmain.h: $(CORED)/fftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) fftmain.v
