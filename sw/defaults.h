@@ -63,7 +63,7 @@
 // Now for parameters matching the butterfly
 #define	TST_BUTTERFLY_IWIDTH	16
 #define	TST_BUTTERFLY_CWIDTH	20
-#define	TST_BUTTERFLY_OWIDTH	17
+#define	TST_BUTTERFLY_OWIDTH	(TST_BUTTERFLY_IWIDTH+1)
 
 // Now for parameters matching the qtrstage
 #define	TST_QTRSTAGE_IWIDTH	16
