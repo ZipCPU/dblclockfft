@@ -65,9 +65,8 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	// core is built ... Note that the minimum LGSPAN (the base two log
 	// of the span, or the base two log of the current FFT size) is 3.
 	// Smaller spans (i.e. the span of 2) must use the dbl laststage module.
-	parameter	LGWIDTH=4, LGSPAN=3, LGBDLY=4, BFLYSHIFT=0;
+	parameter	LGWIDTH=11, LGSPAN=10, BFLYSHIFT=0;
 	parameter	[0:0]	OPT_HWMPY = 1;
-	parameter		MPYDELAY = 11;
 	// Clocks per CE.  If your incoming data rate is less than 50% of your
 	// clock speed, you can set CKPCE to 2'b10, make sure there's at least
 	// one clock between cycles when i_ce is high, and then use two
@@ -75,10 +74,10 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	// on at least two clocks with i_ce low between cycles with i_ce high,
 	// then the hardware optimized butterfly code will used one multiply
 	// instead of two.
-	parameter	[1:0]	CKPCE = 2'h1;
+	parameter		CKPCE = 2;
 	// The COEFFILE parameter contains the name of the file containing the
 	// FFT twiddle factors
-	parameter	COEFFILE="cmem_16.hex";
+	parameter	COEFFILE="cmem_2048.hex";
 	input					i_clk, i_reset, i_ce, i_sync;
 	input		[(2*IWIDTH-1):0]	i_data;
 	output	reg	[(2*OWIDTH-1):0]	o_data;
@@ -161,7 +160,6 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 				ib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);
 	end else begin : FWBFLY
 		butterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),
-				.LGDELAY(LGBDLY),.MPYDELAY(MPYDELAY),
 				.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))
 			bfly(i_clk, i_reset, i_ce, ib_c,
 				ib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);

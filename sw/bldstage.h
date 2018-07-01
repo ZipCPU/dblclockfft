@@ -45,7 +45,7 @@ extern	void	build_dblstage(const char *fname, ROUND_T rounding,
 
 extern	void	build_stage(const char *fname,
 		int stage, int nwide, int offset,
-		int nbits, bool inv, int xtra, int ckpce,
+		int nbits, int xtra, int ckpce,
 		const bool async_reset = false,
 		const bool dbg=false);
 

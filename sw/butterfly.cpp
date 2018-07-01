@@ -109,11 +109,6 @@ void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding,
 		//ckpce = 3;
 	if (ckpce <= 1)
 		ckpce = 1;
-	if (ckpce > 1) {
-		fprintf(stderr, "WARNING: Butterfly code does not yet support CKPCE=%d\n", ckpce);
-		fprintf(stderr, "WARNING: Using CKPCE=1 instead\n");
-		ckpce = 1;
-	}
 
 	std::string	resetw("i_reset");
 	if (async_reset)
@@ -202,23 +197,17 @@ SLASHLINE
 		"\t\to_left, o_right, o_aux);\n"
 	"\t// Public changeable parameters ...\n", resetw.c_str());
 
-	int	IWIDTH = TST_BUTTERFLY_IWIDTH,
-			CWIDTH = IWIDTH+xtracbits; // OWIDTH = IWIDTH+1;
 	if (formal_property_flag)
 		fprintf(fp,
 "`ifdef\tFORMAL\n"
 	"\tparameter IWIDTH=4, CWIDTH=4, OWIDTH=6;\n"
-	"\tparameter	MPYDELAY=%d'd%d,\n"
-			"\t\t\tSHIFT=0, AUXLEN=(MPYDELAY+3);\n"
-	"\tparameter\tLGDELAY=%d;\n"
-"`else\n",
-		lgdelay(4,0), bflydelay(4, 0),lgdelay(4,0));
+	"\tparameter	SHIFT=0;\n"
+"`else\n");
 
 	fprintf(fp,
 	"\tparameter IWIDTH=%d,", TST_BUTTERFLY_IWIDTH);
 #ifdef	TST_BUTTERFLY_CWIDTH
 	fprintf(fp, "CWIDTH=%d,", TST_BUTTERFLY_CWIDTH);
-	CWIDTH = TST_BUTTERFLY_CWIDTH;
 #else
 	fprintf(fp, "CWIDTH=IWIDTH+%d,", xtracbits);
 #endif
@@ -228,31 +217,61 @@ SLASHLINE
 #else
 	fprintf(fp, "OWIDTH=IWIDTH+1;\n");
 #endif
-	fprintf(fp,
-	"\t// The LGDELAY should be the base two log of the MPYDELAY.  If\n"
-	"\t// this value is fractional, then round up to the nearest\n"
-	"\t// integer: LGDELAY=ceil(log(MPYDELAY)/log(2));\n"
-	"\tparameter\tLGDELAY=%d;\n",
-		lgdelay(IWIDTH,CWIDTH-IWIDTH));
-	fprintf(fp,
-	"\t// Parameters specific to the core that should not be changed.\n"
-	"\tparameter [LGDELAY-1:0] MPYDELAY=%d;\n"
-	"\tparameter 	SHIFT=0, AUXLEN=(MPYDELAY+3);\n",
-		bflydelay(IWIDTH, CWIDTH-IWIDTH));
-
+	fprintf(fp, "\tparameter\tSHIFT=0;\n");
 	if (formal_property_flag)
 		fprintf(fp,
 "`endif\t// FORMAL\n");
 
 	fprintf(fp,
-	"\tparameter\tCKPCE=%d;\n"
+	"\t// The number of clocks per each i_ce.  The actual number can be\n"
+	"\t// more, but the algorithm depends upon at least this many for\n"
+	"\t// extra internal processing.\n"
+	"\tparameter	CKPCE=2;\n"
+	"\t//\n"
+	"\t// Local/derived parameters that are calculated from the above\n"
+	"\t// params.  Apart from algorithmic changes below, these should not\n"
+	"\t// be adjusted\n"
+	"\t//\n"
+	"\t// The first step is to calculate how many clocks it takes our\n"
+	"\t// multiply to come back with an answer within.  The time in the\n"
+	"\t// multiply depends upon the input value with the fewest number of\n"
+	"\t// bits--to keep the pipeline depth short.  So, let's find the\n"
+	"\t// fewest number of bits here.\n"
+	"\tlocalparam MXMPYBITS = \n"
+		"\t\t((IWIDTH+2)>(CWIDTH+1)) ? (CWIDTH+1) : (IWIDTH + 2);\n"
+	"\t//\n"
+	"\t// Given this \"fewest\" number of bits, we can calculate the\n"
+	"\t// number of clocks the multiply itself will take.\n"
+	"\tlocalparam	MPYDELAY=((MXMPYBITS+1)/2)+2;\n"
+	"\t//\n"
+	"\t// In an environment when CKPCE > 1, the multiply delay isn\'t\n"
+	"\t// necessarily the delay felt by this algorithm--measured in\n"
+	"\t// i_ce\'s.  In particular, if the multiply can operate with more\n"
+	"\t// operations per clock, it can appear to finish \"faster\".\n"
+	"\t// Since most of the logic in this core operates on the slower\n"
+	"\t// clock, we'll need to map that speed into the number of slower\n"
+	"\t// clock ticks that it takes.\n"
+	"\tlocalparam	LCLDELAY = (CKPCE == 1) ? MPYDELAY\n"
+		"\t\t: (CKPCE == 2) ? (MPYDELAY/2+2)\n"
+		"\t\t: (MPYDELAY/3 + 2);\n"
+	"\tlocalparam	LGDELAY = (MPYDELAY>64) ? 7\n"
+			"\t\t\t: (MPYDELAY > 32) ? 6\n"
+			"\t\t\t: (MPYDELAY > 16) ? 5\n"
+			"\t\t\t: (MPYDELAY >  8) ? 4\n"
+			"\t\t\t: (MPYDELAY >  4) ? 3\n"
+			"\t\t\t: 2;\n"
+	"\tlocalparam	AUXLEN=(LCLDELAY+3);\n"
+	"\tlocalparam	MPYREMAINDER = MPYDELAY - CKPCE*(MPYDELAY/CKPCE);\n"
+"\n\n");
+
+
+	fprintf(fp,
 	"\tinput\t\ti_clk, %s, i_ce;\n"
 	"\tinput\t\t[(2*CWIDTH-1):0] i_coef;\n"
 	"\tinput\t\t[(2*IWIDTH-1):0] i_left, i_right;\n"
 	"\tinput\t\ti_aux;\n"
 	"\toutput\twire	[(2*OWIDTH-1):0] o_left, o_right;\n"
-	"\toutput\treg\to_aux;\n"
-	"\n", ckpce, resetw.c_str());
+	"\toutput\treg\to_aux;\n\n", resetw.c_str());
 	fprintf(fp,
 	"\treg\t[(2*IWIDTH-1):0]\tr_left, r_right;\n"
 	"\treg\t[(2*CWIDTH-1):0]\tr_coef, r_coef_2;\n"
@@ -266,7 +285,7 @@ SLASHLINE
 "\n"
 	"\treg	[(LGDELAY-1):0]	fifo_addr;\n"
 	"\twire	[(LGDELAY-1):0]	fifo_read_addr;\n"
-	"\tassign\tfifo_read_addr = fifo_addr - MPYDELAY[(LGDELAY-1):0];\n"
+	"\tassign\tfifo_read_addr = fifo_addr - LCLDELAY[(LGDELAY-1):0];\n"
 	"\treg	[(2*IWIDTH+1):0]	fifo_left [ 0:((1<<LGDELAY)-1)];\n"
 "\n");
 	fprintf(fp,
@@ -359,18 +378,15 @@ SLASHLINE
 		"\t\t// We need to pad these first two multiplies by an extra\n"
 		"\t\t// bit just to keep them aligned with the third,\n"
 		"\t\t// simpler, multiply.\n"
-		"\t\t%s #(CWIDTH+1,IWIDTH+2) p1(i_clk, i_ce,\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) p1(i_clk, i_ce,\n"
 				"\t\t\t\t{ir_coef_r[CWIDTH-1],ir_coef_r},\n"
 				"\t\t\t\t{r_dif_r[IWIDTH],r_dif_r}, p_one);\n"
-		"\t\t%s #(CWIDTH+1,IWIDTH+2) p2(i_clk, i_ce,\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) p2(i_clk, i_ce,\n"
 				"\t\t\t\t{ir_coef_i[CWIDTH-1],ir_coef_i},\n"
 				"\t\t\t\t{r_dif_i[IWIDTH],r_dif_i}, p_two);\n"
-		"\t\t%s #(CWIDTH+1,IWIDTH+2) p3(i_clk, i_ce,\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) p3(i_clk, i_ce,\n"
 			"\t\t\t\tp3c_in, p3d_in, p_three);\n"
-"\n",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy");
+"\n");
 
 	///////////////////////////////////////////
 	///
@@ -395,7 +411,7 @@ SLASHLINE
 		"\t\treg			mpy_pipe_v;\n"
 		"\t\treg			ce_phase;\n"
 "\n"
-		"\t\treg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
+		"\t\treg	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
 		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
 "\n"
 "\n"
@@ -414,7 +430,6 @@ SLASHLINE
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (ce_phase)\n"
 		"\t\tbegin\n"
-			"\t\t\t// Pre-clock\n"
 			"\t\t\tmpy_pipe_c[2*CWIDTH-1:0] <=\n"
 				"\t\t\t\t\t{ ir_coef_r, ir_coef_i };\n"
 			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <=\n"
@@ -425,7 +440,6 @@ SLASHLINE
 "\n"
 		"\t\tend else if (i_ce)\n"
 		"\t\tbegin\n"
-			"\t\t\t// First clock\n"
 			"\t\t\tmpy_pipe_c[2*(CWIDTH)-1:0] <= {\n"
 				"\t\t\t\tmpy_pipe_c[(CWIDTH)-1:0], {(CWIDTH){1'b0}} };\n"
 			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <= {\n"
@@ -433,39 +447,54 @@ SLASHLINE
 		"\t\tend\n"
 "\n");
 	fprintf(fp,
-		"\t\t%s #(CWIDTH+1,IWIDTH+2) mpy0(i_clk, mpy_pipe_v,\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) mpy0(i_clk, mpy_pipe_v,\n"
 			"\t\t\t\tmpy_cof_sum, mpy_dif_sum, longmpy);\n"
-"\n",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy");
+"\n");
 
 	fprintf(fp,
-		"\t\t%s #(CWIDTH,IWIDTH+1) mpy1(i_clk, mpy_pipe_v,\n"
-			"\t\t\t\tmpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out);\n"
-"\n",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy");
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) mpy1(i_clk, mpy_pipe_v,\n"
+			"\t\t\t\t{ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc },\n"
+			"\t\t\t\t{ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd },\n"
+			"\t\t\t\tmpy_pipe_out);\n\n");
 
 	fprintf(fp,
-		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one;\n"
-		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one,\n"
-				"\t\t\t\t\t\t\t\trp_two;\n"
-		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
+		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\n"
+			"\t\t\t\t\trp_one, rp_two, rp_three,\n"
+			"\t\t\t\t\trp2_one, rp2_two, rp2_three;\n"
 "\n"
 		"\t\talways @(posedge i_clk)\n"
-		"\t\tif (ce_phase) // 1.5 clock\n"
+		"\t\tif (((i_ce)&&(!MPYDELAY[0]))\n"
+		"\t\t\t||((ce_phase)&&(MPYDELAY[0])))\n"
 			"\t\t\trp_one <= mpy_pipe_out;\n"
 		"\t\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce) // two clocks\n"
+		"\t\tif (((i_ce)&&(MPYDELAY[0]))\n"
+		"\t\t\t||((ce_phase)&&(!MPYDELAY[0])))\n"
 			"\t\t\trp_two <= mpy_pipe_out;\n"
 		"\t\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce) // Second clock\n"
-			"\t\t\trp_three<= longmpy;\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\trp_three <= longmpy;\n"
+"\n"
+		"\t\t// Our outputs *MUST* be set on a clock where i_ce is\n"
+		"\t\t// true for the following logic to work.  Make that\n"
+		"\t\t// happen here.\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 			"\t\t\trp2_one<= rp_one;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\trp2_two <= rp_two;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\trp2_three<= rp_three;\n"
 "\n"
-		"\t\tassign	p_one	= { {(2){rp2_one[(IWIDTH+1)+(CWIDTH)-1]}}, rp2_one };\n"
-		"\t\tassign	p_two	= { {(2){rp_two[(IWIDTH+1)+(CWIDTH)-1]}}, rp_two };\n"
-		"\t\tassign	p_three	= rp_three;\n"
+		"\t\tassign	p_one	= rp2_one;\n"
+		"\t\tassign	p_two	= (!MPYDELAY[0])? rp2_two  : rp_two;\n"
+		"\t\tassign	p_three	= ( MPYDELAY[0])? rp_three : rp2_three;\n"
+"\n"
+		"\t\t// verilator lint_off UNUSED\n"
+		"\t\twire\t[2*(IWIDTH+CWIDTH+3)-1:0]\tunused;\n"
+		"\t\tassign\tunused = { rp2_two, rp2_three };\n"
+		"\t\t// verilator lint_on  UNUSED\n"
 "\n");
 
 	/////////////////////////
@@ -528,40 +557,59 @@ SLASHLINE
 		"\t\t\tend\n"
 "\n");
 	fprintf(fp,
-		"\t\t%s #(CWIDTH+1,IWIDTH+2) mpy(i_clk, mpy_pipe_v,\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) mpy(i_clk, mpy_pipe_v,\n"
 			"\t\t\t\tmpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out);\n"
-"\n",
-		(USE_OLD_MULTIPLY)?"shiftaddmpy":"longbimpy");
+"\n");
 
 	fprintf(fp,
-	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp_one, rp_two;\n"
-	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp2_one, rp2_two;\n"
-	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\trp_three, rp2_three;\n"
-
+	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\n"
+				"\t\t\t\trp_one,  rp_two,  rp_three,\n"
+				"\t\t\t\trp2_one, rp2_two, rp2_three,\n"
+				"\t\t\t\trp3_one;\n"
 "\n");
 
 	fprintf(fp,
 	"\t\talways @(posedge i_clk)\n"
-	"\t\tif(i_ce)\n"
-		"\t\t\trp_one <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
-	"\t\talways @(posedge i_clk)\n"
-	"\t\tif(ce_phase == 3'b000)\n"
-		"\t\t\trp_two <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];\n"
-	"\t\talways @(posedge i_clk)\n"
-	"\t\tif(ce_phase == 3'b001)\n"
-		"\t\t\trp_three <= mpy_pipe_out;\n"
+	"\t\tif (MPYREMAINDER == 0)\n"
+	"\t\tbegin\n\n"
+	"\t\t	if (i_ce)\n"
+	"\t\t		rp_two   <= mpy_pipe_out;\n"
+	"\t\t	else if (ce_phase == 3'b000)\n"
+	"\t\t		rp_three <= mpy_pipe_out;\n"
+	"\t\t	else if (ce_phase == 3'b001)\n"
+	"\t\t		rp_one   <= mpy_pipe_out;\n\n"
+	"\t\tend else if (MPYREMAINDER == 1)\n"
+	"\t\tbegin\n\n"
+	"\t\t	if (i_ce)\n"
+	"\t\t		rp_one   <= mpy_pipe_out;\n"
+	"\t\t	else if (ce_phase == 3'b000)\n"
+	"\t\t		rp_two   <= mpy_pipe_out;\n"
+	"\t\t	else if (ce_phase == 3'b001)\n"
+	"\t\t		rp_three <= mpy_pipe_out;\n\n"
+	"\t\tend else // if (MPYREMAINDER == 2)\n"
+	"\t\tbegin\n\n"
+	"\t\t	if (i_ce)\n"
+	"\t\t		rp_three <= mpy_pipe_out;\n"
+	"\t\t	else if (ce_phase == 3'b000)\n"
+	"\t\t		rp_one   <= mpy_pipe_out;\n"
+	"\t\t	else if (ce_phase == 3'b001)\n"
+	"\t\t		rp_two   <= mpy_pipe_out;\n\n"
+	"\t\tend\n\n");
+
+	fprintf(fp,
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif (i_ce)\n"
 	"\t\tbegin\n"
 		"\t\t\trp2_one<= rp_one;\n"
 		"\t\t\trp2_two<= rp_two;\n"
-		"\t\t\trp2_three<= rp_three;\n"
+		"\t\t\trp2_three<= (MPYREMAINDER==2) ? mpy_pipe_out : rp_three;\n"
+		"\t\t\trp3_one<= (MPYREMAINDER == 0) ? rp_one : rp2_one;\n"
 	"\t\tend\n");
 	fprintf(fp,
 
-	"\t\tassign\tp_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};\n"
-	"\t\tassign\tp_two  ={{(2){rp2_two[IWIDTH+CWIDTH]}},rp2_two};\n"
-	"\t\tassign\tp_three\t= rp2_three;\n"
+	"\t\tassign\tp_one   = rp3_one;\n"
+	"\t\tassign\tp_two   = rp2_two;\n"
+	"\t\tassign\tp_three = rp2_three;\n"
 "\n");
 
 	fprintf(fp,
@@ -684,7 +732,7 @@ SLASHLINE
 	if (formal_property_flag) {
 		fprintf(fp,
 "`ifdef	FORMAL\n"
-	"\tlocalparam	F_LGDEPTH = 5;\n"
+	"\tlocalparam	F_LGDEPTH = LGDELAY+1;\n"
 	"\tlocalparam	F_DEPTH = AUXLEN;\n"
 	"\tlocalparam	F_D = F_DEPTH-1;\n"
 "\n"
@@ -696,6 +744,14 @@ SLASHLINE
 	"\treg	signed	[CWIDTH-1:0]	f_dlycoeff_i [0:F_DEPTH-1];\n"
 	"\treg	signed	[F_DEPTH-1:0]	f_dlyaux;\n"
 "\n"
+	"\tinitial\tf_dlyaux[0] = 0;\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (i_reset)\n"
+		"\t\tf_dlyaux[0]      <= 1'b0;\n"
+	"\telse if (i_ce)\n"
+		"\t\tf_dlyaux[0]      <= i_aux;\n"
+"\n"
+"\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 	"\tbegin\n"
@@ -705,25 +761,31 @@ SLASHLINE
 	"\t	f_dlyright_i[0]  <= i_right[(  IWIDTH-1):0];\n"
 	"\t	f_dlycoeff_r[0]  <= i_coef[ (2*CWIDTH-1):CWIDTH];\n"
 	"\t	f_dlycoeff_i[0]  <= i_coef[ (  CWIDTH-1):0];\n"
-	"\t	f_dlyaux[0]      <= i_aux;\n"
 	"\tend\n"
 "\n"
 	"\tgenvar	k;\n"
 	"\tgenerate for(k=1; k<F_DEPTH; k=k+1)\n"
+	"\tbegin : F_PROPAGATE_DELAY_LINES\n"
 "\n"
-	"\t	always @(posedge i_clk)\n"
-	"\t	if (i_ce)\n"
-	"\t	begin\n"
-	"\t		f_dlyleft_r[k]  <= f_dlyleft_r[ k-1];\n"
-	"\t		f_dlyleft_i[k]  <= f_dlyleft_i[ k-1];\n"
-	"\t		f_dlyright_r[k] <= f_dlyright_r[k-1];\n"
-	"\t		f_dlyright_i[k] <= f_dlyright_i[k-1];\n"
-	"\t		f_dlycoeff_r[k] <= f_dlycoeff_r[k-1];\n"
-	"\t		f_dlycoeff_i[k] <= f_dlycoeff_i[k-1];\n"
-	"\t		f_dlyaux[k]     <= f_dlyaux[    k-1];\n"
-	"\t	end\n"
+		"\t\tinitial	f_dlyaux[k] = 0;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_reset)\n"
+		"\t\t	f_dlyaux[k] = 0;\n"
+		"\t\telse if (i_ce)\n"
+		"\t\t	f_dlyaux[k] = f_dlyaux[k-1];\n"
 "\n"
-	"\tendgenerate\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+		"\t\tbegin\n"
+		"\t\t	f_dlyleft_r[k]  <= f_dlyleft_r[ k-1];\n"
+		"\t\t	f_dlyleft_i[k]  <= f_dlyleft_i[ k-1];\n"
+		"\t\t	f_dlyright_r[k] <= f_dlyright_r[k-1];\n"
+		"\t\t	f_dlyright_i[k] <= f_dlyright_i[k-1];\n"
+		"\t\t	f_dlycoeff_r[k] <= f_dlycoeff_r[k-1];\n"
+		"\t\t	f_dlycoeff_i[k] <= f_dlycoeff_i[k-1];\n"
+		"\t\tend\n"
+"\n"
+	"\tend endgenerate\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))\n"
@@ -766,9 +828,9 @@ SLASHLINE
 	"\t	f_sumi = f_dlyleft_i[F_D] + f_dlyright_i[F_D];\n"
 	"\tend\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH-1:0]	f_sumrx, f_sumix;\n"
-	"\tassign	f_sumrx = { {(2){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };\n"
-	"\tassign	f_sumix = { {(2){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };\n"
+	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_sumrx, f_sumix;\n"
+	"\tassign\tf_sumrx = { {(4){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };\n"
+	"\tassign\tf_sumix = { {(4){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };\n"
 "\n"
 	"\twire	signed	[IWIDTH:0]	f_difr, f_difi;\n"
 	"\talways @(*)\n"
@@ -777,14 +839,20 @@ SLASHLINE
 	"\t	f_difi = f_dlyleft_i[F_D] - f_dlyright_i[F_D];\n"
 	"\tend\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH-1:0]	f_difrx, f_difix;\n"
-	"\tassign	f_difrx = { {(CWIDTH){f_difr[IWIDTH]}}, f_difr };\n"
-	"\tassign	f_difix = { {(CWIDTH){f_difi[IWIDTH]}}, f_difi };\n"
+	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;\n"
+	"\tassign\tf_difrx = { {(CWIDTH+2){f_difr[IWIDTH]}}, f_difr };\n"
+	"\tassign\tf_difix = { {(CWIDTH+2){f_difi[IWIDTH]}}, f_difi };\n"
 "\n"
+	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;\n"
+	"\tassign\tf_widecoeff_r ={ {(IWIDTH+3){f_dlycoeff_r[F_D][CWIDTH-1]}},\n"
+					"\t\t\t\t\t\tf_dlycoeff_r[F_D] };\n"
+	"\tassign\tf_widecoeff_i ={ {(IWIDTH+3){f_dlycoeff_i[F_D][CWIDTH-1]}},\n"
+					"\t\t\t\t\t\tf_dlycoeff_i[F_D] };\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (f_startup_counter > F_D)\n"
 	"\tbegin\n"
+	"\t	assert(aux_pipeline == f_dlyaux);\n"
 	"\t	assert(left_sr == f_sumrx);\n"
 	"\t	assert(left_si == f_sumix);\n"
 	"\t	assert(aux_pipeline[AUXLEN-1] == f_dlyaux[F_D]);\n"
@@ -814,14 +882,14 @@ SLASHLINE
 "\n"
 	"\t	if ((f_difr == 1)&&(f_difi == 0))\n"
 	"\t	begin\n"
-	"\t		assert(mpy_r == f_dlycoeff_r[F_D]);\n"
-	"\t		assert(mpy_i == f_dlycoeff_i[F_D]);\n"
+	"\t		assert(mpy_r == f_widecoeff_r);\n"
+	"\t		assert(mpy_i == f_widecoeff_i);\n"
 	"\t	end\n"
 "\n"
 	"\t	if ((f_difr == 0)&&(f_difi == 1))\n"
 	"\t	begin\n"
-	"\t		assert(mpy_r == -f_dlycoeff_i[F_D]);\n"
-	"\t		assert(mpy_i ==  f_dlycoeff_r[F_D]);\n"
+	"\t		assert(mpy_r == -f_widecoeff_i);\n"
+	"\t		assert(mpy_i ==  f_widecoeff_r);\n"
 	"\t	end\n"
 	"\tend\n"
 "\n"
@@ -983,7 +1051,7 @@ SLASHLINE
 	///	One clock per CE, so CE, CE, CE, CE, CE is possible
 	///
 	fprintf(fp,
-"\tgenerate if (CKPCE <= 2'b01)\n\tbegin : CKPCE_ONE\n");
+"\tgenerate if (CKPCE <= 1)\n\tbegin : CKPCE_ONE\n");
 
 	fprintf(fp,
 	"\t\t// Coefficient multiply inputs\n"
@@ -1061,7 +1129,7 @@ SLASHLINE
 	///	Two clocks per CE, so CE, no-ce, CE, no-ce, etc
 	///
 	fprintf(fp,
-	"\tend else if (CKPCE <= 2'b10)\n"
+	"\tend else if (CKPCE <= 2)\n"
 	"\tbegin : CKPCE_TWO\n"
 		"\t\t// Coefficient multiply inputs\n"
 		"\t\treg		[2*(CWIDTH)-1:0]	mpy_pipe_c;\n"
@@ -1167,8 +1235,8 @@ SLASHLINE
 		"\t\tif (i_ce)\n"
 			"\t\t\trp2_one<= rp_one;\n"
 "\n"
-		"\t\tassign	p_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};\n"
-		"\t\tassign	p_two  ={{(2){rp_two[IWIDTH+CWIDTH]}},rp_two};\n"
+		"\t\tassign	p_one  = rp2_one;\n"
+		"\t\tassign	p_two  = rp_two;\n"
 		"\t\tassign	p_three= rp_three;\n"
 "\n");
 
@@ -1306,6 +1374,8 @@ SLASHLINE
 	"\tassign\tleft_si = { {2{left_saved[(IWIDTH+1)-1]}}, left_saved[((IWIDTH+1)-1):0], {(CWIDTH-2){1\'b0}} };\n"
 	"\tassign\taux_s = left_saved[2*IWIDTH+2];\n"
 "\n"
+	"\t(* use_dsp48=\"no\" *)\n"
+	"\treg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n"
 "\n");
 
 	fprintf(fp,
@@ -1346,9 +1416,6 @@ SLASHLINE
 
 	fprintf(fp,
 	"\t// Round the results\n"
-	"\t(* use_dsp48=\"no\" *)\n"
-	"\treg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n");
-	fprintf(fp,
 	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;\n\n");
 	fprintf(fp,
 	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_r(i_clk, i_ce,\n"
@@ -1459,7 +1526,7 @@ SLASHLINE
 		"\t\tf_sumi = f_dlyleft_i[F_D] + f_dlyright_i[F_D];\n"
 	"\tend\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH-1:0]	f_sumrx, f_sumix;\n"
+	"\twire	signed	[IWIDTH+CWIDTH:0]	f_sumrx, f_sumix;\n"
 	"\tassign	f_sumrx = { {(2){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };\n"
 	"\tassign	f_sumix = { {(2){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };\n"
 	"\n"
@@ -1470,10 +1537,15 @@ SLASHLINE
 		"\t\tf_difi = f_dlyleft_i[F_D] - f_dlyright_i[F_D];\n"
 	"\tend\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH-1:0]	f_difrx, f_difix;\n"
-	"\tassign	f_difrx = { {(CWIDTH){f_difr[IWIDTH]}}, f_difr };\n"
-	"\tassign	f_difix = { {(CWIDTH){f_difi[IWIDTH]}}, f_difi };\n"
+	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;\n"
+	"\tassign	f_difrx = { {(CWIDTH+2){f_difr[IWIDTH]}}, f_difr };\n"
+	"\tassign	f_difix = { {(CWIDTH+2){f_difi[IWIDTH]}}, f_difi };\n"
 "\n"
+	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;\n"
+	"\tassign	f_widecoeff_r = {{(IWIDTH+3){f_dlycoeff_r[F_D][CWIDTH-1]}},\n"
+	"\t		f_dlycoeff_r[F_D] };\n"
+	"\tassign	f_widecoeff_i = {{(IWIDTH+3){f_dlycoeff_i[F_D][CWIDTH-1]}},\n"
+	"\t		f_dlycoeff_i[F_D] };\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (f_startup_counter > F_D)\n"
@@ -1507,14 +1579,14 @@ SLASHLINE
 "\n"
 		"\t\tif ((f_difr == 1)&&(f_difi == 0))\n"
 		"\t\tbegin\n"
-		"\t\t	assert(mpy_r == f_dlycoeff_r[F_D]);\n"
-		"\t\t	assert(mpy_i == f_dlycoeff_i[F_D]);\n"
+		"\t\t	assert(mpy_r == f_widecoeff_r);\n"
+		"\t\t	assert(mpy_i == f_widecoeff_i);\n"
 		"\t\tend\n"
 "\n"
 		"\t\tif ((f_difr == 0)&&(f_difi == 1))\n"
 		"\t\tbegin\n"
-		"\t\t	assert(mpy_r == -f_dlycoeff_i[F_D]);\n"
-		"\t\t	assert(mpy_i ==  f_dlycoeff_r[F_D]);\n"
+		"\t\t	assert(mpy_r == -f_widecoeff_r);\n"
+		"\t\t	assert(mpy_i ==  f_widecoeff_i);\n"
 		"\t\tend\n"
 	"\tend\n"
 "\n"

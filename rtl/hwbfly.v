@@ -50,7 +50,7 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	parameter IWIDTH=16,CWIDTH=IWIDTH+4,OWIDTH=IWIDTH+1;
 	// Parameters specific to the core that should not be changed.
 	parameter	SHIFT=0;
-	parameter	[1:0]	CKPCE=3;
+	parameter	[1:0]	CKPCE=2;
 	input		i_clk, i_reset, i_ce;
 	input		[(2*CWIDTH-1):0]	i_coef;
 	input		[(2*IWIDTH-1):0]	i_left, i_right;
@@ -129,7 +129,7 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			leftvv <= leftv;
 		end
 
-	generate if (CKPCE <= 2'b01)
+	generate if (CKPCE <= 1)
 	begin : CKPCE_ONE
 		// Coefficient multiply inputs
 		reg	signed	[(CWIDTH-1):0]	p1c_in, p2c_in;
@@ -189,7 +189,7 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		assign	p_two   = rp_two;
 		assign	p_three = rp_three;
 
-	end else if (CKPCE <= 2'b10)
+	end else if (CKPCE <= 2)
 	begin : CKPCE_TWO
 		// Coefficient multiply inputs
 		reg		[2*(CWIDTH)-1:0]	mpy_pipe_c;
@@ -289,8 +289,8 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		if (i_ce)
 			rp2_one<= rp_one;
 
-		assign	p_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};
-		assign	p_two  ={{(2){rp_two[IWIDTH+CWIDTH]}},rp_two};
+		assign	p_one  = rp2_one;
+		assign	p_two  = rp_two;
 		assign	p_three= rp_three;
 
 	end else if (CKPCE <= 2'b11)
@@ -400,6 +400,8 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	left_si = { {2{left_saved[(IWIDTH+1)-1]}}, left_saved[((IWIDTH+1)-1):0], {(CWIDTH-2){1'b0}} };
 	assign	aux_s = left_saved[2*IWIDTH+2];
 
+	(* use_dsp48="no" *)
+	reg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;
 
 	initial left_saved = 0;
 	initial o_aux      = 1'b0;
@@ -433,8 +435,6 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		end
 
 	// Round the results
-	(* use_dsp48="no" *)
-	reg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;
 	wire	signed	[(OWIDTH-1):0]	rnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;
 
 	convround #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_r(i_clk, i_ce,
@@ -538,7 +538,7 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		f_sumi = f_dlyleft_i[F_D] + f_dlyright_i[F_D];
 	end
 
-	wire	signed	[IWIDTH+CWIDTH-1:0]	f_sumrx, f_sumix;
+	wire	signed	[IWIDTH+CWIDTH:0]	f_sumrx, f_sumix;
 	assign	f_sumrx = { {(2){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };
 	assign	f_sumix = { {(2){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };
 
@@ -549,10 +549,15 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		f_difi = f_dlyleft_i[F_D] - f_dlyright_i[F_D];
 	end
 
-	wire	signed	[IWIDTH+CWIDTH-1:0]	f_difrx, f_difix;
-	assign	f_difrx = { {(CWIDTH){f_difr[IWIDTH]}}, f_difr };
-	assign	f_difix = { {(CWIDTH){f_difi[IWIDTH]}}, f_difi };
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;
+	assign	f_difrx = { {(CWIDTH+2){f_difr[IWIDTH]}}, f_difr };
+	assign	f_difix = { {(CWIDTH+2){f_difi[IWIDTH]}}, f_difi };
 
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;
+	assign	f_widecoeff_r = {{(IWIDTH+3){f_dlycoeff_r[F_D][CWIDTH-1]}},
+			f_dlycoeff_r[F_D] };
+	assign	f_widecoeff_i = {{(IWIDTH+3){f_dlycoeff_i[F_D][CWIDTH-1]}},
+			f_dlycoeff_i[F_D] };
 
 	always @(posedge i_clk)
 	if (f_startup_counter > F_D)
@@ -586,14 +591,14 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 		if ((f_difr == 1)&&(f_difi == 0))
 		begin
-			assert(mpy_r == f_dlycoeff_r[F_D]);
-			assert(mpy_i == f_dlycoeff_i[F_D]);
+			assert(mpy_r == f_widecoeff_r);
+			assert(mpy_i == f_widecoeff_i);
 		end
 
 		if ((f_difr == 0)&&(f_difi == 1))
 		begin
-			assert(mpy_r == -f_dlycoeff_i[F_D]);
-			assert(mpy_i ==  f_dlycoeff_r[F_D]);
+			assert(mpy_r == -f_widecoeff_r);
+			assert(mpy_i ==  f_widecoeff_i);
 		end
 	end
 

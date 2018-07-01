@@ -1121,15 +1121,11 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	if (single_clock) {
-		printf(
-"WARNING: The single clock FFT option is not fully tested yet, but instead\n"
-"represents a work in progress.  Feel free to use it at your own risk.\n");
-	} if (ckpce >= 1) {
+	if (ckpce >= 1) {
 		printf(
 "WARNING: The non-hw optimized butterfly that uses multiple clocks per CE has\n"
 " not yet been fully tested, but rather represent a work in progress.  Feel\n"
-" free to use the ckpce option(s) at your own risk.\n");
+" free to use the ckpce >1 option(s) at your own risk.\n");
 	} else 
 		ckpce = 1;
 	if (!bitreverse) {
@@ -1522,13 +1518,11 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
-				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
-					(inverse)?"i":"",
+				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
-					lgsize, lgtmp-1, lgdelay(nbits,xtracbits),
+					lgsize, lgtmp-1,
 					(mpystage)?1:0,
-					bflydelay(nbits,xtracbits),
 					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d%d, w_s%d%s);\n",
@@ -1542,13 +1536,11 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
-				fprintf(vmain, "\t%sfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
-					(inverse)?"i":"",
+				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
-					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
+					lgsize, lgtmp-2,
 					(mpystage)?1:0,
-					bflydelay(nbits,xtracbits),
 					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_left, w_e%d, w_s%d%s);\n",
@@ -1558,12 +1550,11 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
-				fprintf(vmain, "\t%sfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,%d,0,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\t%sfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 					(inverse)?"i":"",
 					xtracbits, obits+xtrapbits,
-					lgsize, lgtmp-2, lgdelay(nbits,xtracbits),
+					lgsize, lgtmp-2,
 					(mpystage)?1:0,
-					bflydelay(nbits,xtracbits),
 					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_right, w_o%d, w_os%d);\n",
@@ -1584,19 +1575,19 @@ SLASHLINE
 				dbgname += "_dbg";
 				dbgname += ".v";
 				if (single_clock)
-					build_stage(fname.c_str(), fftsize, 1, 0, nbits, inverse, xtracbits, ckpce, async_reset, true);
+					build_stage(fname.c_str(), fftsize, 1, 0, nbits, xtracbits, ckpce, async_reset, true);
 				else
-					build_stage(fname.c_str(), fftsize/2, 2, 1, nbits, inverse, xtracbits, ckpce, async_reset, true);
+					build_stage(fname.c_str(), fftsize/2, 2, 1, nbits, xtracbits, ckpce, async_reset, true);
 			}
 
 			fname += ".v";
 			if (single_clock) {
-				build_stage(fname.c_str(), fftsize, 1, 0, nbits, inverse, xtracbits, ckpce, async_reset, false);
+				build_stage(fname.c_str(), fftsize, 1, 0, nbits, xtracbits, ckpce, async_reset, false);
 			} else {
 				// All stages use the same Verilog, so we only
 				// need to build one
 				// build_stage(fname.c_str(), fftsize/2, 2, 0, nbits, inverse, xtracbits, async_reset, false);
-				build_stage(fname.c_str(), fftsize/2, 2, 1, nbits, inverse, xtracbits, ckpce, async_reset, false);
+				build_stage(fname.c_str(), fftsize/2, 2, 1, nbits, xtracbits, ckpce, async_reset, false);
 			}
 		}
 
@@ -1627,16 +1618,13 @@ SLASHLINE
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 1, 0, inverse);
-					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
-						(inverse)?"i":"",
+					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
 						lgsize, lgtmp-1,
-						lgdelay(nbits+xtrapbits,xtracbits),
 						(dropbit)?0:0, (mpystage)?1:0,
-						bflydelay(nbits+xtrapbits,xtracbits),
 						ckpce,
 						cmem.c_str(), tmp_size,
 						resetw.c_str());
@@ -1655,16 +1643,13 @@ SLASHLINE
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 2, 0, inverse);
-					fprintf(vmain, "\t%sfftstage%s\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
-						(inverse)?"i":"",
+					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
 						lgsize, lgtmp-2,
-						lgdelay(nbits+xtrapbits,xtracbits),
 						(dropbit)?0:0, (mpystage)?1:0,
-						bflydelay(nbits+xtrapbits,xtracbits),
 						ckpce,
 						cmem.c_str(), tmp_size,
 						resetw.c_str());
@@ -1679,15 +1664,12 @@ SLASHLINE
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits,
 						2, 1, inverse);
-					fprintf(vmain, "\t%sfftstage\t#(%d,%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
-						(inverse)?"i":"",
+					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
 						lgsize, lgtmp-2,
-						lgdelay(nbits+xtrapbits,xtracbits),
 						(dropbit)?0:0, (mpystage)?1:0,
-						bflydelay(nbits+xtrapbits,xtracbits),
 						ckpce, cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_o%d, w_o%d, w_os%d);\n",
@@ -1863,12 +1845,10 @@ SLASHLINE
 		std::string	fname;
 
 		fname = coredir + "/butterfly.v";
-		build_butterfly(fname.c_str(), xtracbits, rounding);
+		build_butterfly(fname.c_str(), xtracbits, rounding, ckpce, async_reset);
 
-		if (mpy_stages > 0) {
-			fname = coredir + "/hwbfly.v";
-			build_hwbfly(fname.c_str(), xtracbits, rounding, ckpce, async_reset);
-		}
+		fname = coredir + "/hwbfly.v";
+		build_hwbfly(fname.c_str(), xtracbits, rounding, ckpce, async_reset);
 
 		{
 			// To make debugging easier, we build both of these

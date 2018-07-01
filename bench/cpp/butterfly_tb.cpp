@@ -320,15 +320,32 @@ int	main(int argc, char **argv, char **envp) {
 
 	const int	TESTSZ = 256;
 
-	// bfly->opentrace("butterfly.vcd");
+	bfly->opentrace("butterfly.vcd");
 
 	bfly->reset();
 
+// #define	ZEROTEST
+#define	ZEROTEST bfly->test(9,0,0x0000000000l,0x00000000,0x00000000, 0)
 	// Test whether or not the aux channel starts clear, like its supposed to
+
+	bfly->test(9,0,0x4000000000l,0x000f0000,0x00000000, 1);
+	ZEROTEST;
+	ZEROTEST;
+	bfly->test(9,0,0x4000000000l,0x00000000,0x000f0000, 0);
+	ZEROTEST;
+	ZEROTEST;
 	bfly->test(9,0,0x4000000000l,0x000f0000,0x000f0000, 0);
+	ZEROTEST;
+	ZEROTEST;
 	bfly->test(9,1,0x4000000000l,0x000f0000,0xfff10000, 0);
+	ZEROTEST;
+	ZEROTEST;
 	bfly->test(9,2,0x4000000000l,0x0000000f,0x0000fff1, 0);
+	ZEROTEST;
+	ZEROTEST;
 	bfly->test(9,3,0x4000000000l,0x0000000f,0x0000000f, 0);
+	ZEROTEST;
+	ZEROTEST;
 
 	bfly->test(9,0,0x4000000000l,0x7fff0000,0x7fff0000, 1);
 	bfly->test(9,1,0x4000000000l,0x7fff0000,0x80010000, 0);

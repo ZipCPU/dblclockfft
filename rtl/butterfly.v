@@ -106,20 +106,52 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	// Public changeable parameters ...
 `ifdef	FORMAL
 	parameter IWIDTH=4, CWIDTH=4, OWIDTH=6;
-	parameter	MPYDELAY=3'd5,
-			SHIFT=0, AUXLEN=(MPYDELAY+3);
-	parameter	LGDELAY=3;
+	parameter	SHIFT=0;
 `else
 	parameter IWIDTH=16,CWIDTH=20,OWIDTH=17;
-	// The LGDELAY should be the base two log of the MPYDELAY.  If
-	// this value is fractional, then round up to the nearest
-	// integer: LGDELAY=ceil(log(MPYDELAY)/log(2));
-	parameter	LGDELAY=4;
-	// Parameters specific to the core that should not be changed.
-	parameter [LGDELAY-1:0] MPYDELAY=11;
-	parameter 	SHIFT=0, AUXLEN=(MPYDELAY+3);
+	parameter	SHIFT=0;
 `endif	// FORMAL
-	parameter	CKPCE=1;
+	// The number of clocks per each i_ce.  The actual number can be
+	// more, but the algorithm depends upon at least this many for
+	// extra internal processing.
+	parameter	CKPCE=2;
+	//
+	// Local/derived parameters that are calculated from the above
+	// params.  Apart from algorithmic changes below, these should not
+	// be adjusted
+	//
+	// The first step is to calculate how many clocks it takes our
+	// multiply to come back with an answer within.  The time in the
+	// multiply depends upon the input value with the fewest number of
+	// bits--to keep the pipeline depth short.  So, let's find the
+	// fewest number of bits here.
+	localparam MXMPYBITS = 
+		((IWIDTH+2)>(CWIDTH+1)) ? (CWIDTH+1) : (IWIDTH + 2);
+	//
+	// Given this "fewest" number of bits, we can calculate the
+	// number of clocks the multiply itself will take.
+	localparam	MPYDELAY=((MXMPYBITS+1)/2)+2;
+	//
+	// In an environment when CKPCE > 1, the multiply delay isn't
+	// necessarily the delay felt by this algorithm--measured in
+	// i_ce's.  In particular, if the multiply can operate with more
+	// operations per clock, it can appear to finish "faster".
+	// Since most of the logic in this core operates on the slower
+	// clock, we'll need to map that speed into the number of slower
+	// clock ticks that it takes.
+	localparam	LCLDELAY = (CKPCE == 1) ? MPYDELAY
+		: (CKPCE == 2) ? (MPYDELAY/2+2)
+		: (MPYDELAY/3 + 2);
+	localparam	LGDELAY = (MPYDELAY>64) ? 7
+			: (MPYDELAY > 32) ? 6
+			: (MPYDELAY > 16) ? 5
+			: (MPYDELAY >  8) ? 4
+			: (MPYDELAY >  4) ? 3
+			: 2;
+	localparam	AUXLEN=(LCLDELAY+3);
+	localparam	MPYREMAINDER = MPYDELAY - CKPCE*(MPYDELAY/CKPCE);
+
+
 	input		i_clk, i_reset, i_ce;
 	input		[(2*CWIDTH-1):0] i_coef;
 	input		[(2*IWIDTH-1):0] i_left, i_right;
@@ -139,7 +171,7 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 	reg	[(LGDELAY-1):0]	fifo_addr;
 	wire	[(LGDELAY-1):0]	fifo_read_addr;
-	assign	fifo_read_addr = fifo_addr - MPYDELAY[(LGDELAY-1):0];
+	assign	fifo_read_addr = fifo_addr - LCLDELAY[(LGDELAY-1):0];
 	reg	[(2*IWIDTH+1):0]	fifo_left [ 0:((1<<LGDELAY)-1)];
 
 	// Set up the input to the multiply
@@ -251,7 +283,7 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		reg			mpy_pipe_v;
 		reg			ce_phase;
 
-		reg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;
+		reg	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
 		reg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
 
 
@@ -270,7 +302,6 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		always @(posedge i_clk)
 		if (ce_phase)
 		begin
-			// Pre-clock
 			mpy_pipe_c[2*CWIDTH-1:0] <=
 					{ ir_coef_r, ir_coef_i };
 			mpy_pipe_d[2*(IWIDTH+1)-1:0] <=
@@ -281,7 +312,6 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 		end else if (i_ce)
 		begin
-			// First clock
 			mpy_pipe_c[2*(CWIDTH)-1:0] <= {
 				mpy_pipe_c[(CWIDTH)-1:0], {(CWIDTH){1'b0}} };
 			mpy_pipe_d[2*(IWIDTH+1)-1:0] <= {
@@ -291,30 +321,48 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		longbimpy #(CWIDTH+1,IWIDTH+2) mpy0(i_clk, mpy_pipe_v,
 				mpy_cof_sum, mpy_dif_sum, longmpy);
 
-		longbimpy #(CWIDTH,IWIDTH+1) mpy1(i_clk, mpy_pipe_v,
-				mpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out);
+		longbimpy #(CWIDTH+1,IWIDTH+2) mpy1(i_clk, mpy_pipe_v,
+				{ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc },
+				{ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd },
+				mpy_pipe_out);
 
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one;
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one,
-								rp_two;
-		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;
+		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]
+					rp_one, rp_two, rp_three,
+					rp2_one, rp2_two, rp2_three;
 
 		always @(posedge i_clk)
-		if (ce_phase) // 1.5 clock
+		if (((i_ce)&&(!MPYDELAY[0]))
+			||((ce_phase)&&(MPYDELAY[0])))
 			rp_one <= mpy_pipe_out;
 		always @(posedge i_clk)
-		if (i_ce) // two clocks
+		if (((i_ce)&&(MPYDELAY[0]))
+			||((ce_phase)&&(!MPYDELAY[0])))
 			rp_two <= mpy_pipe_out;
 		always @(posedge i_clk)
-		if (i_ce) // Second clock
-			rp_three<= longmpy;
+		if (i_ce)
+			rp_three <= longmpy;
+
+		// Our outputs *MUST* be set on a clock where i_ce is
+		// true for the following logic to work.  Make that
+		// happen here.
 		always @(posedge i_clk)
 		if (i_ce)
 			rp2_one<= rp_one;
+		always @(posedge i_clk)
+		if (i_ce)
+			rp2_two <= rp_two;
+		always @(posedge i_clk)
+		if (i_ce)
+			rp2_three<= rp_three;
 
-		assign	p_one	= { {(2){rp2_one[(IWIDTH+1)+(CWIDTH)-1]}}, rp2_one };
-		assign	p_two	= { {(2){rp_two[(IWIDTH+1)+(CWIDTH)-1]}}, rp_two };
-		assign	p_three	= rp_three;
+		assign	p_one	= rp2_one;
+		assign	p_two	= (!MPYDELAY[0])? rp2_two  : rp_two;
+		assign	p_three	= ( MPYDELAY[0])? rp_three : rp2_three;
+
+		// verilator lint_off UNUSED
+		wire	[2*(IWIDTH+CWIDTH+3)-1:0]	unused;
+		assign	unused = { rp2_two, rp2_three };
+		// verilator lint_on  UNUSED
 
 	end else if (CKPCE <= 3)
 	begin : CKPCE_THREE
@@ -369,29 +417,55 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		longbimpy #(CWIDTH+1,IWIDTH+2) mpy(i_clk, mpy_pipe_v,
 				mpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out);
 
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one, rp_two;
-		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp2_one, rp2_two;
-		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three, rp2_three;
+		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]
+				rp_one,  rp_two,  rp_three,
+				rp2_one, rp2_two, rp2_three,
+				rp3_one;
 
 		always @(posedge i_clk)
-		if(i_ce)
-			rp_one <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];
-		always @(posedge i_clk)
-		if(ce_phase == 3'b000)
-			rp_two <= mpy_pipe_out[(CWIDTH+IWIDTH+3)-3:0];
-		always @(posedge i_clk)
-		if(ce_phase == 3'b001)
-			rp_three <= mpy_pipe_out;
+		if (MPYREMAINDER == 0)
+		begin
+
+			if (i_ce)
+				rp_two   <= mpy_pipe_out;
+			else if (ce_phase == 3'b000)
+				rp_three <= mpy_pipe_out;
+			else if (ce_phase == 3'b001)
+				rp_one   <= mpy_pipe_out;
+
+		end else if (MPYREMAINDER == 1)
+		begin
+
+			if (i_ce)
+				rp_one   <= mpy_pipe_out;
+			else if (ce_phase == 3'b000)
+				rp_two   <= mpy_pipe_out;
+			else if (ce_phase == 3'b001)
+				rp_three <= mpy_pipe_out;
+
+		end else // if (MPYREMAINDER == 2)
+		begin
+
+			if (i_ce)
+				rp_three <= mpy_pipe_out;
+			else if (ce_phase == 3'b000)
+				rp_one   <= mpy_pipe_out;
+			else if (ce_phase == 3'b001)
+				rp_two   <= mpy_pipe_out;
+
+		end
+
 		always @(posedge i_clk)
 		if (i_ce)
 		begin
 			rp2_one<= rp_one;
 			rp2_two<= rp_two;
-			rp2_three<= rp_three;
+			rp2_three<= (MPYREMAINDER==2) ? mpy_pipe_out : rp_three;
+			rp3_one<= (MPYREMAINDER == 0) ? rp_one : rp2_one;
 		end
-		assign	p_one  ={{(2){rp2_one[IWIDTH+CWIDTH]}},rp2_one};
-		assign	p_two  ={{(2){rp2_two[IWIDTH+CWIDTH]}},rp2_two};
-		assign	p_three	= rp2_three;
+		assign	p_one   = rp3_one;
+		assign	p_two   = rp2_two;
+		assign	p_three = rp2_three;
 
 	end endgenerate
 	// These values are held in memory and delayed during the
@@ -490,7 +564,7 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	o_right= { rnd_right_r,rnd_right_i};
 
 `ifdef	FORMAL
-	localparam	F_LGDEPTH = 5;
+	localparam	F_LGDEPTH = LGDELAY+1;
 	localparam	F_DEPTH = AUXLEN;
 	localparam	F_D = F_DEPTH-1;
 
@@ -502,6 +576,14 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	reg	signed	[CWIDTH-1:0]	f_dlycoeff_i [0:F_DEPTH-1];
 	reg	signed	[F_DEPTH-1:0]	f_dlyaux;
 
+	initial	f_dlyaux[0] = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		f_dlyaux[0]      <= 1'b0;
+	else if (i_ce)
+		f_dlyaux[0]      <= i_aux;
+
+
 	always @(posedge i_clk)
 	if (i_ce)
 	begin
@@ -511,11 +593,18 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		f_dlyright_i[0]  <= i_right[(  IWIDTH-1):0];
 		f_dlycoeff_r[0]  <= i_coef[ (2*CWIDTH-1):CWIDTH];
 		f_dlycoeff_i[0]  <= i_coef[ (  CWIDTH-1):0];
-		f_dlyaux[0]      <= i_aux;
 	end
 
 	genvar	k;
 	generate for(k=1; k<F_DEPTH; k=k+1)
+	begin : F_PROPAGATE_DELAY_LINES
+
+		initial	f_dlyaux[k] = 0;
+		always @(posedge i_clk)
+		if (i_reset)
+			f_dlyaux[k] = 0;
+		else if (i_ce)
+			f_dlyaux[k] = f_dlyaux[k-1];
 
 		always @(posedge i_clk)
 		if (i_ce)
@@ -526,10 +615,9 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			f_dlyright_i[k] <= f_dlyright_i[k-1];
 			f_dlycoeff_r[k] <= f_dlycoeff_r[k-1];
 			f_dlycoeff_i[k] <= f_dlycoeff_i[k-1];
-			f_dlyaux[k]     <= f_dlyaux[    k-1];
 		end
 
-	endgenerate
+	end endgenerate
 
 	always @(posedge i_clk)
 	if ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))
@@ -572,9 +660,9 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		f_sumi = f_dlyleft_i[F_D] + f_dlyright_i[F_D];
 	end
 
-	wire	signed	[IWIDTH+CWIDTH-1:0]	f_sumrx, f_sumix;
-	assign	f_sumrx = { {(2){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };
-	assign	f_sumix = { {(2){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_sumrx, f_sumix;
+	assign	f_sumrx = { {(4){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };
+	assign	f_sumix = { {(4){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };
 
 	wire	signed	[IWIDTH:0]	f_difr, f_difi;
 	always @(*)
@@ -583,14 +671,20 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		f_difi = f_dlyleft_i[F_D] - f_dlyright_i[F_D];
 	end
 
-	wire	signed	[IWIDTH+CWIDTH-1:0]	f_difrx, f_difix;
-	assign	f_difrx = { {(CWIDTH){f_difr[IWIDTH]}}, f_difr };
-	assign	f_difix = { {(CWIDTH){f_difi[IWIDTH]}}, f_difi };
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;
+	assign	f_difrx = { {(CWIDTH+2){f_difr[IWIDTH]}}, f_difr };
+	assign	f_difix = { {(CWIDTH+2){f_difi[IWIDTH]}}, f_difi };
 
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;
+	assign	f_widecoeff_r ={ {(IWIDTH+3){f_dlycoeff_r[F_D][CWIDTH-1]}},
+						f_dlycoeff_r[F_D] };
+	assign	f_widecoeff_i ={ {(IWIDTH+3){f_dlycoeff_i[F_D][CWIDTH-1]}},
+						f_dlycoeff_i[F_D] };
 
 	always @(posedge i_clk)
 	if (f_startup_counter > F_D)
 	begin
+		assert(aux_pipeline == f_dlyaux);
 		assert(left_sr == f_sumrx);
 		assert(left_si == f_sumix);
 		assert(aux_pipeline[AUXLEN-1] == f_dlyaux[F_D]);
@@ -620,14 +714,14 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 		if ((f_difr == 1)&&(f_difi == 0))
 		begin
-			assert(mpy_r == f_dlycoeff_r[F_D]);
-			assert(mpy_i == f_dlycoeff_i[F_D]);
+			assert(mpy_r == f_widecoeff_r);
+			assert(mpy_i == f_widecoeff_i);
 		end
 
 		if ((f_difr == 0)&&(f_difi == 1))
 		begin
-			assert(mpy_r == -f_dlycoeff_i[F_D]);
-			assert(mpy_i ==  f_dlycoeff_r[F_D]);
+			assert(mpy_r == -f_widecoeff_i);
+			assert(mpy_i ==  f_widecoeff_r);
 		end
 	end
 

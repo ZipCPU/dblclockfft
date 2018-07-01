@@ -263,7 +263,7 @@ SLASHLINE
 
 void	build_stage(const char *fname,
 		int stage, int nwide, int offset,
-		int nbits, bool inv, int xtra, int ckpce,
+		int nbits, int xtra, int ckpce,
 		const bool async_reset, const bool dbg) {
 	FILE	*fstage = fopen(fname, "w");
 	int	cbits = nbits + xtra;
@@ -287,7 +287,7 @@ void	build_stage(const char *fname,
 	fprintf(fstage,
 SLASHLINE
 "//\n"
-"// Filename:\t%sfftstage%s.v\n"
+"// Filename:\tfftstage%s.v\n"
 "//\n"
 "// Project:\t%s\n"
 "//\n"
@@ -316,11 +316,11 @@ SLASHLINE
 "// 	hardware accelerated butterfly (uses a DSP) or not.\n"
 "//\n%s"
 "//\n",
-		(inv)?"i":"", (dbg)?"_dbg":"", prjname, creator);
+		(dbg)?"_dbg":"", prjname, creator);
 	fprintf(fstage, "%s", cpyleft);
 	fprintf(fstage, "//\n//\n`default_nettype\tnone\n//\n");
-	fprintf(fstage, "module\t%sfftstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n",
-		(inv)?"i":"", (dbg)?"_dbg":"", resetw.c_str(),
+	fprintf(fstage, "module\tfftstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n",
+		(dbg)?"_dbg":"", resetw.c_str(),
 		(dbg)?", o_dbg":"");
 	// These parameter values are useless at this point--they are to be
 	// replaced by the parameter values in the calling program.  Only
@@ -332,12 +332,9 @@ SLASHLINE
 "\t// core is built ... Note that the minimum LGSPAN (the base two log\n"
 "\t// of the span, or the base two log of the current FFT size) is 3.\n"
 "\t// Smaller spans (i.e. the span of 2) must use the dbl laststage module.\n"
-"\tparameter\tLGWIDTH=%d, LGSPAN=%d, LGBDLY=%d, BFLYSHIFT=0;\n"
+"\tparameter\tLGWIDTH=%d, LGSPAN=%d, BFLYSHIFT=0;\n"
 "\tparameter\t[0:0]	OPT_HWMPY = 1;\n",
-		lgval(stage), (nwide <= 1) ? lgval(stage)-1 : lgval(stage)-2,
-		lgdelay(nbits,cbits-nbits));
-	fprintf(fstage,
-"\tparameter\t\tMPYDELAY = %d;\n", bflydelay(nbits,cbits-nbits));
+		lgval(stage), (nwide <= 1) ? lgval(stage)-1 : lgval(stage)-2);
 	fprintf(fstage,
 "\t// Clocks per CE.  If your incoming data rate is less than 50%% of your\n"
 "\t// clock speed, you can set CKPCE to 2\'b10, make sure there's at least\n"
@@ -346,17 +343,17 @@ SLASHLINE
 "\t// on at least two clocks with i_ce low between cycles with i_ce high,\n"
 "\t// then the hardware optimized butterfly code will used one multiply\n"
 "\t// instead of two.\n"
-"\tparameter\t[1:0]	CKPCE = 2'h%d;\n", ckpce);
+"\tparameter\t	CKPCE = %d;\n", ckpce);
 
 	fprintf(fstage,
 "\t// The COEFFILE parameter contains the name of the file containing the\n"
 "\t// FFT twiddle factors\n");
 	if (nwide == 2) {
-		fprintf(fstage, "\tparameter\tCOEFFILE=\"%scmem_%c%d.hex\";\n",
-			(inv)?"i":"", (offset)?'o':'e', stage*2);
+		fprintf(fstage, "\tparameter\tCOEFFILE=\"cmem_%c%d.hex\";\n",
+			(offset)?'o':'e', stage*2);
 	} else
-		fprintf(fstage, "\tparameter\tCOEFFILE=\"%scmem_%d.hex\";\n",
-			(inv)?"i":"", stage);
+		fprintf(fstage, "\tparameter\tCOEFFILE=\"cmem_%d.hex\";\n",
+			stage);
 	fprintf(fstage,
 "\tinput					i_clk, %s, i_ce, i_sync;\n"
 "\tinput		[(2*IWIDTH-1):0]	i_data;\n"
@@ -460,7 +457,6 @@ SLASHLINE
 			"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
 "\tend else begin : FWBFLY\n"
 "\t\tbutterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
-		"\t\t\t\t.LGDELAY(LGBDLY),.MPYDELAY(MPYDELAY),\n"
 		"\t\t\t\t.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))\n"
 	"\t\t\tbfly(i_clk, %s, i_ce, ib_c,\n"
 		"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
