@@ -50,11 +50,11 @@ OBJDIR   := obj-pc
 BENCHD  := ../bench/cpp
 SOURCES := bitreverse.cpp bldstage.cpp butterfly.cpp fftgen.cpp fftlib.cpp \
 		legal.cpp rounding.cpp softmpy.cpp
-TESTSZ  := -f 16
+TESTSZ  := -f 2048
 # CKPCE 2 is broken
 # CKPCE 3 is broken
-CKPCE   := -k 1
-MPYS    := -p 0
+CKPCE   := -k 3
+MPYS    := -p 6
 IWID    := -n 16
 FFTPARAMS := -d $(CORED) $(TESTSZ) $(CKPCE) $(MPYS) $(IWID)
 OBJECTS := $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SOURCES)))
@@ -102,7 +102,7 @@ $(VOBJDR)/Vfftmain__ALL.so: $(VOBJDR)/Vfftmain.h
 .PHONY: dblfft
 dblfft: $(VOBJDR)/Vdblfftmain__ALL.so
 $(CORED)/dblfftmain.v: fftgen
-	./fftgen -v $(FFTPARAMS) -a $(BENCHD)/dblfftsize.h
+	./fftgen -v $(FFTPARAMS) -a $(BENCHD)/fftsize.h
 $(VOBJDR)/Vdblfftmain.h: $(CORED)/dblfftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) dblfftmain.v
 $(VOBJDR)/Vdblfftmain__ALL.so: $(VOBJDR)/Vdblfftmain.h
@@ -111,7 +111,7 @@ $(VOBJDR)/Vdblfftmain__ALL.so: $(VOBJDR)/Vdblfftmain.h
 .PHONY: idblfft
 idblfft: $(VOBJDR)/Vidblfftmain__ALL.so
 $(CORED)/idblfftmain.v: fftgen
-	./fftgen -d $(CORED) $(TESTSZ) -i -n 22  -p 6 -a $(BENCHD)/idblfftsize.h
+	./fftgen -i $(FFTPARAMS) -a $(BENCHD)/ifftsize.h
 $(VOBJDR)/Vidblfftmain.h: $(CORED)/idblfftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) idblfftmain.v
 $(VOBJDR)/Vidblfftmain__ALL.so: $(VOBJDR)/Vidblfftmain.h
@@ -220,7 +220,12 @@ $(VOBJDR)/Vfftstage__ALL.a: $(VOBJDR)/Vfftstage.cpp
 .PHONY: clean
 clean:
 	rm fftgen fftgen.o
-	rm -rf $(CORED)
+	rm -rf $(CORED)/obj_dir
+	rm -rf $(CORED)/fftmain.v $(CORED)/fftstage.v
+	rm -rf $(CORED)/qtrstage.v $(CORED)/laststage.v $(CORED)/bitreverse.v
+	rm -rf $(CORED)/butterfly.v $(CORED)/hwbfly.v
+	rm -rf $(CORED)/longbimpy.v $(CORED)/bimpy.v
+	rm -rf $(CORED)/convround.v
 
 #
 # The "depends" target, to know what files things depend upon.  The depends

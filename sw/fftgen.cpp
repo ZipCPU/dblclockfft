@@ -1121,12 +1121,7 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	if (ckpce >= 1) {
-		printf(
-"WARNING: The non-hw optimized butterfly that uses multiple clocks per CE has\n"
-" not yet been fully tested, but rather represent a work in progress.  Feel\n"
-" free to use the ckpce >1 option(s) at your own risk.\n");
-	} else 
+	if (ckpce < 1)
 		ckpce = 1;
 	if (!bitreverse) {
 		printf("WARNING: While I can skip the bit reverse stage, the code to do\n");
