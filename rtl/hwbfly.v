@@ -12,6 +12,25 @@
 //	It is understood that a hardware multiply can complete its operation in
 //	a single clock.
 //
+// Operation:
+//
+//	Given two inputs, A (i_left) and B (i_right), and a complex
+//	coefficient C (i_coeff), return two outputs, O1 and O2, where:
+//
+//		O1 = A + B, and
+//		O2 = (A - B)*C
+//
+//	This operation is commonly known as a Decimation in Frequency (DIF)
+//	Radix-2 Butterfly.
+//	O1 and O2 are rounded before being returned in (o_left) and o_right
+//	to OWIDTH bits.  If SHIFT is one, an extra bit is dropped from these
+//	values during the rounding process.
+//
+//	Further, since these outputs will take some number of clocks to
+//	calculate, we'll pipe a value (i_aux) through the system and return
+//	it with the results (o_aux), so you can synchronize to the outgoing
+//	output stream.
+//
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -47,16 +66,22 @@
 module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		o_left, o_right, o_aux);
 	// Public changeable parameters ...
+	//	- IWIDTH, number of bits in each component of the input
+	//	- CWIDTH, number of bits in each component of the twiddle factor
+	//	- OWIDTH, number of bits in each component of the output
 	parameter IWIDTH=16,CWIDTH=IWIDTH+4,OWIDTH=IWIDTH+1;
-	// Parameters specific to the core that should not be changed.
-	parameter	SHIFT=0;
-	parameter	[1:0]	CKPCE=2;
+	// Drop an additional bit on the output?
+	parameter		SHIFT=0;
+	// The number of clocks per clock enable, 1, 2, or 3.
+	parameter	[1:0]	CKPCE=1;
+	//
 	input		i_clk, i_reset, i_ce;
 	input		[(2*CWIDTH-1):0]	i_coef;
 	input		[(2*IWIDTH-1):0]	i_left, i_right;
 	input		i_aux;
 	output	wire	[(2*OWIDTH-1):0]	o_left, o_right;
 	output	reg	o_aux;
+
 
 	reg	[(2*IWIDTH-1):0]	r_left, r_right;
 	reg				r_aux, r_aux_2;
@@ -456,9 +481,13 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	o_left = { rnd_left_r, rnd_left_i };
 	assign	o_right= { rnd_right_r,rnd_right_i};
 
+`ifdef	VERILATOR
+`define	FORMAL
+`endif
 `ifdef	FORMAL
-	parameter	F_DEPTH = 6;
-	localparam	F_D = F_DEPTH-2;
+	localparam	F_LGDEPTH = 3;
+	localparam	F_DEPTH = 5;
+	localparam	[F_LGDEPTH-1:0]	F_D = F_DEPTH-1;
 
 	reg	signed	[IWIDTH-1:0]	f_dlyleft_r  [0:F_DEPTH-1];
 	reg	signed	[IWIDTH-1:0]	f_dlyleft_i  [0:F_DEPTH-1];
@@ -469,6 +498,12 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	reg	signed	[F_DEPTH-1:0]	f_dlyaux;
 
 	always @(posedge i_clk)
+	if (i_reset)
+		f_dlyaux <= 0;
+	else if (i_ce)
+		f_dlyaux <= { f_dlyaux[F_DEPTH-2:0], i_aux };
+
+	always @(posedge i_clk)
 	if (i_ce)
 	begin
 		f_dlyleft_r[0]   <= i_left[ (2*IWIDTH-1):IWIDTH];
@@ -477,7 +512,6 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		f_dlyright_i[0]  <= i_right[(  IWIDTH-1):0];
 		f_dlycoeff_r[0]  <= i_coef[ (2*CWIDTH-1):CWIDTH];
 		f_dlycoeff_i[0]  <= i_coef[ (  CWIDTH-1):0];
-		f_dlyaux[0]      <= i_aux;
 	end
 
 	genvar	k;
@@ -492,11 +526,12 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			f_dlyright_i[k] <= f_dlyright_i[k-1];
 			f_dlycoeff_r[k] <= f_dlycoeff_r[k-1];
 			f_dlycoeff_i[k] <= f_dlycoeff_i[k-1];
-			f_dlyaux[k]     <= f_dlyaux[    k-1];
 		end
 
 	endgenerate
 
+`ifdef	VERILATOR
+`else
 	always @(posedge i_clk)
 	if ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))
 			&&(!$past(i_ce,4)))
@@ -522,12 +557,12 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 				assume(!i_ce);
 
 	end endgenerate
-
-	reg	[4:0]	f_startup_counter;
+`endif
+	reg	[F_LGDEPTH-1:0]	f_startup_counter;
 	initial	f_startup_counter = 0;
 	always @(posedge i_clk)
 	if (i_reset)
-		f_startup_counter = 0;
+		f_startup_counter <= 0;
 	else if ((i_ce)&&(!(&f_startup_counter)))
 		f_startup_counter <= f_startup_counter + 1;
 
@@ -597,9 +632,77 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 		if ((f_difr == 0)&&(f_difi == 1))
 		begin
-			assert(mpy_r == -f_widecoeff_r);
-			assert(mpy_i ==  f_widecoeff_i);
+			assert(mpy_r == -f_widecoeff_i);
+			assert(mpy_i ==  f_widecoeff_r);
 		end
+	end
+
+	// Let's see if we can improve our performance at all by
+	// moving our test one clock earlier.  If nothing else, it should
+	// help induction finish one (or more) clocks ealier than
+	// otherwise
+
+
+	wire	signed	[IWIDTH:0]	f_predifr, f_predifi;
+	always @(*)
+	begin
+		f_predifr = f_dlyleft_r[F_D-1] - f_dlyright_r[F_D-1];
+		f_predifi = f_dlyleft_i[F_D-1] - f_dlyright_i[F_D-1];
+	end
+
+	wire	signed	[IWIDTH+CWIDTH+1-1:0]	f_predifrx, f_predifix;
+	assign	f_predifrx = { {(CWIDTH){f_predifr[IWIDTH]}}, f_predifr };
+	assign	f_predifix = { {(CWIDTH){f_predifi[IWIDTH]}}, f_predifi };
+
+	wire	signed	[CWIDTH:0]	f_sumcoef;
+	wire	signed	[IWIDTH+1:0]	f_sumdiff;
+	always @(*)
+	begin
+		f_sumcoef = f_dlycoeff_r[F_D-1] + f_dlycoeff_i[F_D-1];
+		f_sumdiff = f_predifr + f_predifi;
+	end
+
+	// Induction helpers
+	always @(posedge i_clk)
+	if (f_startup_counter >= F_D)
+	begin
+		if (f_dlycoeff_r[F_D-1] == 0)
+			assert(p_one == 0);
+		if (f_dlycoeff_i[F_D-1] == 0)
+			assert(p_two == 0);
+
+		if (f_dlycoeff_r[F_D-1] == 1)
+			assert(p_one == f_predifrx);
+		if (f_dlycoeff_i[F_D-1] == 1)
+			assert(p_two == f_predifix);
+
+		if (f_predifr == 0)
+			assert(p_one == 0);
+		if (f_predifi == 0)
+			assert(p_two == 0);
+
+		// verilator lint_off WIDTH
+		if (f_predifr == 1)
+			assert(p_one == f_dlycoeff_r[F_D-1]);
+		if (f_predifi == 1)
+			assert(p_two == f_dlycoeff_i[F_D-1]);
+		// verilator lint_on  WIDTH
+
+		if (f_sumcoef == 0)
+			assert(p_three == 0);
+		if (f_sumdiff == 0)
+			assert(p_three == 0);
+		// verilator lint_off WIDTH
+		if (f_sumcoef == 1)
+			assert(p_three == f_sumdiff);
+		if (f_sumdiff == 1)
+			assert(p_three == f_sumcoef);
+		// verilator lint_on  WIDTH
+`ifdef	VERILATOR
+		assert(p_one   == f_predifr * f_dlycoeff_r[F_D-1]);
+		assert(p_two   == f_predifi * f_dlycoeff_i[F_D-1]);
+		assert(p_three == f_sumdiff * f_sumcoef);
+`endif	// VERILATOR
 	end
 
 `endif // FORMAL

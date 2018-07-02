@@ -51,11 +51,10 @@ BENCHD  := ../bench/cpp
 SOURCES := bitreverse.cpp bldstage.cpp butterfly.cpp fftgen.cpp fftlib.cpp \
 		legal.cpp rounding.cpp softmpy.cpp
 TESTSZ  := -f 2048
-# CKPCE 2 is broken
-# CKPCE 3 is broken
-CKPCE   := -k 3
-MPYS    := -p 6
-IWID    := -n 16
+# CKPCE   := -k 1
+CKPCE   := -2
+MPYS    := -p 0
+IWID    := -n 15
 FFTPARAMS := -d $(CORED) $(TESTSZ) $(CKPCE) $(MPYS) $(IWID)
 OBJECTS := $(addprefix $(OBJDIR)/,$(subst .cpp,.o,$(SOURCES)))
 HEADERS := $(wildcard *.h)

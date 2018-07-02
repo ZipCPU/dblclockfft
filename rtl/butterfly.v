@@ -104,17 +104,12 @@
 module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		o_left, o_right, o_aux);
 	// Public changeable parameters ...
-`ifdef	FORMAL
-	parameter IWIDTH=4, CWIDTH=4, OWIDTH=6;
-	parameter	SHIFT=0;
-`else
 	parameter IWIDTH=16,CWIDTH=20,OWIDTH=17;
 	parameter	SHIFT=0;
-`endif	// FORMAL
 	// The number of clocks per each i_ce.  The actual number can be
 	// more, but the algorithm depends upon at least this many for
 	// extra internal processing.
-	parameter	CKPCE=2;
+	parameter	CKPCE=1;
 	//
 	// Local/derived parameters that are calculated from the above
 	// params.  Apart from algorithmic changes below, these should not
@@ -458,10 +453,10 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		always @(posedge i_clk)
 		if (i_ce)
 		begin
-			rp2_one<= rp_one;
-			rp2_two<= rp_two;
-			rp2_three<= (MPYREMAINDER==2) ? mpy_pipe_out : rp_three;
-			rp3_one<= (MPYREMAINDER == 0) ? rp_one : rp2_one;
+			rp2_one   <= rp_one;
+			rp2_two   <= rp_two;
+			rp2_three <= (MPYREMAINDER == 2) ? mpy_pipe_out : rp_three;
+			rp3_one   <= (MPYREMAINDER == 0) ? rp2_one : rp_one;
 		end
 		assign	p_one   = rp3_one;
 		assign	p_two   = rp2_two;
@@ -563,10 +558,18 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	o_left = { rnd_left_r, rnd_left_i };
 	assign	o_right= { rnd_right_r,rnd_right_i};
 
+`ifdef	VERILATOR
+`define FORMAL
+`endif
 `ifdef	FORMAL
-	localparam	F_LGDEPTH = LGDELAY+1;
+	localparam	F_LGDEPTH = (AUXLEN > 64) ? 7
+			: (AUXLEN > 32) ? 6
+			: (AUXLEN > 16) ? 5
+			: (AUXLEN >  8) ? 4
+			: (AUXLEN >  4) ? 3 : 2;
+
 	localparam	F_DEPTH = AUXLEN;
-	localparam	F_D = F_DEPTH-1;
+	localparam	[F_LGDEPTH-1:0]	F_D = F_DEPTH[F_LGDEPTH-1:0]-1;
 
 	reg	signed	[IWIDTH-1:0]	f_dlyleft_r  [0:F_DEPTH-1];
 	reg	signed	[IWIDTH-1:0]	f_dlyleft_i  [0:F_DEPTH-1];
@@ -579,10 +582,9 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	initial	f_dlyaux[0] = 0;
 	always @(posedge i_clk)
 	if (i_reset)
-		f_dlyaux[0]      <= 1'b0;
+		f_dlyaux	<= 0;
 	else if (i_ce)
-		f_dlyaux[0]      <= i_aux;
-
+		f_dlyaux	<= { f_dlyaux[F_DEPTH-2:0], i_aux };
 
 	always @(posedge i_clk)
 	if (i_ce)
@@ -599,12 +601,6 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	generate for(k=1; k<F_DEPTH; k=k+1)
 	begin : F_PROPAGATE_DELAY_LINES
 
-		initial	f_dlyaux[k] = 0;
-		always @(posedge i_clk)
-		if (i_reset)
-			f_dlyaux[k] = 0;
-		else if (i_ce)
-			f_dlyaux[k] = f_dlyaux[k-1];
 
 		always @(posedge i_clk)
 		if (i_ce)
@@ -619,6 +615,7 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 	end endgenerate
 
+`ifndef VERILATOR
 	always @(posedge i_clk)
 	if ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))
 			&&(!$past(i_ce,4)))
@@ -644,12 +641,13 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 				assume(!i_ce);
 
 	end endgenerate
+`endif
 
-	reg	[F_LGDEPTH-1:0]	f_startup_counter;
+	reg	[F_LGDEPTH:0]	f_startup_counter;
 	initial	f_startup_counter = 0;
 	always @(posedge i_clk)
 	if (i_reset)
-		f_startup_counter = 0;
+		f_startup_counter <= 0;
 	else if ((i_ce)&&(!(&f_startup_counter)))
 		f_startup_counter <= f_startup_counter + 1;
 
@@ -682,7 +680,7 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 						f_dlycoeff_i[F_D] };
 
 	always @(posedge i_clk)
-	if (f_startup_counter > F_D)
+	if (f_startup_counter > {1'b0, F_D})
 	begin
 		assert(aux_pipeline == f_dlyaux);
 		assert(left_sr == f_sumrx);
@@ -725,5 +723,81 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		end
 	end
 
-`endif
+	// Let's see if we can improve our performance at all by
+	// moving our test one clock earlier.  If nothing else, it should
+	// help induction finish one (or more) clocks ealier than
+	// otherwise
+
+
+	wire	signed	[IWIDTH:0]	f_predifr, f_predifi;
+	always @(*)
+	begin
+		f_predifr = f_dlyleft_r[F_D-1] - f_dlyright_r[F_D-1];
+		f_predifi = f_dlyleft_i[F_D-1] - f_dlyright_i[F_D-1];
+	end
+
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_predifrx, f_predifix;
+	assign	f_predifrx = { {(CWIDTH+2){f_predifr[IWIDTH]}}, f_predifr };
+	assign	f_predifix = { {(CWIDTH+2){f_predifi[IWIDTH]}}, f_predifi };
+
+	wire	signed	[CWIDTH:0]	f_sumcoef;
+	wire	signed	[IWIDTH+1:0]	f_sumdiff;
+	always @(*)
+	begin
+		f_sumcoef = f_dlycoeff_r[F_D-1] + f_dlycoeff_i[F_D-1];
+		f_sumdiff = f_predifr + f_predifi;
+	end
+
+	// Induction helpers
+	always @(posedge i_clk)
+	if (f_startup_counter >= { 1'b0, F_D })
+	begin
+		if (f_dlycoeff_r[F_D-1] == 0)
+			assert(p_one == 0);
+		if (f_dlycoeff_i[F_D-1] == 0)
+			assert(p_two == 0);
+
+		if (f_dlycoeff_r[F_D-1] == 1)
+			assert(p_one == f_predifrx);
+		if (f_dlycoeff_i[F_D-1] == 1)
+			assert(p_two == f_predifix);
+
+		if (f_predifr == 0)
+			assert(p_one == 0);
+		if (f_predifi == 0)
+			assert(p_two == 0);
+
+		// verilator lint_off WIDTH
+		if (f_predifr == 1)
+			assert(p_one == f_dlycoeff_r[F_D-1]);
+		if (f_predifi == 1)
+			assert(p_two == f_dlycoeff_i[F_D-1]);
+		// verilator lint_on  WIDTH
+
+		if (f_sumcoef == 0)
+			assert(p_three == 0);
+		if (f_sumdiff == 0)
+			assert(p_three == 0);
+		// verilator lint_off WIDTH
+		if (f_sumcoef == 1)
+			assert(p_three == f_sumdiff);
+		if (f_sumdiff == 1)
+			assert(p_three == f_sumcoef);
+		// verilator lint_on  WIDTH
+`ifdef	VERILATOR
+		assert(p_one   == f_predifr * f_dlycoeff_r[F_D-1]);
+		assert(p_two   == f_predifi * f_dlycoeff_i[F_D-1]);
+		assert(p_three == f_sumdiff * f_sumcoef);
+`endif	// VERILATOR
+	end
+
+	// F_CHECK will be set externally by the solver, so that we can
+	// double check that the solver is actually testing what we think
+	// it is testing.  We'll set it here to MPYREMAINDER, which will
+	// essentially eliminate the check--unless overridden by the
+	// solver.
+	parameter	F_CHECK = MPYREMAINDER;
+	initial	assert(MPYREMAINDER == F_CHECK);
+
+`endif // FORMAL
 endmodule

@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename:	fftmain.v
+// Filename:	ifftmain.v
 //
 // Project:	A General Purpose Pipelined FFT Implementation
 //
@@ -41,7 +41,7 @@
 // Arguments:	This file was computer generated using the following command
 //		line:
 //
-//		% ./fftgen -v -d ../rtl -f 2048 -2 -p 0 -n 15 -a ../bench/cpp/fftsize.h
+//		% ./fftgen -i -d ../rtl -f 2048 -2 -p 0 -n 15 -a ../bench/cpp/ifftsize.h
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -76,7 +76,7 @@
 //
 //
 //
-module fftmain(i_clk, i_reset, i_ce,
+module ifftmain(i_clk, i_reset, i_ce,
 		i_left, i_right,
 		o_left, o_right, o_sync);
 	parameter	IWIDTH=15, OWIDTH=21, LGWIDTH=11;
@@ -98,11 +98,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[31:0]	w_e2048, w_o2048;
 	fftstage	#(IWIDTH,IWIDTH+4,16,11,9,0,
-			0, 1, "cmem_e4096.hex")
+			0, 1, "icmem_e4096.hex")
 		stage_e2048(i_clk, i_reset, i_ce,
 			(!i_reset), i_left, w_e2048, w_s2048);
 	fftstage	#(IWIDTH,IWIDTH+4,16,11,9,0,
-			0, 1, "cmem_o4096.hex")
+			0, 1, "icmem_o4096.hex")
 		stage_o2048(i_clk, i_reset, i_ce,
 			(!i_reset), i_right, w_o2048, w_os2048);
 
@@ -113,11 +113,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[33:0]	w_e1024, w_o1024;
 	fftstage	#(16,20,17,11,8,0,
-			0, 1, "cmem_e2048.hex")
+			0, 1, "icmem_e2048.hex")
 		stage_e1024(i_clk, i_reset, i_ce,
 			w_s2048, w_e2048, w_e1024, w_s1024);
 	fftstage	#(16,20,17,11,8,0,
-			0, 1, "cmem_o2048.hex")
+			0, 1, "icmem_o2048.hex")
 		stage_o1024(i_clk, i_reset, i_ce,
 			w_s2048, w_o2048, w_o1024, w_os1024);
 
@@ -127,11 +127,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[33:0]	w_e512, w_o512;
 	fftstage	#(17,21,17,11,7,0,
-			0, 1, "cmem_e1024.hex")
+			0, 1, "icmem_e1024.hex")
 		stage_e512(i_clk, i_reset, i_ce,
 			w_s1024, w_e1024, w_e512, w_s512);
 	fftstage	#(17,21,17,11,7,0,
-			0, 1, "cmem_o1024.hex")
+			0, 1, "icmem_o1024.hex")
 		stage_o512(i_clk, i_reset, i_ce,
 			w_s1024, w_o1024, w_o512, w_os512);
 
@@ -141,11 +141,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[35:0]	w_e256, w_o256;
 	fftstage	#(17,21,18,11,6,0,
-			0, 1, "cmem_e512.hex")
+			0, 1, "icmem_e512.hex")
 		stage_e256(i_clk, i_reset, i_ce,
 			w_s512, w_e512, w_e256, w_s256);
 	fftstage	#(17,21,18,11,6,0,
-			0, 1, "cmem_o512.hex")
+			0, 1, "icmem_o512.hex")
 		stage_o256(i_clk, i_reset, i_ce,
 			w_s512, w_o512, w_o256, w_os256);
 
@@ -155,11 +155,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[35:0]	w_e128, w_o128;
 	fftstage	#(18,22,18,11,5,0,
-			0, 1, "cmem_e256.hex")
+			0, 1, "icmem_e256.hex")
 		stage_e128(i_clk, i_reset, i_ce,
 			w_s256, w_e256, w_e128, w_s128);
 	fftstage	#(18,22,18,11,5,0,
-			0, 1, "cmem_o256.hex")
+			0, 1, "icmem_o256.hex")
 		stage_o128(i_clk, i_reset, i_ce,
 			w_s256, w_o256, w_o128, w_os128);
 
@@ -169,11 +169,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[37:0]	w_e64, w_o64;
 	fftstage	#(18,22,19,11,4,0,
-			0, 1, "cmem_e128.hex")
+			0, 1, "icmem_e128.hex")
 		stage_e64(i_clk, i_reset, i_ce,
 			w_s128, w_e128, w_e64, w_s64);
 	fftstage	#(18,22,19,11,4,0,
-			0, 1, "cmem_o128.hex")
+			0, 1, "icmem_o128.hex")
 		stage_o64(i_clk, i_reset, i_ce,
 			w_s128, w_o128, w_o64, w_os64);
 
@@ -183,11 +183,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[37:0]	w_e32, w_o32;
 	fftstage	#(19,23,19,11,3,0,
-			0, 1, "cmem_e64.hex")
+			0, 1, "icmem_e64.hex")
 		stage_e32(i_clk, i_reset, i_ce,
 			w_s64, w_e64, w_e32, w_s32);
 	fftstage	#(19,23,19,11,3,0,
-			0, 1, "cmem_o64.hex")
+			0, 1, "icmem_o64.hex")
 		stage_o32(i_clk, i_reset, i_ce,
 			w_s64, w_o64, w_o32, w_os32);
 
@@ -197,11 +197,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[39:0]	w_e16, w_o16;
 	fftstage	#(19,23,20,11,2,0,
-			0, 1, "cmem_e32.hex")
+			0, 1, "icmem_e32.hex")
 		stage_e16(i_clk, i_reset, i_ce,
 			w_s32, w_e32, w_e16, w_s16);
 	fftstage	#(19,23,20,11,2,0,
-			0, 1, "cmem_o32.hex")
+			0, 1, "icmem_o32.hex")
 		stage_o16(i_clk, i_reset, i_ce,
 			w_s32, w_o32, w_o16, w_os16);
 
@@ -211,11 +211,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	// verilator lint_on  UNUSED
 	wire	[39:0]	w_e8, w_o8;
 	fftstage	#(20,24,20,11,1,0,
-			0, 1, "cmem_e16.hex")
+			0, 1, "icmem_e16.hex")
 		stage_e8(i_clk, i_reset, i_ce,
 			w_s16, w_e16, w_e8, w_s8);
 	fftstage	#(20,24,20,11,1,0,
-			0, 1, "cmem_o16.hex")
+			0, 1, "icmem_o16.hex")
 		stage_o8(i_clk, i_reset, i_ce,
 			w_s16, w_o16, w_o8, w_os8);
 
@@ -224,9 +224,9 @@ module fftmain(i_clk, i_reset, i_ce,
 	wire		w_os4;
 	// verilator lint_on  UNUSED
 	wire	[41:0]	w_e4, w_o4;
-	qtrstage	#(20,21,11,0,0,0)	stage_e4(i_clk, i_reset, i_ce,
+	qtrstage	#(20,21,11,0,1,0)	stage_e4(i_clk, i_reset, i_ce,
 						w_s8, w_e8, w_e4, w_s4);
-	qtrstage	#(20,21,11,1,0,0)	stage_o4(i_clk, i_reset, i_ce,
+	qtrstage	#(20,21,11,1,1,0)	stage_o4(i_clk, i_reset, i_ce,
 						w_s8, w_o8, w_o4, w_os4);
 	wire		w_s2;
 	wire	[41:0]	w_e2, w_o2;

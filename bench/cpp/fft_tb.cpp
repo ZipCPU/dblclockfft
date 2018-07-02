@@ -163,7 +163,7 @@ public:
 
 	void	tick(void) {
 		m_tickcount++;
-		if ((!m_fft->i_ce)||(m_fft->i_reset))
+		if (m_fft->i_reset)
 			printf("TICK(%s,%s)\n",
 				(m_fft->i_reset)?"RST":"   ",
 				(m_fft->i_ce)?"CE":"  ");
@@ -181,7 +181,7 @@ public:
 		if (m_trace) {
 			m_trace->dump((vluint64_t)(10*m_tickcount+5));
 			m_trace->flush();
-		}printf("\n");
+		}
 	}
 
 	void	cetick(void) {
@@ -193,7 +193,6 @@ public:
 		nkce += FFT_CKPCE;
 #endif
 		if ((ce)&&(nkce>0)) {
-			printf("kce = %d\n", nkce);
 			m_fft->i_ce = 0;
 			for(int kce=1; kce < nkce; kce++)
 				tick();
@@ -469,7 +468,7 @@ public:
 		ilft = (ilft_r << IWIDTH) | ilft_i;
 		irht = (irht_r << IWIDTH) | irht_i;
 
-#ifdef	DBLCLOCKFFT
+#ifdef	DBLCLKFFT
 		return test(ilft, irht);
 #else
 		test(ilft);
@@ -538,7 +537,8 @@ int	main(int argc, char **argv, char **envp) {
 	fft->dump(fpout);
 
 	// 1.
-	fft->test(0.0, 0.0, 32767.0, 0.0);
+	double	maxv = ((1l<<(IWIDTH-1))-1l);
+	fft->test(0.0, 0.0, maxv, 0.0);
 	for(int k=0; k<FFTLEN/2-1; k++)
 		fft->test(0.0,0.0,0.0,0.0);
 
@@ -546,34 +546,34 @@ int	main(int argc, char **argv, char **envp) {
 	for(int k=0; k<FFTLEN/2; k++) {
 		double cl, cr, sl, sr, W;
 		W = - 2.0 * M_PI / FFTLEN * (1);
-		cl = cos(W * (2*k  )) * 16383.0;
-		sl = sin(W * (2*k  )) * 16383.0;
-		cr = cos(W * (2*k+1)) * 16383.0;
-		sr = sin(W * (2*k+1)) * 16383.0;
+		cl = cos(W * (2*k  )) * (double)((1l<<(IWIDTH-2))-1l);
+		sl = sin(W * (2*k  )) * (double)((1l<<(IWIDTH-2))-1l);
+		cr = cos(W * (2*k+1)) * (double)((1l<<(IWIDTH-2))-1l);
+		sr = sin(W * (2*k+1)) * (double)((1l<<(IWIDTH-2))-1l);
 		fft->test(cl, sl, cr, sr);
 	}
 
 	// 2. 
-	fft->test(32767.0, 0.0, 32767.0, 0.0);
+	fft->test(maxv, 0.0, maxv, 0.0);
 	for(int k=0; k<FFTLEN/2-1; k++)
 		fft->test(0.0,0.0,0.0,0.0);
 
 	// 3. 
 	fft->test(0.0,0.0,0.0,0.0);
-	fft->test(32767.0, 0.0, 0.0, 0.0);
+	fft->test(maxv, 0.0, 0.0, 0.0);
 	for(int k=0; k<FFTLEN/2-1; k++)
 		fft->test(0.0,0.0,0.0,0.0);
 
 	// 4.
 	for(int k=0; k<8; k++)
-		fft->test(32767.0, 0.0, 32767.0, 0.0);
+		fft->test(maxv, 0.0, maxv, 0.0);
 	for(int k=8; k<FFTLEN/2; k++)
 		fft->test(0.0,0.0,0.0,0.0);
 
 	// 5.
 	if (FFTLEN/2 >= 16) {
 		for(int k=0; k<16; k++)
-			fft->test(32767.0, 0.0, 32767.0, 0.0);
+			fft->test(maxv, 0.0, maxv, 0.0);
 		for(int k=16; k<FFTLEN/2; k++)
 			fft->test(0.0,0.0,0.0,0.0);
 	}
@@ -581,7 +581,7 @@ int	main(int argc, char **argv, char **envp) {
 	// 6.
 	if (FFTLEN/2 >= 32) {
 		for(int k=0; k<32; k++)
-			fft->test(32767.0, 0.0, 32767.0, 0.0);
+			fft->test(maxv, 0.0, maxv, 0.0);
 		for(int k=32; k<FFTLEN/2; k++)
 			fft->test(0.0,0.0,0.0,0.0);
 	}
@@ -589,28 +589,28 @@ int	main(int argc, char **argv, char **envp) {
 	// 7.
 	if (FFTLEN/2 >= 64) {
 		for(int k=0; k<64; k++)
-			fft->test(32767.0, 0.0, 32767.0, 0.0);
+			fft->test(maxv, 0.0, maxv, 0.0);
 		for(int k=64; k<FFTLEN/2; k++)
 			fft->test(0.0,0.0,0.0,0.0);
 	}
 
 	if (FFTLEN/2 >= 128) {
 		for(int k=0; k<128; k++)
-			fft->test(32767.0, 0.0, 32767.0, 0.0);
+			fft->test(maxv, 0.0, maxv, 0.0);
 		for(int k=128; k<FFTLEN/2; k++)
 			fft->test(0.0,0.0,0.0,0.0);
 	}
 
 	if (FFTLEN/2 >= 256) {
 		for(int k=0; k<256; k++)
-			fft->test(32767.0, 0.0, 32767.0, 0.0);
+			fft->test(maxv, 0.0, maxv, 0.0);
 		for(int k=256; k<FFTLEN/2; k++)
 			fft->test(0.0,0.0,0.0,0.0);
 	}
 
 	if (FFTLEN/2 >= 512) {
 		for(int k=0; k<256+128; k++)
-			fft->test(32767.0, 0.0, 32767.0, 0.0);
+			fft->test(maxv, 0.0, maxv, 0.0);
 		for(int k=256+128; k<FFTLEN/2; k++)
 			fft->test(0.0,0.0,0.0,0.0);
 	}
@@ -727,22 +727,22 @@ int	main(int argc, char **argv, char **envp) {
 
 	// 65.
 	for(int k=0; k<FFTLEN/2; k++)
-		fft->test(32767.0,0.0,-32767.0,0.0);
+		fft->test(maxv,0.0,-maxv,0.0);
 	// 66.
 	for(int k=0; k<FFTLEN/2; k++)
-		fft->test(0.0,-32767.0,0.0,32767.0);
+		fft->test(0.0,-maxv,0.0,maxv);
 	// 67.
 	for(int k=0; k<FFTLEN/2; k++)
-		fft->test(-32768.0,-32768.0,-32768.0,-32768.0);
+		fft->test(-maxv,-maxv,-maxv,-maxv);
 	// 68.
 	for(int k=0; k<FFTLEN/2; k++)
-		fft->test(0.0,-32767.0,0.0,32767.0);
+		fft->test(0.0,-maxv,0.0,maxv);
 	// 69.
 	for(int k=0; k<FFTLEN/2; k++)
-		fft->test(0.0,32767.0,0.0,-32767.0);
+		fft->test(0.0,maxv,0.0,-maxv);
 	// 70. 
 	for(int k=0; k<FFTLEN/2; k++)
-		fft->test(-32768.0,-32768.0,-32768.0,-32768.0);
+		fft->test(-maxv,-maxv,-maxv,-maxv);
 
 	// 71. Now let's go for an impulse (SUCCESS)
 	fft->test(16384.0, 0.0, 0.0, 0.0);

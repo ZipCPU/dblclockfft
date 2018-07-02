@@ -1328,8 +1328,6 @@ SLASHLINE
 		fname_string = coredir;
 		fname_string += "/";
 		if (inverse) fname_string += "i";
-		if (!single_clock)
-			fname_string += "dbl";
 		fname_string += "fftmain.v";
 
 		vmain = fopen(fname_string.c_str(), "w");
@@ -1346,7 +1344,7 @@ SLASHLINE
 	fprintf(vmain,
 SLASHLINE
 "//\n"
-"// Filename:\t%s%sfftmain.v\n"
+"// Filename:\t%sfftmain.v\n"
 "//\n"
 "// Project:	%s\n"
 "//\n"
@@ -1354,7 +1352,7 @@ SLASHLINE
 "//		implementation.  As such, all other modules are subordinate\n"
 "//	to this one.  This module accomplish a fixed size Complex FFT on\n"
 "//	%d data points.\n",
-		(inverse)?"i":"", (single_clock)?"":"dbl",prjname, fftsize);
+		(inverse)?"i":"",prjname, fftsize);
 	if (single_clock) {
 	fprintf(vmain,
 "//	The FFT is fully pipelined, and accepts as inputs one complex two\'s\n"
@@ -1433,8 +1431,8 @@ SLASHLINE
 
 	fprintf(vmain, "//\n");
 	fprintf(vmain, "//\n");
-	fprintf(vmain, "module %s%sfftmain(i_clk, %s, i_ce,\n",
-		(inverse)?"i":"", (single_clock)?"":"dbl", resetw.c_str());
+	fprintf(vmain, "module %sfftmain(i_clk, %s, i_ce,\n",
+		(inverse)?"i":"", resetw.c_str());
 	if (single_clock) {
 		fprintf(vmain, "\t\ti_sample, o_result, o_sync%s);\n",
 			(dbg)?", o_dbg":"");
@@ -1464,8 +1462,6 @@ SLASHLINE
 		fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_sample;\n");
 	else
 		fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_left, br_right;\n");
-	fprintf(vmain, "\n\n");
-
 	int	tmp_size = fftsize, lgtmp = lgsize;
 	if (fftsize == 2) {
 		if (bitreverse) {
@@ -1545,8 +1541,7 @@ SLASHLINE
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
-				fprintf(vmain, "\t%sfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
-					(inverse)?"i":"",
+				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2,
 					(mpystage)?1:0,
@@ -1556,8 +1551,6 @@ SLASHLINE
 					(async_reset)?"":"!",resetw.c_str(),
 					fftsize, fftsize);
 			}
-			fprintf(vmain, "\n\n");
-
 
 			std::string	fname;
 
@@ -1577,12 +1570,14 @@ SLASHLINE
 
 			fname += ".v";
 			if (single_clock) {
-				build_stage(fname.c_str(), fftsize, 1, 0, nbits, xtracbits, ckpce, async_reset, false);
+				build_stage(fname.c_str(), fftsize, 1, 0,
+					nbits, xtracbits, ckpce, async_reset,
+					false);
 			} else {
 				// All stages use the same Verilog, so we only
 				// need to build one
-				// build_stage(fname.c_str(), fftsize/2, 2, 0, nbits, inverse, xtracbits, async_reset, false);
-				build_stage(fname.c_str(), fftsize/2, 2, 1, nbits, xtracbits, ckpce, async_reset, false);
+				build_stage(fname.c_str(), fftsize/2, 2, 1,
+					nbits, xtracbits, ckpce, async_reset, false);
 			}
 		}
 
@@ -1671,7 +1666,7 @@ SLASHLINE
 						tmp_size<<1, tmp_size<<1,
 						tmp_size, tmp_size);
 				}
-				fprintf(vmain, "\n\n");
+				fprintf(vmain, "\n");
 			}
 
 
@@ -1840,10 +1835,12 @@ SLASHLINE
 		std::string	fname;
 
 		fname = coredir + "/butterfly.v";
-		build_butterfly(fname.c_str(), xtracbits, rounding, ckpce, async_reset);
+		build_butterfly(fname.c_str(), xtracbits, rounding,
+			ckpce, async_reset);
 
 		fname = coredir + "/hwbfly.v";
-		build_hwbfly(fname.c_str(), xtracbits, rounding, ckpce, async_reset);
+		build_hwbfly(fname.c_str(), xtracbits, rounding,
+			ckpce, async_reset);
 
 		{
 			// To make debugging easier, we build both of these
@@ -1859,15 +1856,19 @@ SLASHLINE
 		if ((dbg)&&(dbgstage == 4)) {
 			fname = coredir + "/qtrstage_dbg.v";
 			if (single_clock)
-				build_snglquarters(fname.c_str(), rounding, async_reset, true);
+				build_snglquarters(fname.c_str(), rounding,
+					async_reset, true);
 			else
-				build_dblquarters(fname.c_str(), rounding, async_reset, true);
+				build_dblquarters(fname.c_str(), rounding,
+					async_reset, true);
 		}
 		fname = coredir + "/qtrstage.v";
 		if (single_clock)
-			build_snglquarters(fname.c_str(), rounding, async_reset, false);
+			build_snglquarters(fname.c_str(), rounding,
+					async_reset, false);
 		else
-			build_dblquarters(fname.c_str(), rounding, async_reset, false);
+			build_dblquarters(fname.c_str(), rounding,
+					async_reset, false);
 
 
 		if (single_clock) {
@@ -1878,7 +1879,8 @@ SLASHLINE
 				fname = coredir + "/laststage_dbg.v";
 			else
 				fname = coredir + "/laststage.v";
-			build_dblstage(fname.c_str(), rounding, async_reset, (dbg)&&(dbgstage==2));
+			build_dblstage(fname.c_str(), rounding,
+				async_reset, (dbg)&&(dbgstage==2));
 		}
 
 		if (bitreverse) {

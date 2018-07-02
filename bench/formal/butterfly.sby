@@ -1,10 +1,12 @@
 [tasks]
-one
-two
-three
+ck1
+ck2_r0
+ck2_r1
+ck3_r0
+ck3_r1
 
 [options]
-mode bmc
+mode prove
 depth	30
 
 [engines]
@@ -20,9 +22,15 @@ read_verilog -formal -DHWBFLY butterfly.v
 # While I'd love to change the width of the inputs and the coefficients,
 # doing so would adjust the width of the firmware multiplies, and so defeat
 # our purpose here.
-one:   chparam -set CKPCE 1 butterfly
-two:   chparam -set CKPCE 2 butterfly
-three: chparam -set CKPCE 3 butterfly
+# ck1:    chparam -set CKPCE 1 butterfly
+ck1:    chparam -set CKPCE 1 -set CWIDTH 19 -set IWIDTH 15 butterfly
+#
+ck2_r0: chparam -set CKPCE 2 -set CWIDTH 20 -set IWIDTH 12 -set F_CHECK 1 butterfly
+ck2_r1: chparam -set CKPCE 2 -set CWIDTH 16 -set IWIDTH 6 -set F_CHECK 0 butterfly
+#
+ck3_r0: chparam -set CKPCE 3 -set CWIDTH 16 -set IWIDTH 12 -set F_CHECK 0 butterfly
+ck3_r1: chparam -set CKPCE 3 -set CWIDTH 18 -set IWIDTH 14 -set F_CHECK 1 butterfly
+ck3_r2: chparam -set CKPCE 3 -set CWIDTH 20 -set IWIDTH 16 -set F_CHECK 2 butterfly
 
 prep -top butterfly
 

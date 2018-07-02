@@ -326,7 +326,7 @@ SLASHLINE
 	// replaced by the parameter values in the calling program.  Only
 	// problem is, the CWIDTH needs to match exactly!
 	fprintf(fstage, "\tparameter\tIWIDTH=%d,CWIDTH=%d,OWIDTH=%d;\n",
-		nbits, cbits, nbits+1);
+		nbits, 20, nbits+1); // 20, not cbits, since the tb depends upon it
 	fprintf(fstage,
 "\t// Parameters specific to the core that should be changed when this\n"
 "\t// core is built ... Note that the minimum LGSPAN (the base two log\n"
@@ -354,6 +354,14 @@ SLASHLINE
 	} else
 		fprintf(fstage, "\tparameter\tCOEFFILE=\"cmem_%d.hex\";\n",
 			stage);
+
+	fprintf(fstage,"\n"
+"`ifdef	VERILATOR\n"
+	"\tparameter [0:0] ZERO_ON_IDLE = 1'b0;\n"
+"`else\n"
+	"\tlocalparam [0:0] ZERO_ON_IDLE = 1'b0;\n"
+"`endif // VERILATOR\n\n");
+
 	fprintf(fstage,
 "\tinput					i_clk, %s, i_ce, i_sync;\n"
 "\tinput		[(2*IWIDTH-1):0]	i_data;\n"
@@ -425,23 +433,23 @@ SLASHLINE
 	"\t//\n"
 	"\tinitial ib_sync = 1\'b0;\n");
 	if (async_reset)
-		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
-		fprintf(fstage, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fstage, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fstage,
 			"\t\tib_sync <= 1\'b0;\n"
 		"\telse if (i_ce)\n"
 		"\tbegin\n"
 			"\t\t// Set the sync to true on the very first\n"
-				"\t\t// valid input in, and hence on the very\n"
-				"\t\t// first valid data out per FFT.\n"
-				"\t\tib_sync <= (iaddr==(1<<(LGSPAN)));\n"
-			"\t\t\tend\n"
+			"\t\t// valid input in, and hence on the very\n"
+			"\t\t// first valid data out per FFT.\n"
+			"\t\tib_sync <= (iaddr==(1<<(LGSPAN)));\n"
+		"\tend\n\n"
 	"\talways\t@(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 	"\tbegin\n"
-		"\t\t\t// One input from memory, ...\n"
-		"\tib_a <= imem[iaddr[(LGSPAN-1):0]];\n"
+		"\t\t// One input from memory, ...\n"
+		"\t\tib_a <= imem[iaddr[(LGSPAN-1):0]];\n"
 		"\t\t// One input clocked in from the top\n"
 		"\t\tib_b <= i_data;\n"
 		"\t\t// and the coefficient or twiddle factor\n"
@@ -449,17 +457,48 @@ SLASHLINE
 	"\tend\n\n");
 
 	fprintf(fstage,
+	"\t// The idle register is designed to keep track of when an input\n"
+	"\t// to the butterfly is important and going to be used.  It's used\n"
+	"\t// in a flag following, so that when useful values are placed\n"
+	"\t// into the butterfly they'll be non-zero (idle=0), otherwise when\n"
+	"\t// the inputs to the butterfly are irrelevant and will be ignored,\n"
+	"\t// then (idle=1) those inputs will be set to zero.  This\n"
+	"\t// functionality is not designed to be used in operation, but only\n"
+	"\t// within a Verilator simulation context when chasing a bug.\n"
+	"\t// In this limited environment, the non-zero answers will stand\n"
+	"\t// in a trace making it easier to highlight a bug.\n"
+	"\treg	idle;\n"
+	"\tgenerate if (ZERO_ON_IDLE)\n"
+	"\tbegin\n"
+		"\t\tinitial	idle = 1;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_reset)\n"
+			"\t\t\tidle <= 1\'b1;\n"
+		"\t\telse if (i_ce)\n"
+			"\t\t\tidle <= (!iaddr[LGSPAN])&&(!wait_for_sync);\n\n"
+	"\tend else begin\n\n"
+	"\t\talways @(*) idle = 0;\n\n"
+	"\tend endgenerate\n\n");
+
+	fprintf(fstage,
 "\tgenerate if (OPT_HWMPY)\n"
 "\tbegin : HWBFLY\n"
 "\t\thwbfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
 			"\t\t\t\t.CKPCE(CKPCE), .SHIFT(BFLYSHIFT))\n"
-		"\t\t\tbfly(i_clk, %s, i_ce, ib_c,\n"
-			"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
+		"\t\t\tbfly(i_clk, %s, i_ce, (idle)?0:ib_c,\n"
+			"\t\t\t\t(idle || (!i_ce)) ? 0:ib_a,\n"
+			"\t\t\t\t(idle || (!i_ce)) ? 0:ib_b,\n"
+			"\t\t\t\t(ib_sync)&&(i_ce),\n"
+			"\t\t\t\tob_a, ob_b, ob_sync);\n"
 "\tend else begin : FWBFLY\n"
 "\t\tbutterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
 		"\t\t\t\t.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))\n"
-	"\t\t\tbfly(i_clk, %s, i_ce, ib_c,\n"
-		"\t\t\t\tib_a, ib_b, ib_sync, ob_a, ob_b, ob_sync);\n"
+	"\t\t\tbfly(i_clk, %s, i_ce,\n"
+			"\t\t\t\t\t(idle||(!i_ce))?0:ib_c,\n"
+			"\t\t\t\t\t(idle||(!i_ce))?0:ib_a,\n"
+			"\t\t\t\t\t(idle||(!i_ce))?0:ib_b,\n"
+			"\t\t\t\t\t(ib_sync&&i_ce),\n"
+			"\t\t\t\t\tob_a, ob_b, ob_sync);\n"
 "\tend endgenerate\n\n",
 			resetw.c_str(), resetw.c_str());
 
@@ -475,36 +514,36 @@ SLASHLINE
 	else
 		fprintf(fstage, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
 	fprintf(fstage,
-	"\t\tbegin\n"
-		"\t\t\toB <= 0;\n"
-		"\t\t\to_sync <= 0;\n"
-		"\t\t\tb_started <= 0;\n"
-	"\t\tend else if (i_ce)\n"
-	"\t\tbegin\n"
-	"\t\t\to_sync <= (!oB[LGSPAN])?ob_sync : 1\'b0;\n"
-	"\t\t\tif (ob_sync||b_started)\n"
-		"\t\t\t\toB <= oB + { {(LGSPAN){1\'b0}}, 1\'b1 };\n"
-	"\t\t\tif ((ob_sync)&&(!oB[LGSPAN]))\n"
-		"\t\t\t// A butterfly output is available\n"
-			"\t\t\t\tb_started <= 1\'b1;\n"
-	"\t\tend\n\n");
+	"\tbegin\n"
+		"\t\toB <= 0;\n"
+		"\t\to_sync <= 0;\n"
+		"\t\tb_started <= 0;\n"
+	"\tend else if (i_ce)\n"
+	"\tbegin\n"
+	"\t\to_sync <= (!oB[LGSPAN])?ob_sync : 1\'b0;\n"
+	"\t\tif (ob_sync||b_started)\n"
+		"\t\t\toB <= oB + { {(LGSPAN){1\'b0}}, 1\'b1 };\n"
+	"\t\tif ((ob_sync)&&(!oB[LGSPAN]))\n"
+		"\t\t// A butterfly output is available\n"
+			"\t\t\tb_started <= 1\'b1;\n"
+	"\tend\n\n");
 	fprintf(fstage,
 	"\treg	[(LGSPAN-1):0]\t\tdly_addr;\n"
 	"\treg	[(2*OWIDTH-1):0]\tdly_value;\n"
 	"\talways @(posedge i_clk)\n"
-	"\t\tif (i_ce)\n"
-	"\t\tbegin\n"
-	"\t\t\tdly_addr <= oB[(LGSPAN-1):0];\n"
-	"\t\t\tdly_value <= ob_b;\n"
-	"\t\tend\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+	"\t\tdly_addr <= oB[(LGSPAN-1):0];\n"
+	"\t\tdly_value <= ob_b;\n"
+	"\tend\n"
 	"\talways @(posedge i_clk)\n"
-	"\t\tif (i_ce)\n"
-		"\t\t\tomem[dly_addr] <= dly_value;\n"
+	"\tif (i_ce)\n"
+		"\t\tomem[dly_addr] <= dly_value;\n"
 "\n");
 	fprintf(fstage,
 	"\talways @(posedge i_clk)\n"
-	"\t\tif (i_ce)\n"
-	"\t\t\to_data <= (!oB[LGSPAN])?ob_a : omem[oB[(LGSPAN-1):0]];\n"
+	"\tif (i_ce)\n"
+	"\t\to_data <= (!oB[LGSPAN])?ob_a : omem[oB[(LGSPAN-1):0]];\n"
 "\n");
 	fprintf(fstage, "endmodule\n");
 }

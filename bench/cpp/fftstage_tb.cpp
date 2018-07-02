@@ -47,6 +47,7 @@
 #include "Vfftstage.h"
 #include "verilated.h"
 #include "verilated_vcd_c.h"
+#include "twoc.h"
 #include "fftsize.h"
 
 
@@ -136,7 +137,7 @@ public:
 		int	ce = m_ftstage->i_ce, nkce;
 
 		tick();
-		nkce = (rand()&1);
+		nkce = 0; // (rand()&1);
 #ifdef	FFT_CKPCE
 		nkce += FFT_CKPCE;
 #endif
@@ -173,28 +174,20 @@ public:
 		m_syncd = false;
 	}
 
-	long	twos_complement(const long val, const int nbits) {
-		long	r;
-		r = val & ((1l<<nbits)-1);
-		if (r & (1l<<(nbits-1)))
-			r |= (-1l << nbits);
-		return r;
-	}
-
 	void	butterfly(const long cv, const long lft, const long rht,
 				long &o_lft, long &o_rht) {
 		long	cv_r, cv_i;
 		long	lft_r, lft_i, rht_r, rht_i;
 		long	o_lft_r, o_lft_i, o_rht_r, o_rht_i;
 
-		cv_r = twos_complement(cv>>CWIDTH, CWIDTH);
-		cv_i = twos_complement(cv & ((1<<CWIDTH)-1), CWIDTH);
+		cv_r = sbits(cv>>CWIDTH, CWIDTH);
+		cv_i = sbits(cv, CWIDTH);
 
-		lft_r = twos_complement(lft>>IWIDTH, IWIDTH);
-		lft_i = twos_complement(lft & ((1<<IWIDTH)-1), IWIDTH);
+		lft_r = sbits(lft>>IWIDTH, IWIDTH);
+		lft_i = sbits(lft, IWIDTH);
 
-		rht_r = twos_complement(rht>>IWIDTH, IWIDTH);
-		rht_i = twos_complement(rht & ((1<<IWIDTH)-1), IWIDTH);
+		rht_r = sbits(rht>>IWIDTH, IWIDTH);
+		rht_i = sbits(rht, IWIDTH);
 
 		o_lft_r = lft_r + rht_r;
 		o_lft_i = lft_i + rht_i;
@@ -210,8 +203,10 @@ public:
 		o_rht_i = (cv_r * (lft_i-rht_i)) + (cv_i * (lft_r-rht_r));
 
 		if (ROUND) {
-			o_rht_r += (1<<(CWIDTH-3));
-			o_rht_i += (1<<(CWIDTH-3));
+			if (o_rht_r & (1<<(CWIDTH-3)))
+				o_rht_r += (1<<(CWIDTH-3))-1;
+			if (o_rht_i & (1<<(CWIDTH-3)))
+				o_rht_i += (1<<(CWIDTH-3))-1;
 		}
 
 		o_rht_r >>= (CWIDTH-2);
@@ -282,22 +277,26 @@ public:
 		*/
 
 		printf("%4ld, %4ld: %d %9lx -> %9lx %d ... %4x %15lx (%10lx)\n",
-			m_iaddr, m_oaddr,
-			i_sync, i_data & (~(-1l << (2*IWIDTH))),
-			m_ftstage->o_data, m_ftstage->o_sync,
+			(long)m_iaddr, (long)m_oaddr,
+			i_sync, (long)(i_data) & (~(-1l << (2*IWIDTH))),
+			(long)m_ftstage->o_data,
+			m_ftstage->o_sync,
 
 			m_ftstage->iaddr&(FFTMASK>>1),
-			m_ftstage->cmem[m_ftstage->iaddr&(SPANMASK>>1)] & (~(-1l<<(2*CWIDTH))),
-			m_out[raddr]);
+			(long)(m_ftstage->cmem[m_ftstage->iaddr&(SPANMASK>>1)]) & (~(-1l<<(2*CWIDTH))),
+			(long)m_out[raddr]);
 
 		if ((m_syncd)&&(m_ftstage->o_sync != ((((m_iaddr-m_offset)&((1<<(LGSPAN+1))-1))==0)?1:0))) {
-			fprintf(stderr, "Bad output sync (m_iaddr = %lx, m_offset = %x)\n", (m_iaddr-m_offset) & SPANMASK, m_offset);
+			fprintf(stderr, "Bad output sync (m_iaddr = %lx, m_offset = %x)\n",
+				(m_iaddr-m_offset) & SPANMASK, m_offset);
 			failed = true;
 		}
 
 		if (m_syncd) {
 			if (m_out[raddr] != m_ftstage->o_data) {
-				printf("Bad output data, ([%lx - %x = %x] %lx(exp) != %lx(sut))\n", m_iaddr, m_offset, raddr, m_out[raddr], m_ftstage->o_data);
+				printf("Bad output data, ([%lx - %x = %x] %lx(exp) != %lx(sut))\n",
+					m_iaddr, m_offset, raddr,
+					m_out[raddr], (long)m_ftstage->o_data);
 				failed = true;
 			}
 		} else if (m_iaddr > 4096) {
@@ -317,6 +316,9 @@ public:
 int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	FFTSTAGE_TB	*ftstage = new FFTSTAGE_TB;
+
+printf("Expecting : IWIDTH = %d, CWIDTH = %d, OWIDTH = %d\n",
+		IWIDTH, CWIDTH, OWIDTH);
 
 	ftstage->opentrace("fftstage.vcd");
 	ftstage->reset();
