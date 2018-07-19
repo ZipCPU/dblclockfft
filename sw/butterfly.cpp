@@ -723,9 +723,6 @@ SLASHLINE
 
 	if (formal_property_flag) {
 		fprintf(fp,
-"`ifdef	VERILATOR\n"
-"`define FORMAL\n"
-"`endif\n"
 "`ifdef	FORMAL\n"
 	"\tlocalparam	F_LGDEPTH = (AUXLEN > 64) ? 7\n"
 			"\t\t\t: (AUXLEN > 32) ? 6\n"
@@ -1544,9 +1541,6 @@ SLASHLINE
 
 	if (formal_property_flag) {
 		fprintf(fp,
-"`ifdef	VERILATOR\n"
-"`define	FORMAL\n"
-"`endif\n"
 "`ifdef	FORMAL\n"
 	"\tlocalparam	F_LGDEPTH = 3;\n"
 	"\tlocalparam	F_DEPTH = 5;\n"
