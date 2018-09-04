@@ -150,8 +150,8 @@ SLASHLINE
 	"\t// core is built ... Note that the minimum LGSPAN is 2.  Smaller\n"
 	"\t// spans must use the fftdoubles stage.\n"
 	"\tparameter\tLGWIDTH=%d, ODD=0, INVERSE=0,SHIFT=0;\n"
-	"\tinput\t				i_clk, %s, i_ce, i_sync;\n"
-	"\tinput\t	[(2*IWIDTH-1):0]	i_data;\n"
+	"\tinput\twire				i_clk, %s, i_ce, i_sync;\n"
+	"\tinput\twire	[(2*IWIDTH-1):0]	i_data;\n"
 	"\toutput\treg	[(2*OWIDTH-1):0]	o_data;\n"
 	"\toutput\treg				o_sync;\n"
 	"\t\n", (dbg)?"_dbg":"",
@@ -402,8 +402,8 @@ SLASHLINE
 "module\tqtrstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n"
 	"\tparameter	IWIDTH=%d, OWIDTH=IWIDTH+1;\n"
 	"\tparameter\tLGWIDTH=%d, INVERSE=0,SHIFT=0;\n"
-	"\tinput\t				i_clk, %s, i_ce, i_sync;\n"
-	"\tinput\t	[(2*IWIDTH-1):0]	i_data;\n"
+	"\tinput\twire				i_clk, %s, i_ce, i_sync;\n"
+	"\tinput\twire	[(2*IWIDTH-1):0]	i_data;\n"
 	"\toutput\treg	[(2*OWIDTH-1):0]	o_data;\n"
 	"\toutput\treg				o_sync;\n"
 		"\t\n", (dbg)?"_dbg":"", resetw.c_str(),
@@ -763,8 +763,8 @@ SLASHLINE
 	fprintf(fp,
 "module	laststage(i_clk, %s, i_ce, i_sync, i_val, o_val, o_sync);\n"
 "	parameter	IWIDTH=16,OWIDTH=IWIDTH+1, SHIFT=0;\n"
-"	input					i_clk, %s, i_ce, i_sync;\n"
-"	input		[(2*IWIDTH-1):0]	i_val;\n"
+"	input	wire				i_clk, %s, i_ce, i_sync;\n"
+"	input	wire	[(2*IWIDTH-1):0]	i_val;\n"
 "	output	wire	[(2*OWIDTH-1):0]	o_val;\n"
 "	output	reg				o_sync;\n\n",
 		resetw.c_str(), resetw.c_str());
@@ -992,6 +992,8 @@ void	usage(void) {
 "\t\tmultipliers.\n"
 "\t-r\tBuild a real-FFT at four input points per sample, rather than a\n"
 "\t\tcomplex FFT.  (Default is a Complex FFT.)\n"
+"\t\tThis option is a place-holder.  The real-FFT has not (yet) been\n"
+"\t\timplemented.\n"
 "\t-s\tSkip the final bit reversal stage.  This is useful in\n"
 "\t\talgorithms that need to apply a filter without needing to do\n"
 "\t\tbin shifting, as these algorithms can, with this option, just\n"
@@ -1022,7 +1024,7 @@ int main(int argc, char **argv) {
 	const char *EMPTYSTR = "";
 	bool	bitreverse = true, inverse=false,
 		verbose_flag = false,
-		single_clock = false,
+		single_clock = true,
 		real_fft = false,
 		async_reset = false;
 	FILE	*vmain;
@@ -1419,6 +1421,9 @@ SLASHLINE
 "//\n");
 	fprintf(vmain, "//\t\t%% %s\n", cmdline.c_str());
 	fprintf(vmain, "//\n");
+	fprintf(vmain, "//\tThis core will use hardware accelerated multiplies (DSPs)\n"
+		"//\tfor %d of the %d stages\n", mpy_stages, lgval(fftsize));
+	fprintf(vmain, "//\n");
 	fprintf(vmain, "%s", creator);
 	fprintf(vmain, "//\n");
 	fprintf(vmain, "%s", cpyleft);
@@ -1441,15 +1446,22 @@ SLASHLINE
 		fprintf(vmain, "\t\to_left, o_right, o_sync%s);\n",
 			(dbg)?", o_dbg":"");
 	}
-	fprintf(vmain, "\tparameter\tIWIDTH=%d, OWIDTH=%d, LGWIDTH=%d;\n\t//\n", nbitsin, nbitsout, lgsize);
+	fprintf(vmain,
+	"\t// The bit-width of the input, IWIDTH, output, OWIDTH, and the log\n"
+	"\t// of the FFT size.  These are localparams, rather than parameters,\n"
+	"\t// because once the core has been generated, they can no longer be\n"
+	"\t// changed.  (These values can be adjusted by running the core\n"
+	"\t// generator again.)  The reason is simply that these values have\n"
+	"\t// been hardwired into the core at several places.\n");
+	fprintf(vmain, "\tlocalparam\tIWIDTH=%d, OWIDTH=%d, LGWIDTH=%d;\n\t//\n", nbitsin, nbitsout, lgsize);
 	assert(lgsize > 0);
-	fprintf(vmain, "\tinput\t\t\t\t\ti_clk, %s, i_ce;\n\t//\n",
+	fprintf(vmain, "\tinput\twire\t\t\t\ti_clk, %s, i_ce;\n\t//\n",
 		resetw.c_str());
 	if (single_clock) {
-	fprintf(vmain, "\tinput\t\t[(2*IWIDTH-1):0]\ti_sample;\n");
+	fprintf(vmain, "\tinput\twire\t[(2*IWIDTH-1):0]\ti_sample;\n");
 	fprintf(vmain, "\toutput\treg\t[(2*OWIDTH-1):0]\to_result;\n");
 	} else {
-	fprintf(vmain, "\tinput\t\t[(2*IWIDTH-1):0]\ti_left, i_right;\n");
+	fprintf(vmain, "\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right;\n");
 	fprintf(vmain, "\toutput\treg\t[(2*OWIDTH-1):0]\to_left, o_right;\n");
 	}
 	fprintf(vmain, "\toutput\treg\t\t\t\to_sync;\n");
@@ -1500,15 +1512,16 @@ SLASHLINE
 			// since the multiplies can be done by adds
 			mpystage = ((lgtmp-2) <= mpy_stages);
 
+			fprintf(vmain, "\n\n");
 			if (mpystage)
 				fprintf(vmain, "\t// A hardware optimized FFT stage\n");
-			fprintf(vmain, "\n\n");
 			fprintf(vmain, "\twire\t\tw_s%d;\n", fftsize);
 			if (single_clock) {
 				fprintf(vmain, "\twire\t[%d:0]\tw_d%d;\n", 2*(obits+xtrapbits)-1, fftsize);
-				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
+				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 1, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
+				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
 				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
@@ -1524,9 +1537,10 @@ SLASHLINE
 			} else {
 				fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os%d;\n\t// verilator lint_on  UNUSED\n", fftsize);
 				fprintf(vmain, "\twire\t[%d:0]\tw_e%d, w_o%d;\n", 2*(obits+xtrapbits)-1, fftsize, fftsize);
-				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
+				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 2, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
+				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
 				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
@@ -1538,9 +1552,10 @@ SLASHLINE
 					(async_reset)?"":"!", resetw.c_str(),
 					fftsize, fftsize,
 					((dbg)&&(dbgstage == fftsize))?", o_dbg":"");
-				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
+				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 2, 1, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
+				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
 				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 					xtracbits, obits+xtrapbits,
 					lgsize, lgtmp-2,
@@ -1604,10 +1619,11 @@ SLASHLINE
 					fprintf(vmain,"\twire\t[%d:0]\tw_d%d;\n",
 						2*(obits+xtrapbits)-1,
 						tmp_size);
-					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
+					cmem = gen_coeff_fname(coredir.c_str(), tmp_size, 1, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 1, 0, inverse);
+					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
 					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
@@ -1629,10 +1645,11 @@ SLASHLINE
 					fprintf(vmain,"\twire\t[%d:0]\tw_e%d, w_o%d;\n",
 						2*(obits+xtrapbits)-1,
 						tmp_size, tmp_size);
-					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
+					cmem = gen_coeff_fname(coredir.c_str(), tmp_size, 2, 0, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 2, 0, inverse);
+					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
 					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
@@ -1648,12 +1665,14 @@ SLASHLINE
 						tmp_size, tmp_size,
 						((dbg)&&(dbgstage == tmp_size))
 							?", o_dbg":"");
-					cmem = gen_coeff_fname(EMPTYSTR,
+					cmem = gen_coeff_fname(coredir.c_str(),
 						tmp_size, 2, 1, inverse);
 					cmemfp = gen_coeff_open(cmem.c_str());
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits,
 						2, 1, inverse);
+					cmem = gen_coeff_fname(EMPTYSTR,
+						tmp_size, 2, 1, inverse);
 					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -1726,8 +1745,10 @@ SLASHLINE
 				fprintf(vmain, "\twire\t[%d:0]\tw_e2, w_o2;\n",
 					2*obits-1);
 			}
+			/*
 			if ((nbits+xtrapbits+1 == obits)&&(!dropbit))
-				printf("WARNING: SCALING OFF BY A FACTOR OF TWO--should\'ve dropped a bit in the last stage.\n");
+				printf("Warning: Less than optimal scaling\n");
+			*/
 
 			if (single_clock) {
 				fprintf(vmain, "\tlaststage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",

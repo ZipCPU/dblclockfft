@@ -258,10 +258,10 @@ SLASHLINE
 
 
 	fprintf(fp,
-	"\tinput\t\ti_clk, %s, i_ce;\n"
-	"\tinput\t\t[(2*CWIDTH-1):0] i_coef;\n"
-	"\tinput\t\t[(2*IWIDTH-1):0] i_left, i_right;\n"
-	"\tinput\t\ti_aux;\n"
+	"\tinput\twire\ti_clk, %s, i_ce;\n"
+	"\tinput\twire\t[(2*CWIDTH-1):0] i_coef;\n"
+	"\tinput\twire\t[(2*IWIDTH-1):0] i_left, i_right;\n"
+	"\tinput\twire\ti_aux;\n"
 	"\toutput\twire	[(2*OWIDTH-1):0] o_left, o_right;\n"
 	"\toutput\treg\to_aux;\n\n", resetw.c_str());
 	fprintf(fp,
@@ -1048,10 +1048,10 @@ SLASHLINE
 		ckpce);
 
 	fprintf(fp,
-	"\tinput\t\ti_clk, %s, i_ce;\n"
-	"\tinput\t\t[(2*CWIDTH-1):0]\ti_coef;\n"
-	"\tinput\t\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
-	"\tinput\t\ti_aux;\n"
+	"\tinput\twire\ti_clk, %s, i_ce;\n"
+	"\tinput\twire\t[(2*CWIDTH-1):0]\ti_coef;\n"
+	"\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
+	"\tinput\twire\ti_aux;\n"
 	"\toutput\twire\t[(2*OWIDTH-1):0]\to_left, o_right;\n"
 	"\toutput\treg\to_aux;\n\n"
 "\n", resetw.c_str());

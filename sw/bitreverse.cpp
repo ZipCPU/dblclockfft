@@ -98,9 +98,9 @@ SLASHLINE
 	fprintf(fp,
 "module	%s(i_clk, %s, i_ce, i_in, o_out, o_sync);\n"
 	"\tparameter\t\t\tLGSIZE=%d, WIDTH=24;\n"
-	"\tinput\t\t\t\ti_clk, %s, i_ce;\n"
-	"\tinput\t\t[(2*WIDTH-1):0]\ti_in;\n"
-	"\toutput\twire\t[(2*WIDTH-1):0]\to_out;\n"
+	"\tinput\twire\t\t\ti_clk, %s, i_ce;\n"
+	"\tinput\twire\t[(2*WIDTH-1):0]\ti_in;\n"
+	"\toutput\treg\t[(2*WIDTH-1):0]\to_out;\n"
 	"\toutput\treg\t\t\to_sync;\n", modulename, resetw.c_str(),
 		TST_DBLREVERSE_LGSIZE,
 		resetw.c_str());
@@ -393,8 +393,8 @@ SLASHLINE
 "module	%s(i_clk, %s, i_ce, i_in_0, i_in_1,\n"
 	"\t\to_out_0, o_out_1, o_sync);\n"
 	"\tparameter\t\t\tLGSIZE=%d, WIDTH=24;\n"
-	"\tinput\t\t\t\ti_clk, %s, i_ce;\n"
-	"\tinput\t\t[(2*WIDTH-1):0]\ti_in_0, i_in_1;\n"
+	"\tinput\twire\t\t\ti_clk, %s, i_ce;\n"
+	"\tinput\twire\t[(2*WIDTH-1):0]\ti_in_0, i_in_1;\n"
 	"\toutput\twire\t[(2*WIDTH-1):0]\to_out_0, o_out_1;\n"
 	"\toutput\treg\t\t\to_sync;\n", modulename,
 		resetw.c_str(), TST_DBLREVERSE_LGSIZE, resetw.c_str());

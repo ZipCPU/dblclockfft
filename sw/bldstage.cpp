@@ -147,8 +147,8 @@ SLASHLINE
 	fprintf(fp,
 "module\tlaststage%s(i_clk, %s, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
 	"\tparameter\tIWIDTH=%d,OWIDTH=IWIDTH+1, SHIFT=%d;\n"
-	"\tinput\t\ti_clk, %s, i_ce, i_sync;\n"
-	"\tinput\t\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
+	"\tinput\twire\ti_clk, %s, i_ce, i_sync;\n"
+	"\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
 	"\toutput\treg\t[(2*OWIDTH-1):0]\to_left, o_right;\n"
 	"\toutput\treg\t\t\to_sync;\n"
 	"\n", (dbg)?"_dbg":"", resetw.c_str(), (dbg)?", o_dbg":"",
@@ -363,8 +363,8 @@ SLASHLINE
 "`endif // VERILATOR\n\n");
 
 	fprintf(fstage,
-"\tinput					i_clk, %s, i_ce, i_sync;\n"
-"\tinput		[(2*IWIDTH-1):0]	i_data;\n"
+"\tinput	wire				i_clk, %s, i_ce, i_sync;\n"
+"\tinput	wire	[(2*IWIDTH-1):0]	i_data;\n"
 "\toutput	reg	[(2*OWIDTH-1):0]	o_data;\n"
 "\toutput	reg				o_sync;\n"
 "\n", resetw.c_str());

@@ -120,11 +120,11 @@ void	gen_coeffs(FILE *cmem, int stage, int cbits,
 	// width of the FFT at this point.  If thiss is a 2x at a time FFT,
 	// nwide will be equal to 2, and offset will be one or two.
 	//
-	assert(nwide > 0);
-	assert(offset < nwide);
-	assert(stage / nwide >  1);
-	assert(stage % nwide == 0);
-printf("GEN-COEFFS(): stage =%4d, bits =%2d, nwide = %d, offset = %d, nverse = %d\n", stage, cbits, nwide, offset, inv);
+	// assert(nwide > 0);
+	// assert(offset < nwide);
+	// assert(stage / nwide >  1);
+	// assert(stage % nwide == 0);
+	// printf("GEN-COEFFS(): stage =%4d, bits =%2d, nwide = %d, offset = %d, nverse = %d\n", stage, cbits, nwide, offset, inv);
 	int	ncoeffs = stage/nwide/2;
 	for(int i=0; i<ncoeffs; i++) {
 		int k = nwide*i+offset;

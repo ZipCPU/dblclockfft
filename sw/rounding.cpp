@@ -91,8 +91,8 @@ SLASHLINE
 	fprintf(fp,
 "module	truncate(i_clk, i_ce, i_val, o_val);\n"
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
-	"\tinput\t\t\t\t\ti_clk, i_ce;\n"
-	"\tinput\t\tsigned\t[(IWID-1):0]\ti_val;\n"
+	"\tinput\twire\t\t\t\ti_clk, i_ce;\n"
+	"\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"
 	"\toutput\treg\tsigned\t[(OWID-1):0]\to_val;\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
@@ -132,8 +132,8 @@ SLASHLINE
 	fprintf(fp,
 "module	roundhalfup(i_clk, i_ce, i_val, o_val);\n"
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
-	"\tinput\t\t\t\t\ti_clk, i_ce;\n"
-	"\tinput\t\tsigned\t[(IWID-1):0]\ti_val;\n"
+	"\tinput\twire\t\t\t\ti_clk, i_ce;\n"
+	"\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"
 	"\toutput\treg\tsigned\t[(OWID-1):0]\to_val;\n"
 "\n"
 	"\t// Let's deal with two cases to be as general as we can be here\n"
@@ -211,8 +211,8 @@ SLASHLINE
 	fprintf(fp,
 "module	roundfromzero(i_clk, i_ce, i_val, o_val);\n"
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
-	"\tinput\t\t\t\t\ti_clk, i_ce;\n"
-	"\tinput\t\tsigned\t[(IWID-1):0]\ti_val;\n"
+	"\tinput\twire\t\t\t\ti_clk, i_ce;\n"
+	"\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"
 	"\toutput\treg\tsigned\t[(OWID-1):0]\to_val;\n"
 "\n"
 	"\t// Let's deal with three cases to be as general as we can be here\n"
@@ -321,8 +321,8 @@ SLASHLINE
 	fprintf(fp,
 "module	convround(i_clk, i_ce, i_val, o_val);\n"
 "\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
-"\tinput\t\t\t\t\ti_clk, i_ce;\n"
-"\tinput\t\tsigned\t[(IWID-1):0]\ti_val;\n"
+"\tinput\twire\t\t\t\ti_clk, i_ce;\n"
+"\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"
 "\toutput\treg\tsigned\t[(OWID-1):0]\to_val;\n"
 "\n"
 "\t// Let's deal with three cases to be as general as we can be here\n"
