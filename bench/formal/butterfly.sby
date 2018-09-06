@@ -13,11 +13,10 @@ depth	30
 smtbmc
 
 [script]
-read_verilog -formal -DHWBFLY abs_mpy.v
-read_verilog -formal -DHWBFLY convround.v
-read_verilog -formal -DHWBFLY longbimpy.v
-read_verilog -formal -DHWBFLY bimpy.v
-read_verilog -formal -DHWBFLY butterfly.v
+read_verilog -formal abs_mpy.v
+read_verilog -formal convround.v
+read_verilog -formal abs_longbimpy.v
+read_verilog -formal butterfly.v
 
 # While I'd love to change the width of the inputs and the coefficients,
 # doing so would adjust the width of the firmware multiplies, and so defeat
@@ -36,7 +35,6 @@ prep -top butterfly
 
 [files]
 abs_mpy.v
+abs_longbimpy.v
 ../../rtl/convround.v
-../../rtl/bimpy.v
-../../rtl/longbimpy.v
 ../../rtl/butterfly.v

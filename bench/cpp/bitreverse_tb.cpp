@@ -1,6 +1,6 @@
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	snglbrev_tb.cpp
+// Filename: 	bitreverse_tb.cpp
 //
 // Project:	A General Purpose Pipelined FFT Implementation
 //
@@ -16,7 +16,7 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015,2018, Gisselquist Technology, LLC
 //
@@ -31,7 +31,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -39,7 +39,7 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
@@ -61,7 +61,11 @@
 
 typedef	Vbitreverse	TSTCLASS;
 
+#ifdef DBLCLKFFT
+#define	iaddr		VVAR(_iaddr)
+#else
 #define	iaddr		VVAR(_wraddr)
+#endif
 #define	in_reset	VVAR(_in_reset)
 
 VerilatedVcdC	*trace = NULL;
@@ -117,6 +121,14 @@ unsigned long	bitrev(const int nbits, const unsigned long vl) {
 	return r;
 }
 
+#ifdef	DBLCLKFFT
+#define	BREVMASK	(FFTMASK>>1)
+#define	BREVBITS	(FFTBITS-1)
+#else
+#define	BREVMASK	FFTMASK
+#define	BREVBITS	FFTBITS
+#endif
+
 int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	Verilated::traceEverOn(true);
@@ -149,21 +161,36 @@ int	main(int argc, char **argv, char **envp) {
 #endif
 		tick(brev);
 
+#ifdef	DBLCLKFFT
+		printf("k=%3d: IN = %6lx,%6lx OUT = %6lx,%6lx SYNC = %d\t(%2x) %d\n",
+			k, brev->i_in_0, brev->i_in_1,
+			brev->o_out_0, brev->o_out_1, brev->o_sync,
+			brev->iaddr, brev->in_reset);
+#else
 		printf("k=%3d: IN = %6lx, OUT = %6lx, SYNC = %d\t(%2x) %d\n",
 			k, brev->i_in, brev->o_out, brev->o_sync,
 			brev->iaddr, brev->in_reset);
+#endif
 
-		if ((k>BREV_OFFSET)&&((BREV_OFFSET==(k&FFTMASK))?1:0) != brev->o_sync) {
+		if ((k>BREV_OFFSET)&&((BREV_OFFSET==(k&BREVMASK))?1:0) != brev->o_sync) {
 			fprintf(stdout, "FAIL, BAD SYNC (k = %d > %d)\n", k, BREV_OFFSET);
 			exit(EXIT_FAILURE);
 		} else if (brev->o_sync) {
 			syncd = 1;
 		}
+#ifdef	DBLCLKFFT
+		if ((syncd)&&((brev->o_out_0&BREVMASK) != bitrev(FFTBITS, k+1-BREV_OFFSET))) {
+			fprintf(stdout, "FAIL: BITREV.0 of k (%2x) = %2lx, not %2lx\n",
+				k, brev->o_out_0, bitrev(FFTBITS, (k+1-BREV_OFFSET)));
+			// exit(EXIT_FAILURE);
+		}
+#else
 		if ((syncd)&&((brev->o_out&FFTMASK) != bitrev(FFTBITS, k-BREV_OFFSET))) {
 			fprintf(stdout, "FAIL: BITREV.0 of k (%2x) = %2lx, not %2lx\n",
 				k, brev->o_out, bitrev(FFTBITS, (k-BREV_OFFSET)));
 			exit(EXIT_FAILURE);
 		}
+#endif
 	}
 
 	for(int k=0; k<4*(FFTSIZE); k++) {

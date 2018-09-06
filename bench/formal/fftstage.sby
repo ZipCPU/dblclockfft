@@ -1,0 +1,25 @@
+[tasks]
+s2
+s3
+s4
+s5
+s6
+
+[options]
+mode prove
+depth	12
+
+[engines]
+smtbmc
+
+[script]
+read -formal fftstage.v
+s2: chparam -set LGSPAN 2
+s3: chparam -set LGSPAN 3
+s4: chparam -set LGSPAN 4
+s5: chparam -set LGSPAN 5
+s6: chparam -set LGSPAN 6
+prep -top fftstage
+
+[files]
+../../rtl/fftstage.v

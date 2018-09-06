@@ -1,0 +1,15 @@
+[options]
+mode prove
+depth	20
+
+[engines]
+smtbmc
+
+[script]
+read -formal -DLONGBIMPY longbimpy.v
+read -formal -DLONGBIMPY bimpy.v
+prep -top longbimpy
+
+[files]
+../../rtl/longbimpy.v
+../../rtl/bimpy.v

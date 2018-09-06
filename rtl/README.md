@@ -15,6 +15,7 @@ In sum, from the top down, the modules are:
     multiply at the cost of more logic and a greater delay.
 
    - [longbimpy](longbimpy.v) is the logic binary multiply.
+
    - [bimpy](bimpy.v) multiplies a small set of bits together.  It is a
      component of [longbimpy](longbimpy.v)
 

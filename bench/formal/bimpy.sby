@@ -1,0 +1,13 @@
+[options]
+mode prove
+depth	5
+
+[engines]
+smtbmc
+
+[script]
+read_verilog -formal -DLONGBIMPY bimpy.v
+prep -top bimpy
+
+[files]
+../../rtl/bimpy.v

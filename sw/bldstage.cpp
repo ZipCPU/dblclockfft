@@ -4,7 +4,11 @@
 //
 // Project:	A General Purpose Pipelined FFT Implementation
 //
-// Purpose:	
+// Purpose:	Builds the logic necessary to implement a single stage of an
+//		FFT.  This includes referencing the butterfly, but not the
+//	actual butterflies themselves.  Further, this file only contains the
+//	code for the general case of an FFT stage: the special cases of the
+//	two final stages are described in other files.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -24,7 +28,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -63,6 +67,10 @@
 #include "rounding.h"
 #include "bldstage.h"
 
+//
+// Builds the penultimate FFT stage, using integer operations only.
+// This stage is called laststage elsewhere.
+//
 void	build_dblstage(const char *fname, ROUND_T rounding,
 			const bool async_reset, const bool dbg) {
 	FILE	*fp = fopen(fname, "w");
@@ -186,9 +194,9 @@ SLASHLINE
 	"\tinitial\tr_sync        = 1\'b0; // Sync coming out\n",
 		resetw.c_str());
 	if (async_reset)
-		fprintf(fp, "\talways @(posedge i_clk, negdge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fp, "\talways @(posedge i_clk, negdge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
-		fprintf(fp, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
 		"\t\tbegin\n"
 			"\t\t\trnd_sync <= 1\'b0;\n"
@@ -251,7 +259,7 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp, "\talways @(posedge i_clk, negdge i_areset_n)\n\t\tif (!i_areset_n)\n");
 	else
-		fprintf(fp, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
 		"\t\t\to_sync <= 1\'b0;\n"
 		"\t\telse if (i_ce)\n"
@@ -332,9 +340,9 @@ SLASHLINE
 "\t// core is built ... Note that the minimum LGSPAN (the base two log\n"
 "\t// of the span, or the base two log of the current FFT size) is 3.\n"
 "\t// Smaller spans (i.e. the span of 2) must use the dbl laststage module.\n"
-"\tparameter\tLGWIDTH=%d, LGSPAN=%d, BFLYSHIFT=0;\n"
+"\tparameter\tLGSPAN=%d, BFLYSHIFT=0; // LGWIDTH=%d\n"
 "\tparameter\t[0:0]	OPT_HWMPY = 1;\n",
-		lgval(stage), (nwide <= 1) ? lgval(stage)-1 : lgval(stage)-2);
+		(nwide <= 1) ? lgval(stage)-1 : lgval(stage)-2, lgval(stage));
 	fprintf(fstage,
 "\t// Clocks per CE.  If your incoming data rate is less than 50%% of your\n"
 "\t// clock speed, you can set CKPCE to 2\'b10, make sure there's at least\n"
@@ -374,14 +382,17 @@ SLASHLINE
 "\n");
 	}
 	fprintf(fstage,
-"\treg	wait_for_sync;\n"
-"\treg	[(2*IWIDTH-1):0]	ib_a, ib_b;\n"
-"\treg	[(2*CWIDTH-1):0]	ib_c;\n"
-"\treg	ib_sync;\n"
+	"\t// I am using the prefixes\n"
+	"\t// 	ib_*	to reference the inputs to the butterfly, and\n"
+	"\t// 	ob_*	to reference the outputs from the butterfly\n"
+	"\treg	wait_for_sync;\n"
+	"\treg	[(2*IWIDTH-1):0]	ib_a, ib_b;\n"
+	"\treg	[(2*CWIDTH-1):0]	ib_c;\n"
+	"\treg	ib_sync;\n"
 "\n"
-"\treg	b_started;\n"
-"\twire	ob_sync;\n"
-"\twire	[(2*OWIDTH-1):0]\tob_a, ob_b;\n");
+	"\treg	b_started;\n"
+	"\twire	ob_sync;\n"
+	"\twire	[(2*OWIDTH-1):0]\tob_a, ob_b;\n");
 	fprintf(fstage,
 "\n"
 "\t// cmem is defined as an array of real and complex values,\n"
@@ -391,8 +402,16 @@ SLASHLINE
 "\t// cmem[i] = { (2^(CWIDTH-2)) * cos(2*pi*i/(2^LGWIDTH)),\n"
 "\t//		(2^(CWIDTH-2)) * sin(2*pi*i/(2^LGWIDTH)) };\n"
 "\t//\n"
-"\treg	[(2*CWIDTH-1):0]	cmem [0:((1<<LGSPAN)-1)];\n"
-"\tinitial\t$readmemh(COEFFILE,cmem);\n\n");
+"\treg	[(2*CWIDTH-1):0]	cmem [0:((1<<LGSPAN)-1)];\n");
+
+	if (formal_property_flag)
+		fprintf(fstage, 
+			"`ifdef	FORMAL\n"
+			"// Let the formal tool pick the coefficients\n"
+			"`else\n");
+	fprintf(fstage, "\tinitial\t$readmemh(COEFFILE,cmem);\n\n");
+	if (formal_property_flag)
+		fprintf(fstage, "`endif\n\n");
 
 	// gen_coeff_file(coredir, fname, stage, cbits, nwide, offset, inv);
 
@@ -400,20 +419,20 @@ SLASHLINE
 "\treg	[(LGSPAN):0]		iaddr;\n"
 "\treg	[(2*IWIDTH-1):0]	imem	[0:((1<<LGSPAN)-1)];\n"
 "\n"
-"\treg	[LGSPAN:0]		oB;\n"
+"\treg	[LGSPAN:0]		oaddr;\n"
 "\treg	[(2*OWIDTH-1):0]	omem	[0:((1<<LGSPAN)-1)];\n"
 "\n"
 "\tinitial wait_for_sync = 1\'b1;\n"
 "\tinitial iaddr = 0;\n");
 	if (async_reset)
-		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
-		fprintf(fstage, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fstage, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 
 	fprintf(fstage,
 	"\tbegin\n"
-		"\t\t\twait_for_sync <= 1\'b1;\n"
-		"\t\t\tiaddr <= 0;\n"
+		"\t\twait_for_sync <= 1\'b1;\n"
+		"\t\tiaddr <= 0;\n"
 	"\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
 	"\tbegin\n"
 		"\t\t//\n"
@@ -431,6 +450,9 @@ SLASHLINE
 	"\t//\n"
 	"\t// Now, we have all the inputs, so let\'s feed the butterfly\n"
 	"\t//\n"
+	"\t// ib_sync is the synchronization bit to the butterfly.  It will\n"
+	"\t// be tracked within the butterfly, and used to create the o_sync\n"
+	"\t// value when the results from this output are produced\n"
 	"\tinitial ib_sync = 1\'b0;\n");
 	if (async_reset)
 		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
@@ -445,6 +467,8 @@ SLASHLINE
 			"\t\t// first valid data out per FFT.\n"
 			"\t\tib_sync <= (iaddr==(1<<(LGSPAN)));\n"
 		"\tend\n\n"
+	"\t// Read the values from our input memory, and use them to feed first of two\n"
+	"\t// butterfly inputs\n"
 	"\talways\t@(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 	"\tbegin\n"
@@ -480,6 +504,15 @@ SLASHLINE
 	"\t\talways @(*) idle = 0;\n\n"
 	"\tend endgenerate\n\n");
 
+	if (formal_property_flag)
+		fprintf(fstage,
+"// For the formal proof, we'll assume the outputs of hwbfly and/or\n"
+"// butterfly, rather than actually calculating them.  This will simplify\n"
+"// the proof and (if done properly) will be equivalent.  Be careful of\n"
+"// defining FORMAL if you want the full logic!\n"
+"`ifndef	FORMAL\n"
+	"\t//\n");
+
 	fprintf(fstage,
 "\tgenerate if (OPT_HWMPY)\n"
 "\tbegin : HWBFLY\n"
@@ -499,51 +532,256 @@ SLASHLINE
 			"\t\t\t\t\t(idle||(!i_ce))?0:ib_b,\n"
 			"\t\t\t\t\t(ib_sync&&i_ce),\n"
 			"\t\t\t\t\tob_a, ob_b, ob_sync);\n"
-"\tend endgenerate\n\n",
+"\tend endgenerate\n",
 			resetw.c_str(), resetw.c_str());
+
+	if (formal_property_flag)
+		fprintf(fstage, "`endif\n\n");
 
 	fprintf(fstage,
 	"\t//\n"
 	"\t// Next step: recover the outputs from the butterfly\n"
 	"\t//\n"
-	"\tinitial oB        = 0;\n"
+	"\t// The first output can go immediately to the output of this routine\n"
+	"\t// The second output must wait until this time in the idle cycle\n"
+	"\t// oaddr is the output memory address, keeping track of where we are\n"
+	"\t// in this output cycle.\n"
+	"\tinitial oaddr     = 0;\n"
 	"\tinitial o_sync    = 0;\n"
 	"\tinitial b_started = 0;\n");
 	if (async_reset)
-		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
-		fprintf(fstage, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fstage, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fstage,
 	"\tbegin\n"
-		"\t\toB <= 0;\n"
-		"\t\to_sync <= 0;\n"
+		"\t\toaddr     <= 0;\n"
+		"\t\to_sync    <= 0;\n"
+		"\t\t// b_started will be true once we've seen the first ob_sync\n"
 		"\t\tb_started <= 0;\n"
 	"\tend else if (i_ce)\n"
 	"\tbegin\n"
-	"\t\to_sync <= (!oB[LGSPAN])?ob_sync : 1\'b0;\n"
+	"\t\to_sync <= (!oaddr[LGSPAN])?ob_sync : 1\'b0;\n"
 	"\t\tif (ob_sync||b_started)\n"
-		"\t\t\toB <= oB + { {(LGSPAN){1\'b0}}, 1\'b1 };\n"
-	"\t\tif ((ob_sync)&&(!oB[LGSPAN]))\n"
-		"\t\t// A butterfly output is available\n"
+		"\t\t\toaddr <= oaddr + 1\'b1;\n"
+	"\t\tif ((ob_sync)&&(!oaddr[LGSPAN]))\n"
+		"\t\t\t// If b_started is true, then a butterfly output is available\n"
 			"\t\t\tb_started <= 1\'b1;\n"
 	"\tend\n\n");
 	fprintf(fstage,
-	"\treg	[(LGSPAN-1):0]\t\tdly_addr;\n"
-	"\treg	[(2*OWIDTH-1):0]\tdly_value;\n"
+	"\treg	[(LGSPAN-1):0]\t\tnxt_oaddr;\n"
+	"\treg	[(2*OWIDTH-1):0]\tpre_ovalue;\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
+		"\t\tnxt_oaddr[0] <= oaddr[0];\n"
+	"\tgenerate if (LGSPAN>1)\n"
 	"\tbegin\n"
-	"\t\tdly_addr <= oB[(LGSPAN-1):0];\n"
-	"\t\tdly_value <= ob_b;\n"
-	"\tend\n"
+"\n"
+	"\t\talways @(posedge i_clk)\n"
+	"\t\tif (i_ce)\n"
+		"\t\t\tnxt_oaddr[LGSPAN-1:1] <= oaddr[LGSPAN-1:1] + 1\'b1;\n"
+"\n"
+	"\tend endgenerate\n"
+"\n"
+	"\t// Only write to the memory on the first half of the outputs\n"
+	"\t// We'll use the memory value on the second half of the outputs\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(!oaddr[LGSPAN]))\n"
+		"\t\tomem[oaddr[(LGSPAN-1):0]] <= ob_b;\n\n");
+
+	fprintf(fstage,
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
-		"\t\tomem[dly_addr] <= dly_value;\n"
+		"\t\tpre_ovalue <= omem[nxt_oaddr[(LGSPAN-1):0]];\n"
 "\n");
 	fprintf(fstage,
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
-	"\t\to_data <= (!oB[LGSPAN])?ob_a : omem[oB[(LGSPAN-1):0]];\n"
+	"\t\to_data <= (!oaddr[LGSPAN]) ? ob_a : pre_ovalue;\n"
 "\n");
+
+	fprintf(fstage,
+"`ifdef	FORMAL\n");
+
+
+	if (formal_property_flag) {
+
+	fprintf(fstage,
+	"\t// An arbitrary processing delay from butterfly input to\n"
+	"\t// butterfly output(s)\n"
+	"\t(* anyconst *) reg	[LGSPAN:0]	f_mpydelay;\n"
+	"\talways @(*)\n"
+	"\t\tassume(f_mpydelay > 1);\n"
+"\n"
+	"\treg	f_past_valid;\n"
+	"\tinitial	f_past_valid = 1'b0;\n"
+	"\talways @(posedge i_clk)\n"
+		"\t\tf_past_valid <= 1'b1;\n"
+"\n");
+
+	if (async_reset)
+		fprintf(fstage, "\talways @(*)\n\tif ((!f_past_valid)||(!i_areset_n))\n");
+	else
+		fprintf(fstage, "\talways @(posedge i_clk)\n"
+				"\tif ((!f_past_valid)||($past(i_reset)))\n");
+	fprintf(fstage,
+	"\tbegin\n"
+		"\t\tassert(iaddr == 0);\n"
+		"\t\tassert(wait_for_sync);\n"
+		"\t\tassert(o_sync == 0);\n"
+		"\t\tassert(oaddr == 0);\n"
+		"\t\tassert(!b_started);\n"
+		"\t\tassert(!o_sync);\n"
+	"\tend\n\n");
+
+	fprintf(fstage,
+	"\t/////////////////////////////////////////\n"
+	"\t//\n"
+	"\t// Formally verify the input half, from the inputs to this module\n"
+	"\t// to the inputs of the butterfly\n"
+	"\t//\n"
+	"\t/////////////////////////////////////////\n"
+	"\t//\n"
+	"\t// Let's  verify a specific set of inputs\n"
+	"\t(* anyconst *)	reg	[LGSPAN:0]	f_addr;\n"
+	"\treg	[2*IWIDTH-1:0]			f_left, f_right;\n"
+	"\twire	[LGSPAN:0]			f_next_addr;\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))&&(!$past(i_ce,4)))\n"
+		"\tassume(!i_ce);\n"
+"\n"
+	"\talways @(*)\n"
+		"\t\tassume(f_addr[LGSPAN]==1'b0);\n"
+"\n"
+	"\tassign\tf_next_addr = f_addr + 1'b1;\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(iaddr[LGSPAN:0] == f_addr))\n"
+		"\t\tf_left <= i_data;\n"
+"\n"
+	"\talways @(*)\n"
+	"\tif (wait_for_sync)\n"
+		"\t\tassert(iaddr == 0);\n"
+"\n"
+	"\twire	[LGSPAN:0]\tf_last_addr = iaddr - 1'b1;\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((!wait_for_sync)&&(f_last_addr >= { 1'b0, f_addr[LGSPAN-1:0]}))\n"
+		"\t\tassert(f_left == imem[f_addr[LGSPAN-1:0]]);\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(iaddr == { 1'b1, f_addr[LGSPAN-1:0]}))\n"
+		"\t\tf_right <= i_data;\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(!wait_for_sync)&&(f_last_addr == { 1'b1, f_addr[LGSPAN-1:0]}))\n"
+	"\tbegin\n"
+		"\t\tassert(ib_a == f_left);\n"
+		"\t\tassert(ib_b == f_right);\n"
+		"\t\tassert(ib_c == cmem[f_addr[LGSPAN-1:0]]);\n"
+	"\tend\n\n");
+
+	fprintf(fstage,
+	"\t/////////////////////////////////////////\n"
+	"\t//\n"
+	"\t// Formally verify the output half, from the output of the butterfly\n"
+	"\t// to the outputs of this module\n"
+	"\t//\n"
+	"\t/////////////////////////////////////////\n"
+	"\treg	[2*OWIDTH-1:0]	f_oleft, f_oright;\n"
+	"\treg	[LGSPAN:0]	f_oaddr;\n"
+	"\twire	[LGSPAN:0]	f_oaddr_m1 = f_oaddr - 1'b1;\n\n");
+
+	fprintf(fstage,
+	"\talways @(*)\n"
+		"\t\tf_oaddr = iaddr - f_mpydelay + {1'b1,{(LGSPAN-1){1'b0}}};\n"
+"\n"
+	"\tassign\tf_oaddr_m1 = f_oaddr - 1'b1;\n"
+"\n");
+
+	fprintf(fstage,
+	"\treg	f_output_active;\n"
+	"\tinitial\tf_output_active = 1'b0;\n");
+	if (async_reset)
+		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
+	else
+		fprintf(fstage, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
+	fprintf(fstage,
+		"\t\tf_output_active <= 1'b0;\n"
+	"\telse if ((i_ce)&&(ob_sync))\n"
+		"\t\tf_output_active <= 1'b1;\n"
+"\n"
+	"\talways @(*)\n"
+		"\t\tassert(f_output_active == b_started);\n"
+"\n"
+	"\talways @(*)\n"
+	"\tif (wait_for_sync)\n"
+		"\t\tassert(!f_output_active);\n\n");
+
+	fprintf(fstage,
+	"\talways @(*)\n"
+	"\tif (f_output_active)\n"
+		"\t\tassert(oaddr == f_oaddr);\n"
+	"\telse\n"
+		"\t\tassert(oaddr == 0);\n"
+"\n");
+
+
+	fprintf(fstage,
+	"\talways @(*)\n"
+	"\tif (wait_for_sync)\n"
+		"\t\tassume(!ob_sync);\n"
+"\n"
+	"\talways @(*)\n"
+		"\t\tassume(ob_sync == (f_oaddr == 0));\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_past_valid)&&(!$past(i_ce)))\n"
+	"\tbegin\n"
+		"\t\tassume($stable(ob_a));\n"
+		"\t\tassume($stable(ob_b));\n"
+	"\tend\n\n");
+
+	fprintf(fstage,
+	"\tinitial	f_oleft  = 0;\n"
+	"\tinitial	f_oright = 0;\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(f_oaddr == f_addr))\n"
+	"\tbegin\n"
+		"\t\tf_oleft  <= ob_a;\n"
+		"\t\tf_oright <= ob_b;\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_output_active)&&(f_oaddr_m1 >= { 1'b0, f_addr[LGSPAN-1:0]}))\n"
+		"\t\tassert(omem[f_addr[LGSPAN-1:0]] == f_oright);\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(f_oaddr_m1 == 0)&&(f_output_active))\n"
+		"\t\tassert(o_sync);\n"
+	"\telse if ((i_ce)||(!f_output_active))\n"
+		"\t\tassert(!o_sync);\n"
+	"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(f_output_active)&&(f_oaddr_m1 == f_addr))\n"
+		"\t\tassert(o_data == f_oleft);\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(f_output_active)&&(f_oaddr[LGSPAN])\n"
+			"\t\t\t&&(f_oaddr[LGSPAN-1:0] == f_addr[LGSPAN-1:0]))\n"
+		"\t\tassert(pre_ovalue == f_oright);\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((i_ce)&&(f_output_active)&&(f_oaddr_m1[LGSPAN])\n"
+			"\t\t\t&&(f_oaddr_m1[LGSPAN-1:0] == f_addr[LGSPAN-1:0]))\n"
+		"\t\tassert(o_data == f_oright);\n"
+"\n");
+	} else { // If no formal properties
+		fprintf(fstage, "// Formal properties exist, but are not enabled"
+				" in this build\n");
+	} // End of the formal properties section
+
+	fprintf(fstage,
+"`endif\n");
+
 	fprintf(fstage, "endmodule\n");
 }

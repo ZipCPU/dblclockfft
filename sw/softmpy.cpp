@@ -26,7 +26,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -200,8 +200,8 @@ SLASHLINE
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
 "module	bimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
-"\tparameter\tBW=18, // Number of bits in i_b\n"
-"\t\t\tLUTB=2; // Number of bits in i_a for our LUT multiply\n"
+"\tparameter\tBW=18; // Number of bits in i_b\n"
+"\tlocalparam\tLUTB=2; // Number of bits in i_a for our LUT multiply\n"
 "\tinput\twire\t\t\ti_clk, i_ce;\n"
 "\tinput\twire\t[(LUTB-1):0]\ti_a;\n"
 "\tinput\twire\t[(BW-1):0]\ti_b;\n"
@@ -215,10 +215,60 @@ SLASHLINE
 "\tassign\tc = { ((i_a[1])?i_b[(BW-2):0]:{(BW-1){1\'b0}}) }\n"
 "\t\t\t& ((i_a[0])?i_b[(BW-1):1]:{(BW-1){1\'b0}});\n"
 "\n"
+"\tinitial o_r = 0;\n"
 "\talways @(posedge i_clk)\n"
-"\t\tif (i_ce)\n"
-"\t\t\to_r <= w_r + { c, 2'b0 };\n"
+"\tif (i_ce)\n"
+"\t\to_r <= w_r + { c, 2'b0 };\n"
+"\n");
+
+	// Formal properties
+	//
+	// This module is formally verified as part of longbimpy.v
+	// Hence, we'll use an ifdef LONGBIMPY to capture if it is being verified as part of
+	// LONGBIMPY, or placed within another module.
+	fprintf(fp,
+"`ifdef	FORMAL\n");
+
+	if (formal_property_flag) {
+		fprintf(fp,
+"\treg\tf_past_valid;\n"
 "\n"
+"\tinitial\tf_past_valid = 1'b0;\n"
+"\talways @(posedge i_clk)\n"
+"\tf_past_valid <= 1'b1;\n"
+"\n"
+"`ifdef	LONGBIMPY\n"
+"`define\tASSERT\tassert\n"
+"`else\n"
+"`define\tASSERT\tassume\n"
+"`endif\n"
+"\n");
+
+	// Now for our module specific assertions
+	// These properties will be assumed if this proof is not part of LONGBIMPY's proof
+	fprintf(fp,
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_past_valid)&&($past(i_ce)))\n"
+	"\tbegin\n"
+		"\t\tif ($past(i_a)==0)\n"
+			"\t\t\t`ASSERT(o_r == 0);\n"
+		"\t\telse if ($past(i_a) == 1)\n"
+			"\t\t\t`ASSERT(o_r == $past(i_b));\n"
+		"\n"
+		"\t\tif ($past(i_b)==0)\n"
+			"\t\t\t`ASSERT(o_r == 0);\n"
+		"\t\telse if ($past(i_b) == 1)\n"
+			"\t\t\t`ASSERT(o_r[(LUTB-1):0] == $past(i_a));\n"
+	"\tend\n");
+
+	} else {
+		fprintf(fp, "// Enable the formal_property_flag to include formal properties\n");
+	}
+
+	fprintf(fp,
+"`endif\n");
+	// And then the end of the module
+	fprintf(fp,
 "endmodule\n");
 
 	fclose(fp);
@@ -313,6 +363,7 @@ SLASHLINE
 	"\t// taking the absolute value here would require an additional bit.\n"
 	"\t// However, because our results are now unsigned, we can stay\n"
 	"\t// within the number of bits given (for now).\n"
+	"\tinitial u_a = 0;\n"
 	"\tgenerate if (IW > AW)\n"
 	"\tbegin\n"
 		"\t\talways @(posedge i_clk)\n"
@@ -324,12 +375,14 @@ SLASHLINE
 			"\t\t\t\tu_a <= (i_a[AW-1])?(-i_a):(i_a);\n"
 	"\tend endgenerate\n"
 "\n"
+	"\tinitial sgn = 0;\n"
+	"\tinitial u_b = 0;\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-		"\t\tbegin\n"
-			"\t\t\tu_b <= (i_b[BW-1])?(-i_b):(i_b);\n"
-			"\t\t\tsgn <= i_a[AW-1] ^ i_b[BW-1];\n"
-		"\t\tend\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\tu_b <= (i_b[BW-1])?(-i_b):(i_b);\n"
+		"\t\tsgn <= i_a[AW-1] ^ i_b[BW-1];\n"
+	"\tend\n"
 "\n"
 	"\twire	[(BW+LUTB-1):0]	pr_a, pr_b;\n"
 "\n"
@@ -343,19 +396,28 @@ SLASHLINE
 	"\t// a time can follow this--but the first clock can do two at a time.\n"
 	"\tbimpy\t#(BW) lmpy_0(i_clk,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);\n"
 	"\tbimpy\t#(BW) lmpy_1(i_clk,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);\n"
+	"\n"
+	"\tinitial r_s    = 0;\n"
+	"\tinitial r_a[0] = 0;\n"
+	"\tinitial r_b[0] = 0;\n"
 	"\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce) r_a[0] <= u_a[(IW-1):(2*LUTB)];\n"
 	"\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce) r_b[0] <= u_b;\n"
 	"\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce) r_s <= { r_s[(TLEN-2):0], sgn };\n"
+	"\n"
+	"\tinitial acc[0] = 0;\n"
 	"\talways @(posedge i_clk) // One clk after p[0],p[1] become valid\n"
-		"\t\tif (i_ce) acc[0] <= { {(IW-LUTB){1\'b0}}, pr_a}\n"
-			"\t\t\t  +{ {(IW-(2*LUTB)){1\'b0}}, pr_b, {(LUTB){1\'b0}} };\n"
+	"\tif (i_ce) acc[0] <= { {(IW-LUTB){1\'b0}}, pr_a}\n"
+		"\t\t  +{ {(IW-(2*LUTB)){1\'b0}}, pr_b, {(LUTB){1\'b0}} };\n"
 "\n"
 	"\tgenerate // Keep track of intermediate values, before multiplying them\n"
 	"\tif (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)\n"
-	"\tbegin : gencopies\n"
+	"\tbegin : GENCOPIES\n"
+		"\n"
+		"\t\tinitial r_a[k+1] = 0;\n"
+		"\t\tinitial r_b[k+1] = 0;\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 		"\t\tbegin\n"
@@ -367,24 +429,31 @@ SLASHLINE
 "\n"
 	"\tgenerate // The actual multiply and accumulate stage\n"
 	"\tif (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)\n"
-	"\tbegin : genstages\n"
-		"\t\t// First, the multiply: 2-bits times BW bits\n"
+	"\tbegin : GENSTAGES\n"
 		"\t\twire\t[(BW+LUTB-1):0] genp;\n"
+		"\n"
+		"\t\t// First, the multiply: 2-bits times BW bits\n"
 		"\t\tbimpy #(BW) genmpy(i_clk,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);\n"
 "\n"
 		"\t\t// Then the accumulate step -- on the next clock\n"
+		"\t\tinitial acc[k+1] = 0;\n"
 		"\t\talways @(posedge i_clk)\n"
-			"\t\t\tif (i_ce)\n"
-				"\t\t\t\tacc[k+1] <= acc[k] + {{(IW-LUTB*(k+3)){1\'b0}},\n"
-					"\t\t\t\t\tgenp, {(LUTB*(k+2)){1\'b0}} };\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\tacc[k+1] <= acc[k] + {{(IW-LUTB*(k+3)){1\'b0}},\n"
+				"\t\t\t\tgenp, {(LUTB*(k+2)){1\'b0}} };\n"
 	"\tend endgenerate\n"
 "\n"
 	"\twire	[(IW+BW-1):0]	w_r;\n"
 	"\tassign\tw_r = (r_s[TLEN-1]) ? (-acc[TLEN-2]) : acc[TLEN-2];\n"
+	"\n"
+	"\tinitial o_r = 0;\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-			"\t\t\to_r <= w_r[(AW+BW-1):0];\n"
-"\n"
+	"\tif (i_ce)\n"
+		"\t\to_r <= w_r[(AW+BW-1):0];\n"
+"\n");
+
+	// Make Verilator happy
+	fprintf(fp,
 	"\tgenerate if (IW > AW)\n"
 	"\tbegin : VUNUSED\n"
 	"\t\t// verilator lint_off UNUSED\n"
@@ -392,7 +461,173 @@ SLASHLINE
 	"\t\tassign\tunused = w_r[(IW+BW-1):(AW+BW)];\n"
 	"\t\t// verilator lint_on UNUSED\n"
 	"\tend endgenerate\n"
+"\n");
+
+	// The formal property section
+	// Starting with properties specific to this component's proof, and not
+	// any parent modules
+	fprintf(fp,
+"`ifdef	FORMAL\n");
+
+	if (formal_property_flag) {
+		fprintf(fp,
+	"\treg	f_past_valid;\n"
+	"\tinitial\tf_past_valid = 1'b0;\n"
+	"\talways @(posedge i_clk)\n"
+		"\t\tf_past_valid <= 1'b1;\n"
 "\n"
+"`ifdef	LONGBIMPY\n"
+"`define\tASSERT	assert\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (!$past(i_ce))\n"
+	"\t\tassume(i_ce);\n"
+"`else\n"
+"`define	ASSERT	assume\n"
+"`endif\n"
+"\n");
+
+	// Now for properties specific to this core
+	fprintf(fp,
+	"\treg	[AW-1:0]	f_past_a	[0:TLEN];\n"
+	"\treg	[BW-1:0]	f_past_b	[0:TLEN];\n"
+	"\treg	[TLEN+1:0]	f_sgn_a, f_sgn_b;\n"
+"\n"
+	"\tinitial\tf_past_a[0] = 0;\n"
+	"\tinitial\tf_past_b[0] = 0;\n"
+	"\tinitial\tf_sgn_a = 0;\n"
+	"\tinitial\tf_sgn_b = 0;\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\tf_past_a[0] <= u_a;\n"
+		"\t\tf_past_b[0] <= u_b;\n"
+		"\t\tf_sgn_a[0] <= i_a[AW-1];\n"
+		"\t\tf_sgn_b[0] <= i_b[BW-1];\n"
+	"\tend\n"
+"\n"
+	"\tgenerate for(k=0; k<TLEN; k=k+1)\n"
+	"\tbegin\n"
+		"\t\tinitial\tf_past_a[k+1] = 0;\n"
+		"\t\tinitial\tf_past_b[k+1] = 0;\n"
+		"\t\tinitial\tf_sgn_a[k+1] = 0;\n"
+		"\t\tinitial\tf_sgn_b[k+1] = 0;\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+		"\t\tbegin\n"
+				"\t\t\tf_past_a[k+1] <= f_past_a[k];\n"
+				"\t\t\tf_past_b[k+1] <= f_past_b[k];\n"
+		"\n"
+				"\t\t\tf_sgn_a[k+1]  <= f_sgn_a[k];\n"
+				"\t\t\tf_sgn_b[k+1]  <= f_sgn_b[k];\n"
+			"\t\tend\n"
+	"\tend endgenerate\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\tf_sgn_a[TLEN+1] <= f_sgn_a[TLEN];\n"
+		"\t\tf_sgn_b[TLEN+1] <= f_sgn_b[TLEN];\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tbegin\n"
+		"\t\tassert(sgn == (f_sgn_a[0] ^ f_sgn_b[0]));\n"
+		"\t\tassert(r_s[TLEN-1:0] == (f_sgn_a[TLEN:1] ^ f_sgn_b[TLEN:1]));\n"
+		"\t\tassert(r_s[TLEN-1:0] == (f_sgn_a[TLEN:1] ^ f_sgn_b[TLEN:1]));\n"
+	"\tend\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif ((f_past_valid)&&($past(i_ce)))\n"
+	"\tbegin\n"
+		"\t\tif ($past(i_a)==0)\n"
+			"\t\t\t`ASSERT(u_a == 0);\n"
+		"\t\telse if ($past(i_a[AW-1]) == 1'b0)\n"
+			"\t\t\t`ASSERT(u_a == $past(i_a));\n"
+"\n"
+		"\t\tif ($past(i_b)==0)\n"
+			"\t\t\t`ASSERT(u_b == 0);\n"
+		"\t\telse if ($past(i_b[BW-1]) == 1'b0)\n"
+			"\t\t\t`ASSERT(u_b == $past(i_b));\n"
+	"\tend\n"
+"\n"
+	"\tgenerate // Keep track of intermediate values, before multiplying them\n"
+	"\tif (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)\n"
+	"\tbegin : ASSERT_GENCOPY\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_ce)\n"
+		"\t\tbegin\n"
+			"\t\t\tif (f_past_a[k]==0)\n"
+				"\t\t\t\t`ASSERT(r_a[k] == 0);\n"
+			"\t\t\telse if (f_past_a[k]==1)\n"
+				"\t\t\t\t`ASSERT(r_a[k] == 0);\n"
+			"\t\t\t`ASSERT(r_b[k] == f_past_b[k]);\n"
+		"\t\tend\n"
+	"\tend endgenerate\n"
+"\n"
+	"\tgenerate // The actual multiply and accumulate stage\n"
+	"\tif (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)\n"
+	"\tbegin : ASSERT_GENSTAGE\n"
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif ((f_past_valid)&&($past(i_ce)))\n"
+		"\t\tbegin\n"
+			"\t\t\tif (f_past_a[k+1]==0)\n"
+				"\t\t\t\t`ASSERT(acc[k] == 0);\n"
+			"\t\t\tif (f_past_a[k+1]==1)\n"
+				"\t\t\t\t`ASSERT(acc[k] == f_past_b[k+1]);\n"
+			"\t\t\tif (f_past_b[k+1]==0)\n"
+				"\t\t\t\t`ASSERT(acc[k] == 0);\n"
+			"\t\t\tif (f_past_b[k+1]==1)\n"
+			"\t\t\tbegin\n"
+				"\t\t\t\t`ASSERT(acc[k][(2*k)+3:0]\n"
+				"\t\t\t\t		== f_past_a[k+1][(2*k)+3:0]);\n"
+				"\t\t\t\t`ASSERT(acc[k][(IW+BW-1):(2*k)+4] == 0);\n"
+			"\t\t\tend\n"
+		"\t\tend\n"
+	"\tend endgenerate\n"
+"\n"
+	"\twire	[BW-1:0]	f_past_b_neg = - f_past_b[TLEN];\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (f_past_a[TLEN]==0)\n"
+		"\t\t`ASSERT(o_r == 0);\n"
+	"\telse if ((f_past_valid)&&($past(i_ce))\n"
+		"\t\t&&(f_past_a[TLEN]==1)&&(!f_sgn_a[TLEN+1]))\n"
+	"\tbegin\n"
+		"\t\tif (!f_sgn_b[TLEN+1])\n"
+		"\t\tbegin\n"
+			"\t\t\t`ASSERT(o_r[BW-1:0] == f_past_b[TLEN][BW-1:0]);\n"
+			"\t\t\t`ASSERT(o_r[AW+BW-1:BW] == 0);\n"
+		"\t\tend else begin\n"
+			"\t\t\t`ASSERT(o_r[BW-1:0] == f_past_b_neg);\n"
+			"\t\t\t`ASSERT(&o_r[AW+BW-1:BW]);\n"
+		"\t\tend\n"
+	"\tend\n"
+"\n"
+	"\twire	[AW-1:0]	f_past_a_neg = - f_past_a[TLEN];\n"
+"\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (f_past_b[TLEN]==0)\n"
+		"\t\t`ASSERT(o_r == 0);\n"
+	"\telse if ((f_past_valid)&&($past(i_ce))\n"
+		"\t\t&&(f_past_b[TLEN]==1)&&(!f_sgn_b[TLEN+1]))\n"
+	"\tbegin\n"
+		"\t\tif (!f_sgn_a[TLEN+1])\n"
+		"\t\tbegin\n"
+		"\t\t\t`ASSERT(o_r[AW-1:0] == f_past_a[TLEN][AW-1:0]);\n"
+		"\t\t\t`ASSERT(o_r[AW+BW-1:AW] == 0);\n"
+		"\t\tend else begin\n"
+		"\t\t\t`ASSERT(o_r[AW-1:0] == f_past_a_neg);\n"
+		"\t\t\t`ASSERT(&o_r[AW+BW-1:AW]);\n"
+		"\t\tend\n"
+	"\tend\n");
+
+	} else {
+		fprintf(fp, "// Formal properties have not been enabled\n");
+	}
+
+	fprintf(fp,
+"`endif\n"
 "endmodule\n");
 
 	fclose(fp);

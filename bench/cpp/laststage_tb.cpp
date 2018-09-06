@@ -1,8 +1,8 @@
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	laststage_tb.cpp
 //
-// Project:	A Doubletime Pipelined FFT
+// Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A test-bench for the laststage.v subfile of the general purpose
 //		pipelined FFT.  This file may be run autonomously.  If so,
@@ -15,7 +15,7 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015,2018 Gisselquist Technology, LLC
 //
@@ -30,7 +30,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -38,13 +38,14 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>
 #include <stdint.h>
 
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 #include "Vlaststage.h"
+#include "fftsize.h"
 #include "twoc.h"
 
 #define	IWIDTH	16
@@ -287,7 +288,7 @@ int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	LASTSTAGE_TB	*tb = new LASTSTAGE_TB;
 
-	tb->opentrace("laststage.vcd");
+	// tb->opentrace("laststage.vcd");
 	tb->reset();
 
 	tb->sync();

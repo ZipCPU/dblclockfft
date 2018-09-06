@@ -1,8 +1,8 @@
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	ifft_tb.v
 //
-// Project:	A Doubletime Pipelined FFT
+// Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	This file is used to test whether an FFT followed by an
 //		immediate IFFT produces the input again.  It is a test
@@ -17,7 +17,7 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015, Gisselquist Technology, LLC
 //
@@ -32,7 +32,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -40,7 +40,7 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 module	ifft_tb(i_clk, i_rst, i_ce, i_left, i_right, o_left, o_right, o_sync);
 	parameter	IWIDTH=16, MIDWIDTH=22, OWIDTH=28;
 	input					i_clk, i_rst, i_ce;

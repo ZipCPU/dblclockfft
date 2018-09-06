@@ -36,7 +36,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -50,11 +50,11 @@
 `default_nettype	none
 //
 module	bimpy(i_clk, i_ce, i_a, i_b, o_r);
-	parameter	BW=18, // Number of bits in i_b
-			LUTB=2; // Number of bits in i_a for our LUT multiply
-	input				i_clk, i_ce;
-	input		[(LUTB-1):0]	i_a;
-	input		[(BW-1):0]	i_b;
+	parameter	BW=18; // Number of bits in i_b
+	localparam	LUTB=2; // Number of bits in i_a for our LUT multiply
+	input	wire			i_clk, i_ce;
+	input	wire	[(LUTB-1):0]	i_a;
+	input	wire	[(BW-1):0]	i_b;
 	output	reg	[(BW+LUTB-1):0]	o_r;
 
 	wire	[(BW+LUTB-2):0]	w_r;
@@ -65,8 +65,36 @@ module	bimpy(i_clk, i_ce, i_a, i_b, o_r);
 	assign	c = { ((i_a[1])?i_b[(BW-2):0]:{(BW-1){1'b0}}) }
 			& ((i_a[0])?i_b[(BW-1):1]:{(BW-1){1'b0}});
 
+	initial o_r = 0;
 	always @(posedge i_clk)
-		if (i_ce)
-			o_r <= w_r + { c, 2'b0 };
+	if (i_ce)
+		o_r <= w_r + { c, 2'b0 };
 
+`ifdef	FORMAL
+	reg	f_past_valid;
+
+	initial	f_past_valid = 1'b0;
+	always @(posedge i_clk)
+	f_past_valid <= 1'b1;
+
+`ifdef	LONGBIMPY
+`define	ASSERT	assert
+`else
+`define	ASSERT	assume
+`endif
+
+	always @(posedge i_clk)
+	if ((f_past_valid)&&($past(i_ce)))
+	begin
+		if ($past(i_a)==0)
+			`ASSERT(o_r == 0);
+		else if ($past(i_a) == 1)
+			`ASSERT(o_r == $past(i_b));
+
+		if ($past(i_b)==0)
+			`ASSERT(o_r == 0);
+		else if ($past(i_b) == 1)
+			`ASSERT(o_r[(LUTB-1):0] == $past(i_a));
+	end
+`endif
 endmodule

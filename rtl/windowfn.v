@@ -66,7 +66,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -97,8 +97,8 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	input	wire	[(IW-1):0]	i_sample;
 	input	wire			i_alt_ce;
 	//
-	output	wire			o_frame, o_ce;
-	output	wire	[(OW-1):0]	o_sample;
+	output	reg			o_frame, o_ce;
+	output	reg	[(OW-1):0]	o_sample;
 
 
 	reg	[(TW-1):0]	cmem	[0:(1<<LGNFFT)-1];
@@ -203,7 +203,6 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		didx <= 0;
 	else if ((i_alt_ce)&&(dwidx[LGNFFT-2:0]==0))
 	begin
-assert(&didx[LGNFFT-2:0]);
 		didx[LGNFFT-2:0] <= 0;
 		didx[LGNFFT-1] <= dwidx[LGNFFT-1];
 	end else if ((i_ce)||(i_alt_ce))
@@ -218,7 +217,6 @@ assert(&didx[LGNFFT-2:0]);
 	begin
 		// // At the beginning of processing for a given FFT
 		tidx <= 0;
-assert(&tidx);
 	end else if ((i_ce)||(i_alt_ce))
 		// Process the next point in the window function
 		tidx <= tidx + 1'b1;
@@ -246,10 +244,10 @@ assert(&tidx);
 	// 	d_ce: The data (and coefficient), read from memory,will be valid
 	// 	p_ce: The produc of data and coefficient is valid
 	//
-	initial	{ p_ce, d_ce } = 3'h0;
+	initial	{ p_ce, d_ce } = 2'h0;
 	always @(posedge i_clk)
 	if (i_reset)
-		{ p_ce, d_ce } <= 3'h0;
+		{ p_ce, d_ce } <= 2'h0;
 	else
 		{ p_ce, d_ce } <= { d_ce, (!first_block)&&((i_ce)||(i_alt_ce)) };
 
@@ -271,7 +269,6 @@ assert(&tidx);
 	// We'll implement an abstract multiply below--just to make sure the
 	// timing is right.
 `else
-	reg	signed	[IW+TW-1:0]	product;
 	always @(posedge i_clk)
 		product <= data * tap;
 `endif
@@ -310,6 +307,12 @@ assert(&tidx);
 		else if (p_ce)
 			o_sample <= rounded[(AW-1):(AW-OW)];
 
+		// Make Verilator happy
+		// verilator lint_off UNUSED
+		wire	[AW-OW-1:0]	unused_rounding_bits;
+		assign	unused_rounding_bits = rounded[AW-OW-1:0];
+		// verilator lint_on  UNUSED
+
 	end else // if (OW > AW)
 	begin : BIT_ADJUSTMENT_EXTENDING
 
@@ -321,11 +324,12 @@ assert(&tidx);
 
 	end endgenerate
 
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
+	// Make Verilator happy
+	// verilator lint_off UNUSED
+	wire	[LGNFFT-1:0]	unused;
+	assign	unused = tapwidx;
+	// verilator lint_on  UNUSED
+
 `ifdef	FORMAL
 	reg	f_past_valid;
 	initial	f_past_valid = 1'b0;

@@ -40,7 +40,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -1522,11 +1522,10 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
-					lgsize, lgtmp-1,
-					(mpystage)?1:0,
+					lgtmp-1, (mpystage)?1:0,
 					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d%d, w_s%d%s);\n",
@@ -1541,11 +1540,10 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
-					lgsize, lgtmp-2,
-					(mpystage)?1:0,
+					lgtmp-2, (mpystage)?1:0,
 					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_left, w_e%d, w_s%d%s);\n",
@@ -1556,10 +1554,9 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
-				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 					xtracbits, obits+xtrapbits,
-					lgsize, lgtmp-2,
-					(mpystage)?1:0,
+					lgtmp-2, (mpystage)?1:0,
 					ckpce, cmem.c_str(),
 					fftsize, resetw.c_str());
 				fprintf(vmain, "\t\t\t(%s%s), i_right, w_o%d, w_os%d);\n",
@@ -1580,7 +1577,7 @@ SLASHLINE
 				if (single_clock)
 					build_stage(fname.c_str(), fftsize, 1, 0, nbits, xtracbits, ckpce, async_reset, true);
 				else
-					build_stage(fname.c_str(), fftsize/2, 2, 1, nbits, xtracbits, ckpce, async_reset, true);
+					build_stage(fname.c_str(), fftsize, 2, 1, nbits, xtracbits, ckpce, async_reset, true);
 			}
 
 			fname += ".v";
@@ -1591,7 +1588,7 @@ SLASHLINE
 			} else {
 				// All stages use the same Verilog, so we only
 				// need to build one
-				build_stage(fname.c_str(), fftsize/2, 2, 1,
+				build_stage(fname.c_str(), fftsize, 2, 1,
 					nbits, xtracbits, ckpce, async_reset, false);
 			}
 		}
@@ -1624,13 +1621,12 @@ SLASHLINE
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 1, 0, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
-						lgsize, lgtmp-1,
-						(dropbit)?0:0, (mpystage)?1:0,
+						lgtmp-1, (dropbit)?0:0, (mpystage)?1:0,
 						ckpce,
 						cmem.c_str(), tmp_size,
 						resetw.c_str());
@@ -1650,13 +1646,12 @@ SLASHLINE
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 2, 0, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
-						lgsize, lgtmp-2,
-						(dropbit)?0:0, (mpystage)?1:0,
+						lgtmp-2, (dropbit)?0:0, (mpystage)?1:0,
 						ckpce,
 						cmem.c_str(), tmp_size,
 						resetw.c_str());
@@ -1673,12 +1668,11 @@ SLASHLINE
 						2, 1, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR,
 						tmp_size, 2, 1, inverse);
-					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
-						lgsize, lgtmp-2,
-						(dropbit)?0:0, (mpystage)?1:0,
+						lgtmp-2, (dropbit)?0:0, (mpystage)?1:0,
 						ckpce, cmem.c_str(), tmp_size,
 						resetw.c_str());
 					fprintf(vmain, "\t\t\tw_s%d, w_o%d, w_o%d, w_os%d);\n",

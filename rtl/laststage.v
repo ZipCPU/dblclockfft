@@ -6,42 +6,8 @@
 //
 // Purpose:	This is part of an FPGA implementation that will process
 //		the final stage of a decimate-in-frequency FFT, running
-//	through the data at two samples per clock.  If you notice from the
-//	derivation of an FFT, the only time both even and odd samples are
-//	used at the same time is in this stage.  Therefore, other than this
-//	stage and these twiddles, all of the other stages can run two stages
-//	at a time at one sample per clock.
+//	through the data at one sample per clock.
 //
-// Operation:
-// 	Given a stream of values, operate upon them as though they were
-// 	value pairs, x[2n] and x[2n+1].  The stream begins when n=0, and ends
-// 	when n=1.  When the first x[0] value enters, the synchronization
-//	input, i_sync, must be true as well.
-//
-// 	For this stream, produce outputs
-// 	y[2n  ] = x[2n] + x[2n+1], and
-// 	y[2n+1] = x[2n] - x[2n+1]
-//
-// 	When y[0] is output, a synchronization bit o_sync will be true as
-// 	well, otherwise it will be zero.
-//
-//
-//	In this implementation, the output is valid one clock after the input
-//	is valid.  The output also accumulates one bit above and beyond the
-//	number of bits in the input.
-//
-//		i_clk	A system clock
-//		i_reset	A synchronous reset
-//		i_ce	Circuit enable--nothing happens unless this line is high
-//		i_sync	A synchronization signal, high once per FFT at the start
-//		i_left	The first (even) complex sample input.  The higher order
-//			bits contain the real portion, low order bits the
-//			imaginary portion, all in two's complement.
-//		i_right	The next (odd) complex sample input, same format as
-//			i_left.
-//		o_left	The first (even) complex output.
-//		o_right	The next (odd) complex output.
-//		o_sync	Output synchronization signal.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -61,7 +27,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -74,98 +40,166 @@
 //
 `default_nettype	none
 //
-module	laststage(i_clk, i_reset, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync);
+module	laststage(i_clk, i_reset, i_ce, i_sync, i_val, o_val, o_sync);
 	parameter	IWIDTH=16,OWIDTH=IWIDTH+1, SHIFT=0;
-	input		i_clk, i_reset, i_ce, i_sync;
-	input		[(2*IWIDTH-1):0]	i_left, i_right;
-	output	reg	[(2*OWIDTH-1):0]	o_left, o_right;
-	output	reg			o_sync;
+	input	wire				i_clk, i_reset, i_ce, i_sync;
+	input	wire	[(2*IWIDTH-1):0]	i_val;
+	output	wire	[(2*OWIDTH-1):0]	o_val;
+	output	reg				o_sync;
 
-	wire	signed	[(IWIDTH-1):0]	i_in_0r, i_in_0i, i_in_1r, i_in_1i;
-	assign	i_in_0r = i_left[(2*IWIDTH-1):(IWIDTH)];
-	assign	i_in_0i = i_left[(IWIDTH-1):0];
-	assign	i_in_1r = i_right[(2*IWIDTH-1):(IWIDTH)];
-	assign	i_in_1i = i_right[(IWIDTH-1):0];
-	wire	[(OWIDTH-1):0]		o_out_0r, o_out_0i,
-					o_out_1r, o_out_1i;
+	reg	signed	[(IWIDTH-1):0]	m_r, m_i;
+	wire	signed	[(IWIDTH-1):0]	i_r, i_i;
 
+	assign	i_r = i_val[(2*IWIDTH-1):(IWIDTH)]; 
+	assign	i_i = i_val[(IWIDTH-1):0]; 
 
-	// Handle a potential rounding situation, when IWIDTH>=OWIDTH.
-
-
-
-	// As with any register connected to the sync pulse, these must
-	// have initial values and be reset on the i_reset signal.
-	// Other data values need only restrict their updates to i_ce
-	// enabled clocks, but sync's must obey resets and initial
-	// conditions as well.
-	reg	rnd_sync, r_sync;
-
-	initial	rnd_sync      = 1'b0; // Sync into rounding
-	initial	r_sync        = 1'b0; // Sync coming out
-	always @(posedge i_clk)
-		if (i_reset)
-		begin
-			rnd_sync <= 1'b0;
-			r_sync <= 1'b0;
-		end else if (i_ce)
-		begin
-			rnd_sync <= i_sync;
-			r_sync <= rnd_sync;
-		end
-
-	// As with other variables, these are really only updated when in
-	// the processing pipeline, after the first i_sync.  However, to
-	// eliminate as much unnecessary logic as possible, we toggle
-	// these any time the i_ce line is enabled, and don't reset.
-	// them on i_reset.
 	// Don't forget that we accumulate a bit by adding two values
 	// together. Therefore our intermediate value must have one more
 	// bit than the two originals.
-	reg	signed	[(IWIDTH):0]	rnd_in_0r, rnd_in_0i;
-	reg	signed	[(IWIDTH):0]	rnd_in_1r, rnd_in_1i;
+	reg	signed	[(IWIDTH):0]	rnd_r, rnd_i, sto_r, sto_i;
+	reg				wait_for_sync, stage;
+	reg		[1:0]		sync_pipe;
 
-	always @(posedge i_clk)
-		if (i_ce)
-		begin
-			//
-			rnd_in_0r <= i_in_0r + i_in_1r;
-			rnd_in_0i <= i_in_0i + i_in_1i;
-			//
-			rnd_in_1r <= i_in_0r - i_in_1r;
-			rnd_in_1i <= i_in_0i - i_in_1i;
-			//
-		end
-
-	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_0r(i_clk, i_ce,
-							rnd_in_0r, o_out_0r);
-
-	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_0i(i_clk, i_ce,
-							rnd_in_0i, o_out_0i);
-
-	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_1r(i_clk, i_ce,
-							rnd_in_1r, o_out_1r);
-
-	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_1i(i_clk, i_ce,
-							rnd_in_1i, o_out_1i);
-
-
-	// Prior versions of this routine did not include the extra
-	// clock and register/flip-flops that this routine requires.
-	// These are placed in here to correct a bug in Verilator, that
-	// otherwise struggles.  (Hopefully this will fix the problem ...)
-	always @(posedge i_clk)
-		if (i_ce)
-		begin
-			o_left  <= { o_out_0r, o_out_0i };
-			o_right <= { o_out_1r, o_out_1i };
-		end
-
-	initial	o_sync = 1'b0; // Final sync coming out of module
+	initial	wait_for_sync = 1'b1;
+	initial	stage         = 1'b0;
 	always @(posedge i_clk)
 		if (i_reset)
-			o_sync <= 1'b0;
-		else if (i_ce)
-			o_sync <= r_sync;
+		begin
+			wait_for_sync <= 1'b1;
+			stage         <= 1'b0;
+		end else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))
+		begin
+			wait_for_sync <= 1'b0;
+			//
+			stage <= 1'b1;
+			//
+		end else if (i_ce)
+			stage <= 1'b0;
 
+	initial	sync_pipe = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		sync_pipe <= 0;
+	else if (i_ce)
+		sync_pipe <= { sync_pipe[0], i_sync };
+
+	initial	o_sync = 1'b0;
+	always @(posedge i_clk)
+	if (i_reset)
+		o_sync <= 1'b0;
+	else if (i_ce)
+		o_sync <= sync_pipe[1];
+
+	always @(posedge i_clk)
+	if (i_ce)
+	begin
+		if (!stage)
+		begin
+			// Clock 1
+			m_r <= i_r;
+			m_i <= i_i;
+			// Clock 3
+			rnd_r <= sto_r;
+			rnd_i <= sto_i;
+			//
+		end else begin
+			// Clock 2
+			rnd_r <= m_r + i_r;
+			rnd_i <= m_i + i_i;
+			//
+			sto_r <= m_r - i_r;
+			sto_i <= m_i - i_i;
+			//
+		end
+	end
+
+	// Now that we have our results, let's round them and report them
+	wire	signed	[(OWIDTH-1):0]	o_r, o_i;
+
+	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_r(i_clk, i_ce, rnd_r, o_r);
+	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_i(i_clk, i_ce, rnd_i, o_i);
+
+	assign	o_val  = { o_r, o_i };
+
+`ifdef	FORMAL
+	reg	f_past_valid;
+	initial	f_past_valid = 1'b0;
+	always @(posedge i_clk)
+		f_past_valid <= 1'b1;
+
+`ifdef	LASTSTAGE
+	always @(posedge i_clk)
+		assume((i_ce)||($past(i_ce))||($past(i_ce,2)));
+`endif
+
+	initial	assert(IWIDTH+1 == OWIDTH);
+
+	reg	signed	[IWIDTH-1:0]	f_piped_real	[0:3];
+	reg	signed	[IWIDTH-1:0]	f_piped_imag	[0:3];
+	always @(posedge i_clk)
+	if (i_ce)
+	begin
+		f_piped_real[0] <= i_val[2*IWIDTH-1:IWIDTH];
+		f_piped_imag[0] <= i_val[  IWIDTH-1:0];
+
+		f_piped_real[1] <= f_piped_real[0];
+		f_piped_imag[1] <= f_piped_imag[0];
+
+		f_piped_real[2] <= f_piped_real[1];
+		f_piped_imag[2] <= f_piped_imag[1];
+
+		f_piped_real[3] <= f_piped_real[2];
+		f_piped_imag[3] <= f_piped_imag[2];
+	end
+
+	wire	f_syncd;
+	reg	f_rsyncd;
+
+	initial	f_rsyncd	= 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		f_rsyncd <= 1'b0;
+	else if (!f_rsyncd)
+		f_rsyncd <= o_sync;
+	assign	f_syncd = (f_rsyncd)||(o_sync);
+
+	reg	f_state;
+	initial	f_state = 0;
+	always @(posedge i_clk)
+	if (i_reset)
+		f_state <= 0;
+	else if ((i_ce)&&((!wait_for_sync)||(i_sync)))
+		f_state <= f_state + 1;
+
+	always @(*)
+	if (f_state != 0)
+		assume(!i_sync);
+
+	always @(*)
+		assert(stage == f_state[0]);
+
+	always @(posedge i_clk)
+	if ((f_state == 1'b1)&&(f_syncd))
+	begin
+		assert(o_r == f_piped_real[2] + f_piped_real[1]);
+		assert(o_i == f_piped_imag[2] + f_piped_imag[1]);
+	end
+
+	always @(posedge i_clk)
+	if ((f_state == 1'b0)&&(f_syncd))
+	begin
+		assert(!o_sync);
+		assert(o_r == f_piped_real[3] - f_piped_real[2]);
+		assert(o_i == f_piped_imag[3] - f_piped_imag[2]);
+	end
+
+	always @(*)
+	if (wait_for_sync)
+	begin
+		assert(!f_rsyncd);
+		assert(!o_sync);
+		assert(f_state == 0);
+	end
+
+`endif // FORMAL
 endmodule

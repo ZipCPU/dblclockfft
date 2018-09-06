@@ -2,7 +2,7 @@
 //
 // Filename:	abs_mpy.v
 //
-// Project:	Zip CPU -- a small, lightweight, RISC CPU soft core
+// Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	This code has been modified from the mpyop.v file so as to
 //		abstract the multiply that formal methods struggle so hard to

@@ -1,8 +1,8 @@
-############################################################################/
+################################################################################
 ##
 ## Filename: 	Makefile
 ##
-## Project:	A Generic Pipelined FFT Implementation
+## Project:	A General Purpose Pipelined FFT Implementation
 ##
 ## Purpose:	This is the main Makefile for the FFT core generator.
 ##		It is very simple in its construction, the most complicated
@@ -16,7 +16,7 @@
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
-##########################################################################/
+################################################################################
 ##
 ## Copyright (C) 2015,2018, Gisselquist Technology, LLC
 ##
@@ -31,15 +31,15 @@
 ## for more details.
 ##
 ## You should have received a copy of the GNU General Public License along
-## with this program.  (It's in the $(ROOT)/doc directory, run make with no
+## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 ## target there if the PDF file isn't present.)  If not, see
-## <http:##www.gnu.org/licenses/> for a copy.
+## <http://www.gnu.org/licenses/> for a copy.
 ##
 ## License:	GPL, v3, as defined and found on www.gnu.org,
-##		http:##www.gnu.org/licenses/gpl.html
+##		http://www.gnu.org/licenses/gpl.html
 ##
 ##
-##########################################################################/
+################################################################################
 ##
 ##
 # This is really simple ...
@@ -51,8 +51,8 @@ BENCHD  := ../bench/cpp
 SOURCES := bitreverse.cpp bldstage.cpp butterfly.cpp fftgen.cpp fftlib.cpp \
 		legal.cpp rounding.cpp softmpy.cpp
 TESTSZ  := -f 2048
-# CKPCE   := -k 1
-CKPCE   := -2
+CKPCE   := -1 -k 1
+# CKPCE   := -2
 MPYS    := -p 0
 IWID    := -n 15
 FFTPARAMS := -d $(CORED) $(TESTSZ) $(CKPCE) $(MPYS) $(IWID)
@@ -218,13 +218,16 @@ $(VOBJDR)/Vfftstage__ALL.a: $(VOBJDR)/Vfftstage.cpp
 
 .PHONY: clean
 clean:
-	rm fftgen fftgen.o
+	rm -rf fft-core/
+	rm -rf fftgen $(OBJDIR)/
 	rm -rf $(CORED)/obj_dir
 	rm -rf $(CORED)/fftmain.v $(CORED)/fftstage.v
+	rm -rf $(CORED)/ifftmain.v $(CORED)/ifftstage.v
 	rm -rf $(CORED)/qtrstage.v $(CORED)/laststage.v $(CORED)/bitreverse.v
 	rm -rf $(CORED)/butterfly.v $(CORED)/hwbfly.v
 	rm -rf $(CORED)/longbimpy.v $(CORED)/bimpy.v
 	rm -rf $(CORED)/convround.v
+	rm -rf $(CORED)/*cmem_*.hex
 
 #
 # The "depends" target, to know what files things depend upon.  The depends
@@ -259,4 +262,6 @@ tags:	$(SOURCES) $(HEADERS)
 	@echo "Generating tags"
 	@ctags $(SOURCES) $(HEADERS)
 
+ifneq ($(MAKECMDGOALS),clean)
 -include $(OBJDIR)/depends.txt
+endif

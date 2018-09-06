@@ -4,7 +4,9 @@
 //
 // Project:	A General Purpose Pipelined FFT Implementation
 //
-// Purpose:	
+// Purpose:	Builds one of two butterflies: either a butterfly implementation
+//		using hardware optimized multiplies, or one that uses a logic
+//	soft-multiply.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -24,7 +26,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -721,9 +723,10 @@ SLASHLINE
 	"\tassign	o_right= { rnd_right_r,rnd_right_i};\n"
 "\n");
 
+	fprintf(fp,
+"`ifdef	FORMAL\n");
 	if (formal_property_flag) {
 		fprintf(fp,
-"`ifdef	FORMAL\n"
 	"\tlocalparam	F_LGDEPTH = (AUXLEN > 64) ? 7\n"
 			"\t\t\t: (AUXLEN > 32) ? 6\n"
 			"\t\t\t: (AUXLEN > 16) ? 5\n"
@@ -785,10 +788,20 @@ SLASHLINE
 	"\tgenerate if (CKPCE <= 1)\n"
 	"\tbegin\n"
 "\n"
-	"\t	// i_ce is allowed to be anything in this mode\n"
+	"\t	always @(posedge i_clk)\n"
+	"\t	if ((!$past(i_ce)))\n"
+	"\t		assume(i_ce);\n"
 "\n"
 	"\tend else if (CKPCE == 2)\n"
 	"\tbegin : F_CKPCE_TWO\n"
+"\n"
+	"\t	always @(posedge i_clk)\n"
+	"\t	if ((!$past(i_ce))&&(!$past(i_ce,2)))\n"
+	"\t		assume(i_ce);\n"
+"\n"
+	"\t	always @(posedge i_clk)\n"
+	"\t	if ((!$past(i_ce))&&($past(i_ce,2))&&(!$past(i_ce,3))&&(!$past(i_ce,4)))\n"
+	"\t		assume(i_ce);\n"
 "\n"
 	"\t	always @(posedge i_clk)\n"
 	"\t		if ($past(i_ce))\n"
@@ -962,9 +975,12 @@ SLASHLINE
 	"\tparameter	F_CHECK = MPYREMAINDER;\n"
 	"\tinitial	assert(MPYREMAINDER == F_CHECK);\n\n");
 
+	} else {
+		fprintf(fp, "// Set the formal_property_flag to enable formal\n"
+			"// property generation\n");
+	}
 		fprintf(fp,
 "`endif // FORMAL\n");
-	}
 
 	fprintf(fp,
 "endmodule\n");

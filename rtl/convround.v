@@ -30,7 +30,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -45,8 +45,8 @@
 //
 module	convround(i_clk, i_ce, i_val, o_val);
 	parameter	IWID=16, OWID=8, SHIFT=0;
-	input					i_clk, i_ce;
-	input		signed	[(IWID-1):0]	i_val;
+	input	wire				i_clk, i_ce;
+	input	wire	signed	[(IWID-1):0]	i_val;
 	output	reg	signed	[(OWID-1):0]	o_val;
 
 	// Let's deal with three cases to be as general as we can be here

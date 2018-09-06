@@ -1,8 +1,8 @@
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	butterfly_tb.cpp
 //
-// Project:	A Doubletime Pipelined FFT
+// Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A test-bench for the butterfly.v subfile of the generic
 //		pipelined FFT.  This file may be run autonomously.  If so,
@@ -15,7 +15,7 @@
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015,2018 Gisselquist Technology, LLC
 //
@@ -30,7 +30,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -38,7 +38,7 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>
 #include <stdint.h>
 
@@ -58,6 +58,8 @@
 #define	CWIDTH	TST_BUTTERFLY_CWIDTH
 #define	OWIDTH	TST_BUTTERFLY_OWIDTH
 #define	BFLYDELAY	TST_BUTTERFLY_MPYDELAY
+
+bool	gbl_debug = false;
 
 class	BFLY_TB {
 public:
@@ -182,9 +184,10 @@ public:
 		m_bfly->i_ce = 1;
 		cetick();
 
-		if ((m_bfly->o_aux)&&(!m_lastaux))
-			printf("\n");
-		printf("n,k=%d,%3d: COEF=%0*lx, LFT=%0*x, RHT=%0*x, A=%d, OLFT =%0*lx, ORHT=%0*lx, AUX=%d\n",
+		if (gbl_debug) {
+			if ((m_bfly->o_aux)&&(!m_lastaux))
+				printf("\n");
+			printf("n,k=%d,%3d: COEF=%0*lx, LFT=%0*x, RHT=%0*x, A=%d, OLFT =%0*lx, ORHT=%0*lx, AUX=%d\n",
 			n,k,
 			(2*CWIDTH+3)/4, ubits(m_bfly->i_coef, 2*CWIDTH),
 			(2*IWIDTH+3)/4, m_bfly->i_left,
@@ -193,6 +196,7 @@ public:
 			(2*OWIDTH+3)/4, (long)m_bfly->o_left,
 			(2*OWIDTH+3)/4, (long)m_bfly->o_right,
 			m_bfly->o_aux);
+		}
 
 		if ((m_syncd)&&(m_left[(m_addr-m_offset)&(64-1)] != m_bfly->o_left)) {
 			printf("WRONG O_LEFT! (%lx(exp) != %lx(sut)\n",
@@ -320,7 +324,7 @@ int	main(int argc, char **argv, char **envp) {
 
 	const int	TESTSZ = 256;
 
-	bfly->opentrace("butterfly.vcd");
+	// bfly->opentrace("butterfly.vcd");
 
 	bfly->reset();
 

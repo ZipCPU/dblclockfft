@@ -4,7 +4,12 @@
 //
 // Project:	A General Purpose Pipelined FFT Implementation
 //
-// Purpose:
+// Purpose:	This defaults file contains defaults used throughout the design.
+//		These primarily consist of whether or not the project contains
+//	formal properties, the default directory the core will be placed into,
+//	as well as the default parameters of the various modules--parameters
+//	which will be overridden in operation but are kept as is for bench-test
+//	simulation.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -24,7 +29,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //

@@ -1,25 +1,17 @@
-all: ifft_tb
 ################################################################################
 ##
 ## Filename: 	Makefile
 ##
 ## Project:	A General Purpose Pipelined FFT Implementation
 ##
-## Purpose:	This programs the build process for part of the ifft_tb test
-##		bench associated with the double clocked FFT project.
-##
-##		This is only part of the test bench program.  This one is
-##		different from the others, in that the ifft_tb includes
-##		both verilator code in the test bench as well as the
-##		C++ code.  The C++ code will depend upon the verilog
-##		code found in this directory and built here.
+## Purpose:	This is the master Makefile for the FFT core generator.
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
 ##
-## Copyright (C) 2015, Gisselquist Technology, LLC
+## Copyright (C) 2018, Gisselquist Technology, LLC
 ##
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
@@ -44,32 +36,26 @@ all: ifft_tb
 ##
 ##
 # This is really simple ...
-all: ifft_tb
-CORED := fft-core
-ifneq ($(VERILATOR_ROOT),)
-VERILATOR:=$(VERILATOR_ROOT)/bin/verilator
-else
-VERILATOR:=verilator
-VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | sed -e " s/^.*=\s*//"')
-endif
-export	$(VERILATOR)
-VROOT   := $(VERILATOR_ROOT)
-VSRCD   := ../../sw/$(CORED)
-VFLAGS  := -Wall -MMD --trace -y $(VSRCD) -cc
+SUBMAKE := make -C
+.PHONY: all
+all:
+	$(SUBMAKE) sw
 
-LCLDR:= obj_dir
-IFTLB:= $(LCLDR)/Vifft_tb__ALL.a
+.PHONY: example rtl
+rtl: example
+example:
+	$(SUBMAKE) sw test
 
-.PHONY: ifft_tb
-ifft_tb: $(IFTLB)
+.PHONY: bench
+bench: example
+	$(SUBMAKE) bench/cpp
 
-$(IFTLB): $(LCLDR)/Vifft_tb.cpp
-	cd $(LCLDR); make -f Vifft_tb.mk
-$(LCLDR)/Vifft_tb.cpp: ifft_tb.v $(VSRCD)/fftmain.v $(VSRCD)/ifftmain.v
-	$(VERILATOR) $(VFLAGS) ifft_tb.v
+.PHONY: bench-test
+bench-test: bench
+	$(SUBMAKE) bench/cpp test
 
 .PHONY: clean
 clean:
-	rm -rf $(LCLDR)
-
--include $(VERILATOR_ROOT)/include/verilated.mk
+	$(SUBMAKE) sw           clean
+	$(SUBMAKE) bench/cpp    clean
+	$(SUBMAKE) bench/formal clean

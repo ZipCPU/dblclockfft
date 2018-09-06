@@ -33,7 +33,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -59,6 +59,14 @@
 
 #define	cmem	VVAR(_cmem)
 #define	iaddr	VVAR(_iaddr)
+#define	ib_sync	VVAR(_ib_sync)
+#define	ib_a	VVAR(_ib_a)
+#define	ib_b	VVAR(_ib_b)
+#define	ib_c	VVAR(_ib_c)
+
+#define	ob_sync	VVAR(_ob_sync)
+#define	ob_a	VVAR(_ob_a)
+#define	ob_b	VVAR(_ob_b)
 
 #define	FFTBITS	(FFT_LGWIDTH)
 #define	FFTLEN	(1<<FFTBITS)
@@ -76,28 +84,34 @@
 #endif
 #define	ROUND	true
 
-#define	SPANLEN	(1<<LGSPAN)
+#define	SPANLEN		(1<<LGSPAN)
 #define	SPANMASK	(SPANLEN-1)
 #define	DBLSPANLEN	(1<<(LGSPAN+4))
 #define	DBLSPANMASK	(DBLSPANLEN-1)
+
+const	bool	gbl_debug = false;
 
 class	FFTSTAGE_TB {
 public:
 	Vfftstage	*m_ftstage;
 	VerilatedVcdC	*m_trace;
-	long		m_oaddr, m_iaddr;
+	long		m_iaddr;
 	long		m_vals[SPANLEN], m_out[DBLSPANLEN];
-	bool		m_syncd;
-	int		m_offset;
+	bool		m_syncd, m_ib_syncd, m_ob_syncd, m_input_sync;
+	int		m_offset, m_ib_offset, m_ob_offset;
 	uint64_t	m_tickcount;
 
 	FFTSTAGE_TB(void) {
 		Verilated::traceEverOn(true);
 		m_ftstage = new Vfftstage;
 		m_syncd = false;
-		m_iaddr = m_oaddr = 0;
+		m_input_sync = false;
+		m_ib_syncd   = false;
+		m_ob_syncd   = false;
+		m_iaddr = 0;
 		m_offset = 0;
 		m_tickcount = 0;
+assert(OWIDTH == IWIDTH+1);
 	}
 
 	void	opentrace(const char *vcdname) {
@@ -153,11 +167,14 @@ public:
 	void	reset(void) {
 		m_ftstage->i_ce  = 0;
 		m_ftstage->i_reset = 1;
+		m_ftstage->i_sync  = 0;
 		tick();
 
 		// Let's give it several ticks with no sync
 		m_ftstage->i_ce = 0;
 		m_ftstage->i_reset = 0;
+		m_ftstage->i_sync  = 0;
+		/*
 		for(int i=0; i<8192; i++) {
 			m_ftstage->i_data = rand();
 			m_ftstage->i_sync = 0;
@@ -167,11 +184,13 @@ public:
 
 			assert(m_ftstage->o_sync == 0);
 		}
+		*/
 
 		m_iaddr = 0;
-		m_oaddr = 0;
 		m_offset = 0;
 		m_syncd = false;
+		m_ib_syncd = false;
+		m_ob_syncd = false;
 	}
 
 	void	butterfly(const long cv, const long lft, const long rht,
@@ -191,9 +210,8 @@ public:
 
 		o_lft_r = lft_r + rht_r;
 		o_lft_i = lft_i + rht_i;
-
-		o_lft_r &= (~(-1l << OWIDTH));
-		o_lft_i &= (~(-1l << OWIDTH));
+		o_lft_r = ubits(o_lft_r, OWIDTH);
+		o_lft_i = ubits(o_lft_i, OWIDTH);
 
 		// o_lft_r >>= 1;
 		// o_lft_i >>= 1;
@@ -203,26 +221,37 @@ public:
 		o_rht_i = (cv_r * (lft_i-rht_i)) + (cv_i * (lft_r-rht_r));
 
 		if (ROUND) {
+			/* Non-convergent rounding
 			if (o_rht_r & (1<<(CWIDTH-3)))
 				o_rht_r += (1<<(CWIDTH-3))-1;
 			if (o_rht_i & (1<<(CWIDTH-3)))
+				o_rht_i += (1<<(CWIDTH-3))-1;
+			*/
+
+			// Convergent rounding
+			if (o_rht_r & (1<<(CWIDTH-2)))
+				o_rht_r += (1<<(CWIDTH-3));
+			else
+				o_rht_r += (1<<(CWIDTH-3))-1;
+
+			if (o_rht_i & (1<<(CWIDTH-2)))
+				o_rht_i += (1<<(CWIDTH-3));
+			else
 				o_rht_i += (1<<(CWIDTH-3))-1;
 		}
 
 		o_rht_r >>= (CWIDTH-2);
 		o_rht_i >>= (CWIDTH-2);
 
-		o_rht_r &= (~(-1l << OWIDTH));
-		o_rht_i &= (~(-1l << OWIDTH));
+		o_rht_r = ubits(o_rht_r, OWIDTH);
+		o_rht_i = ubits(o_rht_i, OWIDTH);
 		o_rht = (o_rht_r << OWIDTH) | (o_rht_i);
 
 		/*
-		printf("%10lx %10lx %10lx -> %10lx %10lx\n",
-			cv & ((1l<<(2*CWIDTH))-1l),
-			lft & ((1l<<(2*IWIDTH))-1l),
-			rht & ((1l<<(2*IWIDTH))-1l),
-			o_lft & ((1l<<(2*OWIDTH))-1l),
-			o_rht & ((1l<<(2*OWIDTH))-1l));
+		printf("BUTTERFLY: %10lx %10lx %10lx -> %10lx %10lx\n",
+			ubits(cv, 2*CWIDTH),
+			ubits(lft,   2*IWIDTH), ubits(rht,   2*IWIDTH),
+			ubits(o_lft, 2*OWIDTH), ubits(o_rht, 2*OWIDTH));
 		*/
 	}
 
@@ -232,11 +261,17 @@ public:
 		int	raddr;
 		bool	failed = false;
 
-		m_ftstage->i_reset  = 0;
+		m_ftstage->i_reset = 0;
 		m_ftstage->i_ce   = 1;
 		m_ftstage->i_sync = i_sync;
-		i_data &= (~(-1l<<(2*IWIDTH)));
+		i_data = ubits(i_data, 2*IWIDTH);
 		m_ftstage->i_data = i_data;
+
+		if (!m_input_sync) {
+			if (i_sync)
+				m_input_sync = true;
+			m_iaddr = 0;
+		}
 
 		cv = m_ftstage->cmem[m_iaddr & SPANMASK];
 		bc = m_iaddr & (1<<LGSPAN);
@@ -247,64 +282,103 @@ public:
 			waddr &= (DBLSPANMASK);
 			if (m_iaddr & (1<<(LGSPAN+1)))
 				waddr |= (1<<(LGSPAN));
-			butterfly(cv, m_vals[m_iaddr & (SPANMASK)], i_data,
+			butterfly(cv,
+				m_vals[m_iaddr & (SPANMASK)],
+				i_data,
 				m_out[(m_iaddr-SPANLEN) & (DBLSPANMASK)],
 				m_out[m_iaddr & (DBLSPANMASK)]);
-			/*
-			printf("BFLY: C=%16lx M=%8lx I=%10lx -> %10lx %10lx\n",
-				cv, m_vals[m_iaddr & (SPANMASK)], i_data,
-				m_out[(m_iaddr-SPANLEN)&(DBLSPANMASK)],
-				m_out[m_iaddr & (DBLSPANMASK)]);
-			*/
 		}
 
 		cetick();
 
+		unsigned	ib_addr = (m_iaddr - m_ib_offset)
+					& ((SPANMASK<<1)|1);
+		if ((!m_ib_syncd)&&(m_ftstage->ib_sync)) {
+			m_ib_syncd = true;
+			m_ib_offset = m_iaddr;
+
+			if (gbl_debug) printf("IB-SYNC!!!!  Offset = %d\n", m_ib_offset);
+		} else if ((m_ib_syncd)&&(ib_addr <(1<<(LGSPAN)))) {
+			unsigned long	ib_a, ib_b, ib_c;
+			ib_a = m_vals[ib_addr&SPANMASK];
+			ib_b = i_data; // m_vals[(m_iaddr-m_ib_offset+(1<<(LGSPAN-1)))&(SPANMASK)];
+			ib_c = m_ftstage->cmem[(m_iaddr-m_ib_offset)&(SPANMASK)];
+
+			assert(m_ftstage->ib_a == ib_a);
+			assert(m_ftstage->ib_b == ib_b);
+			// assert(m_ftstage->ib_a == ib_a);
+		}
+
+		if ((!m_ob_syncd)&&(m_ftstage->ob_sync)) {
+			m_ob_syncd = true;
+			m_ob_offset = m_iaddr;
+
+			if (gbl_debug) printf("OB-SYNC!!!!  Offset = %d\n", m_ob_offset);
+		}
+
 		if ((!m_syncd)&&(m_ftstage->o_sync)) {
 			m_syncd = true;
-			// m_oaddr = m_iaddr - 0x219;
-			// m_oaddr = m_iaddr - 0;
 			m_offset = m_iaddr;
-			m_oaddr = 0;
 
-			printf("SYNC!!!!\n");
+			if (gbl_debug) printf("SYNC!!!!\n");
 		}
 
 		raddr = (m_iaddr-m_offset) & DBLSPANMASK;
-		/*
-		if (m_oaddr & (1<<(LGSPAN+1)))
-			raddr |= (1<<LGSPAN);
-		*/
 
-		printf("%4ld, %4ld: %d %9lx -> %9lx %d ... %4x %15lx (%10lx)\n",
-			(long)m_iaddr, (long)m_oaddr,
-			i_sync, (long)(i_data) & (~(-1l << (2*IWIDTH))),
-			(long)m_ftstage->o_data,
+		if (gbl_debug)
+			printf("%4ld, %4ld: %d %9lx -> %d %9lx ... "
+				"%4x %15lx (%10lx)",
+			(long)m_iaddr, (long)raddr,
+			// Input values
+			i_sync, ubits(i_data, 2*IWIDTH),
+			// Output values
 			m_ftstage->o_sync,
+			(long)m_ftstage->o_data,
 
-			m_ftstage->iaddr&(FFTMASK>>1),
-			(long)(m_ftstage->cmem[m_ftstage->iaddr&(SPANMASK>>1)]) & (~(-1l<<(2*CWIDTH))),
+			m_ftstage->iaddr&FFTMASK,
+			(long)(ubits(m_ftstage->cmem[
+				m_ftstage->iaddr&(SPANMASK)],
+				2*CWIDTH)),
 			(long)m_out[raddr]);
+
+		unsigned long	oba, obb;
+
+		oba = ubits(
+		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_left_r,OWIDTH)
+				<<OWIDTH;
+		oba |= ubits(
+		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_left_i, OWIDTH);
+
+		obb = ubits(
+		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_right_r, OWIDTH)
+				<<OWIDTH;
+		obb |= ubits(
+		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_right_i, OWIDTH);
+
+		if ((gbl_debug)&&(m_ob_syncd))
+			printf(" [%d %10lx %10lx]",
+				m_ftstage->ob_sync,
+				ubits(oba, 2*OWIDTH), ubits(obb, 2*OWIDTH));
 
 		if ((m_syncd)&&(m_ftstage->o_sync != ((((m_iaddr-m_offset)&((1<<(LGSPAN+1))-1))==0)?1:0))) {
 			fprintf(stderr, "Bad output sync (m_iaddr = %lx, m_offset = %x)\n",
 				(m_iaddr-m_offset) & SPANMASK, m_offset);
 			failed = true;
-		}
+		} printf("\n");
 
 		if (m_syncd) {
 			if (m_out[raddr] != m_ftstage->o_data) {
-				printf("Bad output data, ([%lx - %x = %x] %lx(exp) != %lx(sut))\n",
-					m_iaddr, m_offset, raddr,
+				printf("Bad output data, ([%lx - %x = %x (%d)] "
+					"%lx(exp) != %lx(sut))\n",
+					m_iaddr, m_offset, raddr, raddr,
 					m_out[raddr], (long)m_ftstage->o_data);
 				failed = true;
-			}
-		} else if (m_iaddr > 4096) {
+			} // printf("Checked #%d\n", raddr);
+		} else if (m_iaddr > FFTSIZE/2+128) {
 			printf("NO OUTPUT SYNC!\n");
 			failed = true;
 		}
 		m_iaddr++;
-		m_oaddr++;
 
 		if (failed)
 			exit(-1);
@@ -316,50 +390,52 @@ public:
 int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	FFTSTAGE_TB	*ftstage = new FFTSTAGE_TB;
-
-printf("Expecting : IWIDTH = %d, CWIDTH = %d, OWIDTH = %d\n",
-		IWIDTH, CWIDTH, OWIDTH);
+#ifdef	DBLCLKFFT
+#define	STEP	2
+#else
+#define	STEP	1
+#endif
 
 	ftstage->opentrace("fftstage.vcd");
 	ftstage->reset();
 
 	// Medium real (constant) value ... just for starters
-	for(int k=1; k<FFTSIZE; k+=2)
-		ftstage->test((k==1), 0x00200000l);
+	for(int k=0; k<FFTSIZE; k+=STEP)
+		ftstage->test((k==0), 0x00200000l);
 	// Medium imaginary (constant) value ... just for starters
-	for(int k=1; k<FFTSIZE; k+=2)
-		ftstage->test((k==1), 0x00000020l);
+	for(int k=0; k<FFTSIZE; k+=STEP)
+		ftstage->test((k==0), 0x00000020l);
 	// Medium sine wave, real
-	for(int k=1; k<FFTSIZE; k+=2) {
+	for(int k=0; k<FFTSIZE; k+=STEP) {
 		long vl;
 		vl= (long)(cos(2.0 * M_PI * 1.0 / FFTSIZE * k)*(1l<<30) + 0.5);
 		vl &= (-1l << 16); // Turn off the imaginary bit portion
-		vl &= (~(-1l << (IWIDTH*2))); // Turn off unused high order bits
+		vl = ubits(vl,2*IWIDTH); // Turn off unused high order bits
 		ftstage->test((k==1), vl);
 	}
 	// Smallest real value
-	for(int k=1; k<FFTSIZE; k+=2)
-		ftstage->test((k==1), 0x00080000l);
+	for(int k=0; k<FFTSIZE; k+=STEP)
+		ftstage->test((k==0), 0x00080000l);
 	// Smallest imaginary value
-	for(int k=1; k<FFTSIZE; k+=2)
-		ftstage->test((k==1), 0x00000001l);
+	for(int k=0; k<FFTSIZE; k+=STEP)
+		ftstage->test((k==0), 0x00000001l);
 	// Largest real value
-	for(int k=1; k<FFTSIZE; k+=2)
-		ftstage->test((k==1), 0x200000000l);
+	for(int k=0; k<FFTSIZE; k+=STEP)
+		ftstage->test((k==0), 0x200000000l);
 	// Largest negative imaginary value
-	for(int k=1; k<FFTSIZE; k+=2)
-		ftstage->test((k==1), 0x000010000l);
+	for(int k=0; k<FFTSIZE; k+=STEP)
+		ftstage->test((k==0), 0x000010000l);
 	// Let's try an impulse
-	for(int k=0; k<FFTSIZE; k+=2)
+	for(int k=0; k<FFTSIZE; k+=STEP)
 		ftstage->test((k==0), (k==0)?0x020000000l:0l);
 	// Now, let's clear out the result
-	for(int k=0; k<FFTSIZE; k+=2)
+	for(int k=0; k<FFTSIZE; k+=STEP)
 		ftstage->test((k==0), 0x000000000l);
-	for(int k=0; k<FFTSIZE; k+=2)
+	for(int k=0; k<FFTSIZE; k+=STEP)
 		ftstage->test((k==0), 0x000000000l);
-	for(int k=0; k<FFTSIZE; k+=2)
+	for(int k=0; k<FFTSIZE; k+=STEP)
 		ftstage->test((k==0), 0x000000000l);
-	for(int k=0; k<FFTSIZE; k+=2)
+	for(int k=0; k<FFTSIZE; k+=STEP)
 		ftstage->test((k==0), 0x000000000l);
 
 	printf("SUCCESS! (Offset = %d)\n", ftstage->m_offset);

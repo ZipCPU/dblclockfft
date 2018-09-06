@@ -4,30 +4,10 @@
 //
 // Project:	A General Purpose Pipelined FFT Implementation
 //
-// Purpose:	This module bitreverses a pipelined FFT input.  Operation is
-//		expected as follows:
-//
-//		i_clk	A running clock at whatever system speed is offered.
-//		i_reset	A synchronous reset signal, that resets all internals
-//		i_ce	If this is one, one input is consumed and an output
-//			is produced.
-//		i_in_0, i_in_1
-//			Two inputs to be consumed, each of width WIDTH.
-//		o_out_0, o_out_1
-//			Two of the bitreversed outputs, also of the same
-//			width, WIDTH.  Of course, there is a delay from the
-//			first input to the first output.  For this purpose,
-//			o_sync is present.
-//		o_sync	This will be a 1'b1 for the first value in any block.
-//			Following a reset, this will only become 1'b1 once
-//			the data has been loaded and is now valid.  After that,
-//			all outputs will be valid.
-//
-//	20150602 -- This module has undergone massive rework in order to
-//		ensure that it uses resources efficiently.  As a result,
-//		it now optimizes nicely into block RAMs.  As an unfortunately
-//		side effect, it now passes it's bench test (dblrev_tb) but
-//		fails the integration bench test (fft_tb).
+// Purpose:	This module bitreverses a pipelined FFT input.  It differes
+//		from the dblreverse module in that this is just a simple and
+//	straightforward bitreverse, rather than one written to handle two
+//	words at once.
 //
 //
 // Creator:	Dan Gisselquist, Ph.D.
@@ -48,7 +28,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -61,108 +41,52 @@
 //
 `default_nettype	none
 //
-
-
-//
-// How do we do bit reversing at two smples per clock?  Can we separate out
-// our work into eight memory banks, writing two banks at once and reading
-// another two banks in the same clock?
-//
-//	mem[00xxx0] = s_0[n]
-//	mem[00xxx1] = s_1[n]
-//	o_0[n] = mem[10xxx0]
-//	o_1[n] = mem[11xxx0]
-//	...
-//	mem[01xxx0] = s_0[m]
-//	mem[01xxx1] = s_1[m]
-//	o_0[m] = mem[10xxx1]
-//	o_1[m] = mem[11xxx1]
-//	...
-//	mem[10xxx0] = s_0[n]
-//	mem[10xxx1] = s_1[n]
-//	o_0[n] = mem[00xxx0]
-//	o_1[n] = mem[01xxx0]
-//	...
-//	mem[11xxx0] = s_0[m]
-//	mem[11xxx1] = s_1[m]
-//	o_0[m] = mem[00xxx1]
-//	o_1[m] = mem[01xxx1]
-//	...
-//
-//	The answer is that, yes we can but: we need to use four memory banks
-//	to do it properly.  These four banks are defined by the two bits
-//	that determine the top and bottom of the correct address.  Larger
-//	FFT's would require more memories.
-//
-//
-module	bitreverse(i_clk, i_reset, i_ce, i_in_0, i_in_1,
-		o_out_0, o_out_1, o_sync);
+module	bitreverse(i_clk, i_reset, i_ce, i_in, o_out, o_sync);
 	parameter			LGSIZE=5, WIDTH=24;
-	input				i_clk, i_reset, i_ce;
-	input		[(2*WIDTH-1):0]	i_in_0, i_in_1;
-	output	wire	[(2*WIDTH-1):0]	o_out_0, o_out_1;
+	input	wire			i_clk, i_reset, i_ce;
+	input	wire	[(2*WIDTH-1):0]	i_in;
+	output	reg	[(2*WIDTH-1):0]	o_out;
 	output	reg			o_sync;
+	reg	[(LGSIZE):0]	wraddr;
+	wire	[(LGSIZE):0]	rdaddr;
 
-	reg			in_reset;
-	reg	[(LGSIZE-1):0]	iaddr;
-	wire	[(LGSIZE-3):0]	braddr;
+	reg	[(2*WIDTH-1):0]	brmem	[0:((1<<(LGSIZE+1))-1)];
 
 	genvar	k;
-	generate for(k=0; k<LGSIZE-2; k=k+1)
-	begin : gen_a_bit_reversed_value
-		assign braddr[k] = iaddr[LGSIZE-3-k];
-	end endgenerate
+	generate for(k=0; k<LGSIZE; k=k+1)
+		assign rdaddr[k] = wraddr[LGSIZE-1-k];
+	endgenerate
+	assign	rdaddr[LGSIZE] = !wraddr[LGSIZE];
 
-	initial iaddr = 0;
-	initial in_reset = 1'b1;
-	initial o_sync = 1'b0;
+	reg	in_reset;
+
+	initial	in_reset = 1'b1;
 	always @(posedge i_clk)
 		if (i_reset)
-		begin
-			iaddr <= 0;
 			in_reset <= 1'b1;
-			o_sync <= 1'b0;
-		end else if (i_ce)
+		else if ((i_ce)&&(&wraddr[(LGSIZE-1):0]))
+			in_reset <= 1'b0;
+
+	initial	wraddr = 0;
+	always @(posedge i_clk)
+		if (i_reset)
+			wraddr <= 0;
+		else if (i_ce)
 		begin
-			iaddr <= iaddr + { {(LGSIZE-1){1'b0}}, 1'b1 };
-			if (&iaddr[(LGSIZE-2):0])
-				in_reset <= 1'b0;
-			if (in_reset)
-				o_sync <= 1'b0;
-			else
-				o_sync <= ~(|iaddr[(LGSIZE-2):0]);
+			brmem[wraddr] <= i_in;
+			wraddr <= wraddr + 1;
 		end
 
-	reg	[(2*WIDTH-1):0]	mem_e [0:((1<<(LGSIZE))-1)];
-	reg	[(2*WIDTH-1):0]	mem_o [0:((1<<(LGSIZE))-1)];
+	always @(posedge i_clk)
+		if (i_ce) // If (i_reset) we just output junk ... not a problem
+			o_out <= brmem[rdaddr]; // w/o a sync pulse
 
+	initial	o_sync = 1'b0;
 	always @(posedge i_clk)
-		if (i_ce)	mem_e[iaddr] <= i_in_0;
-	always @(posedge i_clk)
-		if (i_ce)	mem_o[iaddr] <= i_in_1;
-
-
-	reg [(2*WIDTH-1):0] evn_out_0, evn_out_1, odd_out_0, odd_out_1;
-
-	always @(posedge i_clk)
-		if (i_ce)
-			evn_out_0 <= mem_e[{!iaddr[LGSIZE-1],1'b0,braddr}];
-	always @(posedge i_clk)
-		if (i_ce)
-			evn_out_1 <= mem_e[{!iaddr[LGSIZE-1],1'b1,braddr}];
-	always @(posedge i_clk)
-		if (i_ce)
-			odd_out_0 <= mem_o[{!iaddr[LGSIZE-1],1'b0,braddr}];
-	always @(posedge i_clk)
-		if (i_ce)
-			odd_out_1 <= mem_o[{!iaddr[LGSIZE-1],1'b1,braddr}];
-
-	reg	adrz;
-	always @(posedge i_clk)
-		if (i_ce) adrz <= iaddr[LGSIZE-2];
-
-	assign	o_out_0 = (adrz)?odd_out_0:evn_out_0;
-	assign	o_out_1 = (adrz)?odd_out_1:evn_out_1;
+		if (i_reset)
+			o_sync <= 1'b0;
+		else if ((i_ce)&&(!in_reset))
+			o_sync <= (wraddr[(LGSIZE-1):0] == 0);
 
 `ifdef	FORMAL
 `ifdef	BITREVERSE
@@ -182,7 +106,7 @@ module	bitreverse(i_clk, i_reset, i_ce, i_in_0, i_in_1,
 	always @(posedge i_clk)
 	if ((!f_past_valid)||($past(i_reset)))
 	begin
-		`ASSERT(iaddr == 0);
+		`ASSERT(wraddr == 0);
 		`ASSERT(in_reset);
 		`ASSERT(!o_sync);
 	end
@@ -191,134 +115,59 @@ module	bitreverse(i_clk, i_reset, i_ce, i_in_0, i_in_1,
 		assume((i_ce)||($past(i_ce))||($past(i_ce,2)));
 `endif // BITREVERSE
 
-		(* anyconst *) reg	[LGSIZE-1:0]	f_const_addr;
-		wire	[LGSIZE-3:0]	f_reversed_addr;
-		// reg	[LGSIZE:0]	f_now;
-		reg			f_addr_loaded_0, f_addr_loaded_1;
-		reg	[(2*WIDTH-1):0]	f_data_0, f_data_1;
-		wire			f_writing, f_reading;
+		(* anyconst *) reg	[LGSIZE:0]	f_const_addr;
+		wire	[LGSIZE:0]	f_reversed_addr;
+		reg			f_addr_loaded;
+		reg	[(2*WIDTH-1):0]	f_addr_value;
 
-		generate for(k=0; k<LGSIZE-2; k=k+1)
-			assign	f_reversed_addr[k] = f_const_addr[LGSIZE-3-k];
+		generate for(k=0; k<LGSIZE; k=k+1)
+			assign	f_reversed_addr[k] = f_const_addr[LGSIZE-1-k];
 		endgenerate
+		assign	f_reversed_addr[LGSIZE] = f_const_addr[LGSIZE];
 
-		assign	f_writing=(f_const_addr[LGSIZE-1]==iaddr[LGSIZE-1]);
-		assign	f_reading=(f_const_addr[LGSIZE-1]!=iaddr[LGSIZE-1]);
-		initial	f_addr_loaded_0 = 1'b0;
-		initial	f_addr_loaded_1 = 1'b0;
+		initial	f_addr_loaded = 1'b0;
 		always @(posedge i_clk)
 		if (i_reset)
+			f_addr_loaded <= 1'b0;
+		else if (i_ce)
 		begin
-			f_addr_loaded_0 <= 1'b0;
-			f_addr_loaded_1 <= 1'b0;
-		end else if (i_ce)
-		begin
-			if (iaddr == f_const_addr)
-			begin
-				f_addr_loaded_0 <= 1'b1;
-				f_addr_loaded_1 <= 1'b1;
-			end
-
-			if (f_reading)
-			begin
-				if ((braddr == f_const_addr[LGSIZE-3:0])
-					&&(iaddr[LGSIZE-2] == 1'b0))
-					f_addr_loaded_0 <= 1'b0;
-
-				if ((braddr == f_const_addr[LGSIZE-3:0])
-					&&(iaddr[LGSIZE-2] == 1'b1))
-					f_addr_loaded_1 <= 1'b0;
-			end
+			if (wraddr == f_const_addr)
+				f_addr_loaded <= 1'b1;
+			else if (rdaddr == f_const_addr)
+				f_addr_loaded <= 1'b0;
 		end
 
 		always @(posedge i_clk)
-		if ((i_ce)&&(iaddr == f_const_addr))
+		if ((i_ce)&&(wraddr == f_const_addr))
 		begin
-			f_data_0 <= i_in_0;
-			f_data_1 <= i_in_1;
-			`ASSERT(!f_addr_loaded_0);
-			`ASSERT(!f_addr_loaded_1);
+			f_addr_value <= i_in;
+			`ASSERT(!f_addr_loaded);
 		end
 
 		always @(posedge i_clk)
 		if ((f_past_valid)&&(!$past(i_reset))
-				&&($past(f_addr_loaded_0))&&(!f_addr_loaded_0))
-		begin
-			assert(!$past(iaddr[LGSIZE-2]));
-			if (f_const_addr[LGSIZE-2])
-				assert(o_out_1 == f_data_0);
-			else
-				assert(o_out_0 == f_data_0);
-		end
-
-		always @(posedge i_clk)
-		if ((f_past_valid)&&(!$past(i_reset))
-				&&($past(f_addr_loaded_1))&&(!f_addr_loaded_1))
-		begin
-			assert($past(iaddr[LGSIZE-2]));
-			if (f_const_addr[LGSIZE-2])
-				assert(o_out_1 == f_data_1);
-			else
-				assert(o_out_0 == f_data_1);
-		end
+				&&($past(f_addr_loaded))&&(!f_addr_loaded))
+			assert(o_out == f_addr_value);
 
 		always @(*)
-			`ASSERT(o_sync == ((iaddr[LGSIZE-2:0] == 1)&&(!in_reset)));
-
-		// Before writing to a section, the loaded flags should be
-		// zero
-		always @(*)
-		if (f_writing)
-		begin
-			`ASSERT(f_addr_loaded_0 == (iaddr[LGSIZE-2:0]
-						> f_const_addr[LGSIZE-2:0]));
-			`ASSERT(f_addr_loaded_1 == (iaddr[LGSIZE-2:0]
-						> f_const_addr[LGSIZE-2:0]));
-		end
-
-		// If we were writing, and now we are reading, then both
-		// f_addr_loaded flags must be set
-		always @(posedge i_clk)
-		if ((f_past_valid)&&(!$past(i_reset))
-				&&($past(f_writing))&&(f_reading))
-		begin
-			`ASSERT(f_addr_loaded_0);
-			`ASSERT(f_addr_loaded_1);
-		end
+		if (o_sync)
+			assert(wraddr[LGSIZE-1:0] == 1);
 
 		always @(*)
-		if (f_writing)
-			`ASSERT(f_addr_loaded_0 == f_addr_loaded_1);
-
-		// When reading, and the loaded flag is zero, our pointer
-		// must not have hit the address of interest yet
-		always @(*)
-		if ((!in_reset)&&(f_reading))
-			`ASSERT(f_addr_loaded_0 ==
-				((!iaddr[LGSIZE-2])&&(iaddr[LGSIZE-3:0]
-					<= f_reversed_addr[LGSIZE-3:0])));
-		always @(*)
-		if ((!in_reset)&&(f_reading))
-			`ASSERT(f_addr_loaded_1 ==
-				((!iaddr[LGSIZE-2])||(iaddr[LGSIZE-3:0]
-					<= f_reversed_addr[LGSIZE-3:0])));
-		always @(*)
-		if ((in_reset)&&(f_reading))
-		begin
-			`ASSERT(!f_addr_loaded_0);
-			`ASSERT(!f_addr_loaded_1);
-		end
+		if ((wraddr[LGSIZE]==f_const_addr[LGSIZE])
+				&&(wraddr[LGSIZE-1:0]
+						<= f_const_addr[LGSIZE-1:0]))
+			`ASSERT(!f_addr_loaded);
 
 		always @(*)
-		if(iaddr[LGSIZE-1])
-			`ASSERT(!in_reset);
+		if ((rdaddr[LGSIZE]==f_const_addr[LGSIZE])&&(f_addr_loaded))
+			`ASSERT(wraddr[LGSIZE-1:0]
+					<= f_reversed_addr[LGSIZE-1:0]+1);
 
 		always @(*)
-		if (f_addr_loaded_0)
-			`ASSERT(mem_e[f_const_addr] == f_data_0);
-		always @(*)
-		if (f_addr_loaded_1)
-			`ASSERT(mem_o[f_const_addr] == f_data_1);
+		if (f_addr_loaded)
+			`ASSERT(brmem[f_const_addr] == f_addr_value);
+
 
 
 `endif	// FORMAL

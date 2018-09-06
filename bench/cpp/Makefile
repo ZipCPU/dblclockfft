@@ -1,8 +1,8 @@
-############################################################################
+################################################################################
 ##
 ## Filename: 	Makefile
 ##
-## Project:	A Doubletime Pipelined FFT
+## Project:	A General Purpose Pipelined FFT Implementation
 ##
 ## Purpose:	This programs the build process for the test benches
 ##		associated with the double clocked FFT project.  These
@@ -11,14 +11,13 @@
 ##	be too difficult to modify for other FFT parameters.
 ##
 ##	Please note that running these test benches requires access to the
-##	*cmem_*.hex files found in trunk/rtl.  I usually soft link
-##	them into this directory, but such linking is not currently part of
-##	this makefile or the build scripts.
+##	*cmem_*.hex files found in trunk/rtl.  They will be linked into this
+##	directory as part of the tests.
 ##
 ## Creator:	Dan Gisselquist, Ph.D.
 ##		Gisselquist Technology, LLC
 ##
-##########################################################################/
+################################################################################
 ##
 ## Copyright (C) 2015,2018 Gisselquist Technology, LLC
 ##
@@ -33,17 +32,17 @@
 ## for more details.
 ##
 ## You should have received a copy of the GNU General Public License along
-## with this program.  (It's in the $(ROOT)/doc directory, run make with no
+## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 ## target there if the PDF file isn't present.)  If not, see
-## <http:##www.gnu.org/licenses/> for a copy.
+## <http://www.gnu.org/licenses/> for a copy.
 ##
 ## License:	GPL, v3, as defined and found on www.gnu.org,
-##		http:##www.gnu.org/licenses/gpl.html
+##		http://www.gnu.org/licenses/gpl.html
 ##
 ##
-##########################################################################/
+################################################################################
 all: mpy_tb bitreverse_tb hwbfly_tb butterfly_tb fftstage_tb fft_tb
-all: qtrstage_tb laststage_tb test
+all: qtrstage_tb laststage_tb
 
 OBJDR:= ../../rtl/obj_dir
 VSRCD = ../../rtl
@@ -110,26 +109,49 @@ ifft_tb: ifft_tb.cpp twoc.cpp twoc.h fftsize.h $(IFTLB)
 # cmem_%.hex: $(VSRCD)/cmem_%.hex
 	# echo ln -s $* $<
 HEX:
-	ln -s $(VSRCD)/*.hex .
+	ln -sf $(VSRCD)/*.hex .
 
 .PHONY: test
-test: mpy_tb bitreverse_tb fftstage_tb qtrstage_tb butterfly_tb fftstage_tb
-test: fft_tb ifft_tb hwbfly_tb
-	./mpy_tb
-	./bitreverse_tb
-	./fftstage_tb
-	echo ./qtrstage_tb
-	./butterfly_tb
-	./hwbfly_tb
-	./fftstage_tb
+test: mpy_tb.pass bitreverse_tb.pass fftstage_tb.pass qtrstage_tb.pass
+test: laststage_tb.pass butterfly_tb.pass hwbfly_tb.pass
+test: fft_tb ifft_tb HEX
 	./fft_tb
 	./ifft_tb
+
+mpy_tb.pass: mpy_tb
+	./mpy_tb
+	touch mpy_tb.pass
+
+fftstage_tb.pass: fftstage_tb HEX
+	./fftstage_tb
+	touch fftstage_tb.pass
+
+butterfly_tb.pass: butterfly_tb
+	./butterfly_tb
+	touch butterfly_tb.pass
+
+hwbfly_tb.pass: hwbfly_tb
+	./hwbfly_tb
+	touch hwbfly_tb.pass
+
+qtrstage_tb.pass: qtrstage_tb
+	./qtrstage_tb
+	touch qtrstage_tb.pass
+
+laststage_tb.pass: laststage_tb
+	./laststage_tb
+	touch laststage_tb.pass
+
+bitreverse_tb.pass: bitreverse_tb
+	./bitreverse_tb
+	touch bitreverse_tb.pass
 
 .PHONY: clean
 clean:
 	rm -f mpy_tb bitreverse_tb fftstage_tb qtrstage_tb butterfly_tb
-	rm -f fftstage_tb fft_tb ifft_tb hwbfly_tb
+	rm -f fftstage_tb fft_tb ifft_tb hwbfly_tb laststage_tb
 	rm -rf fft_tb.dbl ifft_tb.dbl
 	rm -rf *cmem_*.hex
+	rm -rf *.pass
 
 include $(VERILATOR_ROOT)/include/verilated.mk

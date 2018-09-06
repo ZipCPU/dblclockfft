@@ -1,4 +1,4 @@
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	mpy_tb.cpp
 //
@@ -6,16 +6,16 @@
 //
 // Purpose:	A test-bench for the shift and add shiftaddmpy.v subfile of
 //		the double clocked FFT.  This file may be run autonomously. 
-//		If so, the last line output will either read "SUCCESS" on
-//		success, or some other failure message otherwise.
+//	If so, the last line output will either read "SUCCESS" on success, or
+//	some other failure message otherwise.
 //
-//		This file depends upon verilator to both compile, run, and
-//		therefore test shiftaddmpy.v
+//	This file depends upon verilator to both compile, run, and therefore
+//	test shiftaddmpy.v
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015-2018, Gisselquist Technology, LLC
 //
@@ -30,7 +30,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -38,7 +38,7 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
@@ -180,7 +180,7 @@ int	main(int argc, char **argv, char **envp) {
 	Verilated::commandArgs(argc, argv);
 	MPYTB		*tb = new MPYTB;
 
-	tb->opentrace("mpy.vcd");
+	// tb->opentrace("mpy.vcd");
 	tb->reset();
 
 	for(int k=0; k<15; k++) {

@@ -50,7 +50,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -75,10 +75,10 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	// The number of clocks per clock enable, 1, 2, or 3.
 	parameter	[1:0]	CKPCE=1;
 	//
-	input		i_clk, i_reset, i_ce;
-	input		[(2*CWIDTH-1):0]	i_coef;
-	input		[(2*IWIDTH-1):0]	i_left, i_right;
-	input		i_aux;
+	input	wire	i_clk, i_reset, i_ce;
+	input	wire	[(2*CWIDTH-1):0]	i_coef;
+	input	wire	[(2*IWIDTH-1):0]	i_left, i_right;
+	input	wire	i_aux;
 	output	wire	[(2*OWIDTH-1):0]	o_left, o_right;
 	output	reg	o_aux;
 
@@ -481,9 +481,6 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	o_left = { rnd_left_r, rnd_left_i };
 	assign	o_right= { rnd_right_r,rnd_right_i};
 
-`ifdef	VERILATOR
-`define	FORMAL
-`endif
 `ifdef	FORMAL
 	localparam	F_LGDEPTH = 3;
 	localparam	F_DEPTH = 5;

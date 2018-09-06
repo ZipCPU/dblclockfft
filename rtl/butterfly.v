@@ -88,7 +88,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -147,10 +147,10 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	localparam	MPYREMAINDER = MPYDELAY - CKPCE*(MPYDELAY/CKPCE);
 
 
-	input		i_clk, i_reset, i_ce;
-	input		[(2*CWIDTH-1):0] i_coef;
-	input		[(2*IWIDTH-1):0] i_left, i_right;
-	input		i_aux;
+	input	wire	i_clk, i_reset, i_ce;
+	input	wire	[(2*CWIDTH-1):0] i_coef;
+	input	wire	[(2*IWIDTH-1):0] i_left, i_right;
+	input	wire	i_aux;
 	output	wire	[(2*OWIDTH-1):0] o_left, o_right;
 	output	reg	o_aux;
 
@@ -558,9 +558,6 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	o_left = { rnd_left_r, rnd_left_i };
 	assign	o_right= { rnd_right_r,rnd_right_i};
 
-`ifdef	VERILATOR
-`define FORMAL
-`endif
 `ifdef	FORMAL
 	localparam	F_LGDEPTH = (AUXLEN > 64) ? 7
 			: (AUXLEN > 32) ? 6
@@ -624,10 +621,20 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	generate if (CKPCE <= 1)
 	begin
 
-		// i_ce is allowed to be anything in this mode
+		always @(posedge i_clk)
+		if ((!$past(i_ce)))
+			assume(i_ce);
 
 	end else if (CKPCE == 2)
 	begin : F_CKPCE_TWO
+
+		always @(posedge i_clk)
+		if ((!$past(i_ce))&&(!$past(i_ce,2)))
+			assume(i_ce);
+
+		always @(posedge i_clk)
+		if ((!$past(i_ce))&&($past(i_ce,2))&&(!$past(i_ce,3))&&(!$past(i_ce,4)))
+			assume(i_ce);
 
 		always @(posedge i_clk)
 			if ($past(i_ce))

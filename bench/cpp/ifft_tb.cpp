@@ -1,23 +1,22 @@
+////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	ifft_tb.cpp
 //
-// Project:	A Doubletime Pipelined FFT
+// Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A test-bench for the combined work of both fftmain.v and
 //		ifftmain.v.  If they work together, in concert like they should,
-//		then the operation of both in series should yield an identity.
-//		This program attempts to check that identity with various
-//		inputs given to it.
+//	then the operation of both in series should yield an identity.  This
+//	program attempts to check that identity with various inputs given to it.
 //
-//		This file has a variety of dependencies, not the least of which
-//		are verilator, ifftmain.v and fftmain.v (both produced by
-//		fftgen), but also on the ifft_tb.v verilog test bench found
-//		within this directory.
+//	This file has a variety of dependencies, not the least of which are
+//	verilator, ifftmain.v and fftmain.v (both produced by fftgen), but also on
+//	the ifft_tb.v verilog test bench.
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
 // Copyright (C) 2015, Gisselquist Technology, LLC
 //
@@ -32,7 +31,7 @@
 // for more details.
 //
 // You should have received a copy of the GNU General Public License along
-// with this program.  (It's in the $(ROOT)/doc directory, run make with no
+// with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
 //
@@ -40,7 +39,7 @@
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
-///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
