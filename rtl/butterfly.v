@@ -154,6 +154,38 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	output	wire	[(2*OWIDTH-1):0] o_left, o_right;
 	output	reg	o_aux;
 
+`ifdef	FORMAL
+	localparam	F_LGDEPTH = (AUXLEN > 64) ? 7
+			: (AUXLEN > 32) ? 6
+			: (AUXLEN > 16) ? 5
+			: (AUXLEN >  8) ? 4
+			: (AUXLEN >  4) ? 3 : 2;
+
+	localparam	F_DEPTH = AUXLEN;
+	localparam	[F_LGDEPTH-1:0]	F_D = F_DEPTH[F_LGDEPTH-1:0]-1;
+
+	reg	signed	[IWIDTH-1:0]	f_dlyleft_r  [0:F_DEPTH-1];
+	reg	signed	[IWIDTH-1:0]	f_dlyleft_i  [0:F_DEPTH-1];
+	reg	signed	[IWIDTH-1:0]	f_dlyright_r [0:F_DEPTH-1];
+	reg	signed	[IWIDTH-1:0]	f_dlyright_i [0:F_DEPTH-1];
+	reg	signed	[CWIDTH-1:0]	f_dlycoeff_r [0:F_DEPTH-1];
+	reg	signed	[CWIDTH-1:0]	f_dlycoeff_i [0:F_DEPTH-1];
+	reg	signed	[F_DEPTH-1:0]	f_dlyaux;
+
+	wire	signed	[IWIDTH:0]		f_predifr, f_predifi;
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_predifrx, f_predifix;
+	wire	signed	[CWIDTH:0]		f_sumcoef;
+	wire	signed	[IWIDTH+1:0]		f_sumdiff;
+	wire	signed	[IWIDTH:0]		f_sumr, f_sumi;
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_sumrx, f_sumix;
+	wire	signed	[IWIDTH:0]		f_difr, f_difi;
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;
+	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;
+
+	wire	[(CWIDTH):0]	fp_one_ic, fp_two_ic, fp_three_ic, f_p3c_in;
+	wire	[(IWIDTH+1):0]	fp_one_id, fp_two_id, fp_three_id, f_p3d_in;
+`endif
+
 	reg	[(2*IWIDTH-1):0]	r_left, r_right;
 	reg	[(2*CWIDTH-1):0]	r_coef, r_coef_2;
 	wire	signed	[(IWIDTH-1):0]	r_left_r, r_left_i, r_right_r, r_right_i;
@@ -171,37 +203,37 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 	// Set up the input to the multiply
 	always @(posedge i_clk)
-		if (i_ce)
-		begin
-			// One clock just latches the inputs
-			r_left <= i_left;	// No change in # of bits
-			r_right <= i_right;
-			r_coef  <= i_coef;
-			// Next clock adds/subtracts
-			r_sum_r <= r_left_r + r_right_r; // Now IWIDTH+1 bits
-			r_sum_i <= r_left_i + r_right_i;
-			r_dif_r <= r_left_r - r_right_r;
-			r_dif_i <= r_left_i - r_right_i;
-			// Other inputs are simply delayed on second clock
-			r_coef_2<= r_coef;
-		end
+	if (i_ce)
+	begin
+		// One clock just latches the inputs
+		r_left <= i_left;	// No change in # of bits
+		r_right <= i_right;
+		r_coef  <= i_coef;
+		// Next clock adds/subtracts
+		r_sum_r <= r_left_r + r_right_r; // Now IWIDTH+1 bits
+		r_sum_i <= r_left_i + r_right_i;
+		r_dif_r <= r_left_r - r_right_r;
+		r_dif_i <= r_left_i - r_right_i;
+		// Other inputs are simply delayed on second clock
+		r_coef_2<= r_coef;
+	end
 
 	// Don't forget to record the even side, since it doesn't need
 	// to be multiplied, but yet we still need the results in sync
 	// with the answer when it is ready.
 	initial fifo_addr = 0;
 	always @(posedge i_clk)
-		if (i_reset)
-			fifo_addr <= 0;
-		else if (i_ce)
-			// Need to delay the sum side--nothing else happens
-			// to it, but it needs to stay synchronized with the
-			// right side.
-			fifo_addr <= fifo_addr + 1;
+	if (i_reset)
+		fifo_addr <= 0;
+	else if (i_ce)
+		// Need to delay the sum side--nothing else happens
+		// to it, but it needs to stay synchronized with the
+		// right side.
+		fifo_addr <= fifo_addr + 1;
 
 	always @(posedge i_clk)
-		if (i_ce)
-			fifo_left[fifo_addr] <= { r_sum_r, r_sum_i };
+	if (i_ce)
+		fifo_left[fifo_addr] <= { r_sum_r, r_sum_i };
 
 	wire	signed	[(CWIDTH-1):0]	ir_coef_r, ir_coef_i;
 	assign	ir_coef_r = r_coef_2[(2*CWIDTH-1):CWIDTH];
@@ -253,12 +285,24 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		// simpler, multiply.
 		longbimpy #(CWIDTH+1,IWIDTH+2) p1(i_clk, i_ce,
 				{ir_coef_r[CWIDTH-1],ir_coef_r},
-				{r_dif_r[IWIDTH],r_dif_r}, p_one);
+				{r_dif_r[IWIDTH],r_dif_r}, p_one
+`ifdef	FORMAL
+				, fp_one_ic, fp_one_id
+`endif
+			);
 		longbimpy #(CWIDTH+1,IWIDTH+2) p2(i_clk, i_ce,
 				{ir_coef_i[CWIDTH-1],ir_coef_i},
-				{r_dif_i[IWIDTH],r_dif_i}, p_two);
+				{r_dif_i[IWIDTH],r_dif_i}, p_two
+`ifdef	FORMAL
+				, fp_two_ic, fp_two_id
+`endif
+			);
 		longbimpy #(CWIDTH+1,IWIDTH+2) p3(i_clk, i_ce,
-				p3c_in, p3d_in, p_three);
+				p3c_in, p3d_in, p_three
+`ifdef	FORMAL
+				, fp_three_ic, fp_three_id
+`endif
+			);
 
 	end else if (CKPCE == 2)
 	begin : CKPCE_TWO
@@ -280,6 +324,18 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 		reg	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
 		reg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
+
+`ifdef	FORMAL
+		wire	[CWIDTH:0]	f_past_ic;
+		wire	[IWIDTH+1:0]	f_past_id;
+		wire	[CWIDTH:0]	f_past_mux_ic;
+		wire	[IWIDTH+1:0]	f_past_mux_id;
+
+		reg	[CWIDTH:0]	f_rpone_ic, f_rptwo_ic, f_rpthree_ic,
+					f_rp2one_ic, f_rp2two_ic, f_rp2three_ic;
+		reg	[IWIDTH+1:0]	f_rpone_id, f_rptwo_id, f_rpthree_id,
+					f_rp2one_id, f_rp2two_id, f_rp2three_id;
+`endif
 
 
 		initial	ce_phase = 1'b0;
@@ -314,12 +370,20 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		end
 
 		longbimpy #(CWIDTH+1,IWIDTH+2) mpy0(i_clk, mpy_pipe_v,
-				mpy_cof_sum, mpy_dif_sum, longmpy);
+				mpy_cof_sum, mpy_dif_sum, longmpy
+`ifdef	FORMAL
+				, f_past_ic, f_past_id
+`endif
+			);
 
 		longbimpy #(CWIDTH+1,IWIDTH+2) mpy1(i_clk, mpy_pipe_v,
 				{ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc },
 				{ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd },
-				mpy_pipe_out);
+				mpy_pipe_out
+`ifdef	FORMAL
+				, f_past_mux_ic, f_past_mux_id
+`endif
+			);
 
 		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]
 					rp_one, rp_two, rp_three,
@@ -328,27 +392,56 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		always @(posedge i_clk)
 		if (((i_ce)&&(!MPYDELAY[0]))
 			||((ce_phase)&&(MPYDELAY[0])))
+		begin
 			rp_one <= mpy_pipe_out;
+`ifdef	FORMAL
+			f_rpone_ic <= f_past_mux_ic;
+			f_rpone_id <= f_past_mux_id;
+`endif
+		end
+
 		always @(posedge i_clk)
 		if (((i_ce)&&(MPYDELAY[0]))
 			||((ce_phase)&&(!MPYDELAY[0])))
+		begin
 			rp_two <= mpy_pipe_out;
+`ifdef	FORMAL
+			f_rptwo_ic <= f_past_mux_ic;
+			f_rptwo_id <= f_past_mux_id;
+`endif
+		end
+
 		always @(posedge i_clk)
 		if (i_ce)
+		begin
 			rp_three <= longmpy;
+`ifdef	FORMAL
+			f_rpthree_ic <= f_past_ic;
+			f_rpthree_id <= f_past_id;
+`endif
+		end
+
 
 		// Our outputs *MUST* be set on a clock where i_ce is
 		// true for the following logic to work.  Make that
 		// happen here.
 		always @(posedge i_clk)
 		if (i_ce)
+		begin
 			rp2_one<= rp_one;
-		always @(posedge i_clk)
-		if (i_ce)
 			rp2_two <= rp_two;
-		always @(posedge i_clk)
-		if (i_ce)
 			rp2_three<= rp_three;
+`ifdef	FORMAL
+			f_rp2one_ic <= f_rpone_ic;
+			f_rp2one_id <= f_rpone_id;
+
+			f_rp2two_ic <= f_rptwo_ic;
+			f_rp2two_id <= f_rptwo_id;
+
+			f_rp2three_ic <= f_rpthree_ic;
+			f_rp2three_id <= f_rpthree_id;
+`endif
+		end
 
 		assign	p_one	= rp2_one;
 		assign	p_two	= (!MPYDELAY[0])? rp2_two  : rp_two;
@@ -358,6 +451,14 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		wire	[2*(IWIDTH+CWIDTH+3)-1:0]	unused;
 		assign	unused = { rp2_two, rp2_three };
 		// verilator lint_on  UNUSED
+
+`ifdef	FORMAL
+		assign fp_two_ic = (!MPYDELAY[0])? f_rp2two_ic : f_rptwo_ic;
+		assign fp_two_id = (!MPYDELAY[0])? f_rp2two_id : f_rptwo_id;
+
+		assign fp_three_ic= (MPYDELAY[0])? f_rpthree_ic : f_rp2three_ic;
+		assign fp_three_id= (MPYDELAY[0])? f_rpthree_id : f_rp2three_id;
+`endif
 
 	end else if (CKPCE <= 3)
 	begin : CKPCE_THREE
@@ -376,6 +477,18 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 
 		reg	signed	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
 
+`ifdef	FORMAL
+		wire	[CWIDTH:0]	f_past_ic;
+		wire	[IWIDTH+1:0]	f_past_id;
+
+		reg	[CWIDTH:0]	f_rpone_ic, f_rptwo_ic, f_rpthree_ic,
+					f_rp2one_ic, f_rp2two_ic, f_rp2three_ic,
+					f_rp3one_ic;
+		reg	[IWIDTH+1:0]	f_rpone_id, f_rptwo_id, f_rpthree_id,
+					f_rp2one_id, f_rp2two_id, f_rp2three_id,
+					f_rp3one_id;
+`endif
+
 		initial	ce_phase = 3'b011;
 		always @(posedge i_clk)
 		if (i_reset)
@@ -389,28 +502,32 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			mpy_pipe_v = (i_ce)||(ce_phase < 3'b010);
 
 		always @(posedge i_clk)
-			if (ce_phase == 3'b000)
-			begin
-				// Second clock
-				mpy_pipe_c[3*(CWIDTH+1)-1:(CWIDTH+1)] <= {
-					ir_coef_r[CWIDTH-1], ir_coef_r,
-					ir_coef_i[CWIDTH-1], ir_coef_i };
-				mpy_pipe_c[CWIDTH:0] <= ir_coef_i + ir_coef_r;
-				mpy_pipe_d[3*(IWIDTH+2)-1:(IWIDTH+2)] <= {
-					r_dif_r[IWIDTH], r_dif_r,
-					r_dif_i[IWIDTH], r_dif_i };
-				mpy_pipe_d[(IWIDTH+2)-1:0] <= r_dif_r + r_dif_i;
+		if (ce_phase == 3'b000)
+		begin
+			// Second clock
+			mpy_pipe_c[3*(CWIDTH+1)-1:(CWIDTH+1)] <= {
+				ir_coef_r[CWIDTH-1], ir_coef_r,
+				ir_coef_i[CWIDTH-1], ir_coef_i };
+			mpy_pipe_c[CWIDTH:0] <= ir_coef_i + ir_coef_r;
+			mpy_pipe_d[3*(IWIDTH+2)-1:(IWIDTH+2)] <= {
+				r_dif_r[IWIDTH], r_dif_r,
+				r_dif_i[IWIDTH], r_dif_i };
+			mpy_pipe_d[(IWIDTH+2)-1:0] <= r_dif_r + r_dif_i;
 
-			end else if (mpy_pipe_v)
-			begin
-				mpy_pipe_c[3*(CWIDTH+1)-1:0] <= {
-					mpy_pipe_c[2*(CWIDTH+1)-1:0], {(CWIDTH+1){1'b0}} };
-				mpy_pipe_d[3*(IWIDTH+2)-1:0] <= {
-					mpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1'b0}} };
-			end
+		end else if (mpy_pipe_v)
+		begin
+			mpy_pipe_c[3*(CWIDTH+1)-1:0] <= {
+				mpy_pipe_c[2*(CWIDTH+1)-1:0], {(CWIDTH+1){1'b0}} };
+			mpy_pipe_d[3*(IWIDTH+2)-1:0] <= {
+				mpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1'b0}} };
+		end
 
 		longbimpy #(CWIDTH+1,IWIDTH+2) mpy(i_clk, mpy_pipe_v,
-				mpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out);
+				mpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out
+`ifdef	FORMAL
+				, f_past_ic, f_past_id
+`endif
+			);
 
 		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]
 				rp_one,  rp_two,  rp_three,
@@ -422,32 +539,77 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		begin
 
 			if (i_ce)
+			begin
 				rp_two   <= mpy_pipe_out;
-			else if (ce_phase == 3'b000)
+`ifdef	FORMAL
+				f_rptwo_ic <= f_past_ic;
+				f_rptwo_id <= f_past_id;
+`endif
+			end else if (ce_phase == 3'b000)
+			begin
 				rp_three <= mpy_pipe_out;
-			else if (ce_phase == 3'b001)
+`ifdef	FORMAL
+				f_rpthree_ic <= f_past_ic;
+				f_rpthree_id <= f_past_id;
+`endif
+			end else if (ce_phase == 3'b001)
+			begin
 				rp_one   <= mpy_pipe_out;
-
+`ifdef	FORMAL
+				f_rpone_ic <= f_past_ic;
+				f_rpone_id <= f_past_id;
+`endif
+			end
 		end else if (MPYREMAINDER == 1)
 		begin
 
 			if (i_ce)
+			begin
 				rp_one   <= mpy_pipe_out;
-			else if (ce_phase == 3'b000)
+`ifdef	FORMAL
+				f_rpone_ic <= f_past_ic;
+				f_rpone_id <= f_past_id;
+`endif
+			end else if (ce_phase == 3'b000)
+			begin
 				rp_two   <= mpy_pipe_out;
-			else if (ce_phase == 3'b001)
+`ifdef	FORMAL
+				f_rptwo_ic <= f_past_ic;
+				f_rptwo_id <= f_past_id;
+`endif
+			end else if (ce_phase == 3'b001)
+			begin
 				rp_three <= mpy_pipe_out;
-
+`ifdef	FORMAL
+				f_rpthree_ic <= f_past_ic;
+				f_rpthree_id <= f_past_id;
+`endif
+			end
 		end else // if (MPYREMAINDER == 2)
 		begin
 
 			if (i_ce)
+			begin
 				rp_three <= mpy_pipe_out;
-			else if (ce_phase == 3'b000)
+`ifdef	FORMAL
+				f_rpthree_ic <= f_past_ic;
+				f_rpthree_id <= f_past_id;
+`endif
+			end else if (ce_phase == 3'b000)
+			begin
 				rp_one   <= mpy_pipe_out;
-			else if (ce_phase == 3'b001)
+`ifdef	FORMAL
+				f_rpone_ic <= f_past_ic;
+				f_rpone_id <= f_past_id;
+`endif
+			end else if (ce_phase == 3'b001)
+			begin
 				rp_two   <= mpy_pipe_out;
-
+`ifdef	FORMAL
+				f_rptwo_ic <= f_past_ic;
+				f_rptwo_id <= f_past_id;
+`endif
+			end
 		end
 
 		always @(posedge i_clk)
@@ -457,10 +619,34 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			rp2_two   <= rp_two;
 			rp2_three <= (MPYREMAINDER == 2) ? mpy_pipe_out : rp_three;
 			rp3_one   <= (MPYREMAINDER == 0) ? rp2_one : rp_one;
+`ifdef	FORMAL
+			f_rp2one_ic <= f_rpone_ic;
+			f_rp2one_id <= f_rpone_id;
+
+			f_rp2two_ic <= f_rptwo_ic;
+			f_rp2two_id <= f_rptwo_id;
+
+			f_rp2three_ic <= (MPYREMAINDER==2) ? f_past_ic : f_rpthree_ic;
+			f_rp2three_id <= (MPYREMAINDER==2) ? f_past_id : f_rpthree_id;
+			f_rp3one_ic <= (MPYREMAINDER==0) ? f_rp2one_ic : f_rpone_ic;
+			f_rp3one_id <= (MPYREMAINDER==0) ? f_rp2one_id : f_rpone_id;
+`endif
 		end
+
 		assign	p_one   = rp3_one;
 		assign	p_two   = rp2_two;
 		assign	p_three = rp2_three;
+
+`ifdef	FORMAL
+		assign	fp_one_ic = f_rp3one_ic;
+		assign	fp_one_id = f_rp3one_id;
+
+		assign	fp_two_ic = f_rp2two_ic;
+		assign	fp_two_id = f_rp2two_id;
+
+		assign	fp_three_ic = f_rp2three_ic;
+		assign	fp_three_id = f_rp2three_id;
+`endif
 
 	end endgenerate
 	// These values are held in memory and delayed during the
@@ -471,8 +657,10 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	// extension.
 	wire	signed	[(IWIDTH+CWIDTH):0]	fifo_i, fifo_r;
 	reg		[(2*IWIDTH+1):0]	fifo_read;
-	assign	fifo_r = { {2{fifo_read[2*(IWIDTH+1)-1]}}, fifo_read[(2*(IWIDTH+1)-1):(IWIDTH+1)], {(CWIDTH-2){1'b0}} };
-	assign	fifo_i = { {2{fifo_read[(IWIDTH+1)-1]}}, fifo_read[((IWIDTH+1)-1):0], {(CWIDTH-2){1'b0}} };
+	assign	fifo_r = { {2{fifo_read[2*(IWIDTH+1)-1]}},
+		fifo_read[(2*(IWIDTH+1)-1):(IWIDTH+1)], {(CWIDTH-2){1'b0}} };
+	assign	fifo_i = { {2{fifo_read[(IWIDTH+1)-1]}},
+		fifo_read[((IWIDTH+1)-1):0], {(CWIDTH-2){1'b0}} };
 
 
 	reg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;
@@ -521,35 +709,35 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 				mpy_i, rnd_right_i);
 
 	always @(posedge i_clk)
-		if (i_ce)
-		begin
-			// First clock, recover all values
-			fifo_read <= fifo_left[fifo_read_addr];
-			// These values are IWIDTH+CWIDTH+3 bits wide
-			// although they only need to be (IWIDTH+1)
-			// + (CWIDTH) bits wide.  (We've got two
-			// extra bits we need to get rid of.)
-			mpy_r <= p_one - p_two;
-			mpy_i <= p_three - p_one - p_two;
-		end
+	if (i_ce)
+	begin
+		// First clock, recover all values
+		fifo_read <= fifo_left[fifo_read_addr];
+		// These values are IWIDTH+CWIDTH+3 bits wide
+		// although they only need to be (IWIDTH+1)
+		// + (CWIDTH) bits wide.  (We've got two
+		// extra bits we need to get rid of.)
+		mpy_r <= p_one - p_two;
+		mpy_i <= p_three - p_one - p_two;
+	end
 
 	reg	[(AUXLEN-1):0]	aux_pipeline;
 	initial	aux_pipeline = 0;
 	always @(posedge i_clk)
-		if (i_reset)
-			aux_pipeline <= 0;
-		else if (i_ce)
-			aux_pipeline <= { aux_pipeline[(AUXLEN-2):0], i_aux };
+	if (i_reset)
+		aux_pipeline <= 0;
+	else if (i_ce)
+		aux_pipeline <= { aux_pipeline[(AUXLEN-2):0], i_aux };
 
 	initial o_aux = 1'b0;
 	always @(posedge i_clk)
-		if (i_reset)
-			o_aux <= 1'b0;
-		else if (i_ce)
-		begin
-			// Second clock, latch for final clock
-			o_aux <= aux_pipeline[AUXLEN-1];
-		end
+	if (i_reset)
+		o_aux <= 1'b0;
+	else if (i_ce)
+	begin
+		// Second clock, latch for final clock
+		o_aux <= aux_pipeline[AUXLEN-1];
+	end
 
 	// As a final step, we pack our outputs into two packed two's
 	// complement numbers per output word, so that each output word
@@ -559,23 +747,6 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	assign	o_right= { rnd_right_r,rnd_right_i};
 
 `ifdef	FORMAL
-	localparam	F_LGDEPTH = (AUXLEN > 64) ? 7
-			: (AUXLEN > 32) ? 6
-			: (AUXLEN > 16) ? 5
-			: (AUXLEN >  8) ? 4
-			: (AUXLEN >  4) ? 3 : 2;
-
-	localparam	F_DEPTH = AUXLEN;
-	localparam	[F_LGDEPTH-1:0]	F_D = F_DEPTH[F_LGDEPTH-1:0]-1;
-
-	reg	signed	[IWIDTH-1:0]	f_dlyleft_r  [0:F_DEPTH-1];
-	reg	signed	[IWIDTH-1:0]	f_dlyleft_i  [0:F_DEPTH-1];
-	reg	signed	[IWIDTH-1:0]	f_dlyright_r [0:F_DEPTH-1];
-	reg	signed	[IWIDTH-1:0]	f_dlyright_i [0:F_DEPTH-1];
-	reg	signed	[CWIDTH-1:0]	f_dlycoeff_r [0:F_DEPTH-1];
-	reg	signed	[CWIDTH-1:0]	f_dlycoeff_i [0:F_DEPTH-1];
-	reg	signed	[F_DEPTH-1:0]	f_dlyaux;
-
 	initial	f_dlyaux[0] = 0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -613,39 +784,76 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	end endgenerate
 
 `ifndef VERILATOR
-	always @(posedge i_clk)
-	if ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))
-			&&(!$past(i_ce,4)))
-		assume(i_ce);
-
+	//
+	// Make some i_ce restraining assumptions.  These are necessary
+	// to get the design to pass induction.
+	//
 	generate if (CKPCE <= 1)
 	begin
 
+		// No primary i_ce assumption.  i_ce can be anything
+		//
+		// First induction i_ce assumption: No more than one
+		// empty cycle between used cycles.  Without this
+		// assumption, or one like it, induction would never
+		// complete.
 		always @(posedge i_clk)
 		if ((!$past(i_ce)))
+			assume(i_ce);
+
+		// Second induction i_ce assumption: avoid skipping an
+		// i_ce and thus stretching out the i_ce cycle two i_ce
+		// cycles in a row.  Without this assumption, induction
+		// would still complete, it would just take longer
+		always @(posedge i_clk)
+		if (($past(i_ce))&&(!$past(i_ce,2)))
 			assume(i_ce);
 
 	end else if (CKPCE == 2)
 	begin : F_CKPCE_TWO
 
+		// Primary i_ce assumption: Every i_ce cycle is followed
+		// by a non-i_ce cycle, so the multiplies can be
+		// multiplexed
+		always @(posedge i_clk)
+		if ($past(i_ce))
+			assume(!i_ce);
+		// First induction assumption: Don't let this stretch
+		// out too far.  This is necessary to pass induction
 		always @(posedge i_clk)
 		if ((!$past(i_ce))&&(!$past(i_ce,2)))
 			assume(i_ce);
 
 		always @(posedge i_clk)
-		if ((!$past(i_ce))&&($past(i_ce,2))&&(!$past(i_ce,3))&&(!$past(i_ce,4)))
+		if ((!$past(i_ce))&&($past(i_ce,2))
+				&&(!$past(i_ce,3))&&(!$past(i_ce,4)))
 			assume(i_ce);
-
-		always @(posedge i_clk)
-			if ($past(i_ce))
-				assume(!i_ce);
 
 	end else if (CKPCE == 3)
 	begin : F_CKPCE_THREE
 
+		// Primary i_ce assumption: Following any i_ce cycle,
+		// there must be two clock cycles with i_ce de-asserted
 		always @(posedge i_clk)
-			if (($past(i_ce))||($past(i_ce,2)))
-				assume(!i_ce);
+		if (($past(i_ce))||($past(i_ce,2)))
+			assume(!i_ce);
+
+		// Induction assumption: Allow i_ce's every third or
+		// fourth clock, but don't allow them to be separated
+		// further than that
+		always @(posedge i_clk)
+		if ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3)))
+			assume(i_ce);
+
+		// Second induction assumption, to speed up the proof:
+		// If it's the earliest possible opportunity for an
+		// i_ce, and the last i_ce was late, don't let this one
+		// be late as well.
+		always @(posedge i_clk)
+		if ((!$past(i_ce))&&(!$past(i_ce,2))
+			&&($past(i_ce,3))&&(!$past(i_ce,4))
+			&&(!$past(i_ce,5))&&(!$past(i_ce,6)))
+			assume(i_ce);
 
 	end endgenerate
 `endif
@@ -658,29 +866,24 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	else if ((i_ce)&&(!(&f_startup_counter)))
 		f_startup_counter <= f_startup_counter + 1;
 
-	wire	signed	[IWIDTH:0]	f_sumr, f_sumi;
 	always @(*)
 	begin
 		f_sumr = f_dlyleft_r[F_D] + f_dlyright_r[F_D];
 		f_sumi = f_dlyleft_i[F_D] + f_dlyright_i[F_D];
 	end
 
-	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_sumrx, f_sumix;
 	assign	f_sumrx = { {(4){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };
 	assign	f_sumix = { {(4){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };
 
-	wire	signed	[IWIDTH:0]	f_difr, f_difi;
 	always @(*)
 	begin
 		f_difr = f_dlyleft_r[F_D] - f_dlyright_r[F_D];
 		f_difi = f_dlyleft_i[F_D] - f_dlyright_i[F_D];
 	end
 
-	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;
 	assign	f_difrx = { {(CWIDTH+2){f_difr[IWIDTH]}}, f_difr };
 	assign	f_difix = { {(CWIDTH+2){f_difi[IWIDTH]}}, f_difi };
 
-	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;
 	assign	f_widecoeff_r ={ {(IWIDTH+3){f_dlycoeff_r[F_D][CWIDTH-1]}},
 						f_dlycoeff_r[F_D] };
 	assign	f_widecoeff_i ={ {(IWIDTH+3){f_dlycoeff_i[F_D][CWIDTH-1]}},
@@ -736,19 +939,15 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	// otherwise
 
 
-	wire	signed	[IWIDTH:0]	f_predifr, f_predifi;
 	always @(*)
 	begin
 		f_predifr = f_dlyleft_r[F_D-1] - f_dlyright_r[F_D-1];
 		f_predifi = f_dlyleft_i[F_D-1] - f_dlyright_i[F_D-1];
 	end
 
-	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_predifrx, f_predifix;
 	assign	f_predifrx = { {(CWIDTH+2){f_predifr[IWIDTH]}}, f_predifr };
 	assign	f_predifix = { {(CWIDTH+2){f_predifi[IWIDTH]}}, f_predifi };
 
-	wire	signed	[CWIDTH:0]	f_sumcoef;
-	wire	signed	[IWIDTH+1:0]	f_sumdiff;
 	always @(*)
 	begin
 		f_sumcoef = f_dlycoeff_r[F_D-1] + f_dlycoeff_i[F_D-1];
@@ -792,10 +991,34 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 			assert(p_three == f_sumcoef);
 		// verilator lint_on  WIDTH
 `ifdef	VERILATOR
+		// Check that the multiplies match--but *ONLY* if using
+		// Verilator, and not if using formal proper
 		assert(p_one   == f_predifr * f_dlycoeff_r[F_D-1]);
 		assert(p_two   == f_predifi * f_dlycoeff_i[F_D-1]);
 		assert(p_three == f_sumdiff * f_sumcoef);
 `endif	// VERILATOR
+	end
+
+	// The following logic formally insists that our version of the
+	// inputs to the multiply matches what the (multiclock) multiply
+	// thinks its inputs were.  While this may seem redundant, the
+	// proof will not complete in any reasonable amount of time
+	// without these assertions.
+
+	assign	f_p3c_in = f_dlycoeff_i[F_D-1] + f_dlycoeff_r[F_D-1];
+	assign	f_p3d_in = f_predifi + f_predifr;
+
+	always @(*)
+	if (f_startup_counter >= { 1'b0, F_D })
+	begin
+		assert(fp_one_ic == { f_dlycoeff_r[F_D-1][CWIDTH-1],
+				f_dlycoeff_r[F_D-1][CWIDTH-1:0] });
+		assert(fp_two_ic == { f_dlycoeff_i[F_D-1][CWIDTH-1],
+				f_dlycoeff_i[F_D-1][CWIDTH-1:0] });
+		assert(fp_one_id == { f_predifr[IWIDTH], f_predifr });
+		assert(fp_two_id == { f_predifi[IWIDTH], f_predifi });
+		assert(fp_three_ic == f_p3c_in);
+		assert(fp_three_id == f_p3d_in);
 	end
 
 	// F_CHECK will be set externally by the solver, so that we can

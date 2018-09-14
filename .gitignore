@@ -13,3 +13,4 @@ fftsize.h
 ifftsize.h
 tags
 *.vcd
+*.out

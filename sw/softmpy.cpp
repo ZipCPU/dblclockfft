@@ -305,7 +305,14 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);\n"
+"module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r\n");
+
+	if (formal_property_flag) fprintf(fp,
+"`ifdef	FORMAL\n"
+	"\t, f_past_a_unsorted, f_past_b_unsorted\n"
+"`endif\n\t\t");
+
+	fprintf(fp, ");\n"
 	"\tparameter	IAW=%d,	// The width of i_a, min width is 5\n"
 			"\t\t\tIBW=", TST_LONGBIMPY_AW);
 #ifdef	TST_LONGBIMPY_BW
@@ -329,7 +336,14 @@ SLASHLINE
 	"\tinput\twire\t[(IAW-1):0]\ti_a_unsorted;\n"
 	"\tinput\twire\t[(IBW-1):0]\ti_b_unsorted;\n"
 	"\toutput\treg\t[(AW+BW-1):0]\to_r;\n"
-"\n"
+"\n");
+	if (formal_property_flag) fprintf(fp,
+"`ifdef	FORMAL\n"
+	"\toutput\twire\t[(IAW-1):0]\tf_past_a_unsorted;\n"
+	"\toutput\twire\t[(IBW-1):0]\tf_past_b_unsorted;\n"
+"`endif\n");
+
+	fprintf(fp, "\n"
 	"\t//\n"
 	"\t// Swap parameter order, so that AW <= BW -- for performance\n"
 	"\t// reasons\n"
@@ -488,11 +502,13 @@ SLASHLINE
 "\n");
 
 	// Now for properties specific to this core
-	fprintf(fp,
+		fprintf(fp,
 	"\treg	[AW-1:0]	f_past_a	[0:TLEN];\n"
 	"\treg	[BW-1:0]	f_past_b	[0:TLEN];\n"
 	"\treg	[TLEN+1:0]	f_sgn_a, f_sgn_b;\n"
-"\n"
+"\n");
+
+		fprintf(fp,
 	"\tinitial\tf_past_a[0] = 0;\n"
 	"\tinitial\tf_past_b[0] = 0;\n"
 	"\tinitial\tf_sgn_a = 0;\n"
@@ -505,7 +521,9 @@ SLASHLINE
 		"\t\tf_sgn_a[0] <= i_a[AW-1];\n"
 		"\t\tf_sgn_b[0] <= i_b[BW-1];\n"
 	"\tend\n"
-"\n"
+"\n");
+
+		fprintf(fp,
 	"\tgenerate for(k=0; k<TLEN; k=k+1)\n"
 	"\tbegin\n"
 		"\t\tinitial\tf_past_a[k+1] = 0;\n"
@@ -522,21 +540,27 @@ SLASHLINE
 				"\t\t\tf_sgn_b[k+1]  <= f_sgn_b[k];\n"
 			"\t\tend\n"
 	"\tend endgenerate\n"
-"\n"
+"\n");
+
+		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 	"\tbegin\n"
 		"\t\tf_sgn_a[TLEN+1] <= f_sgn_a[TLEN];\n"
 		"\t\tf_sgn_b[TLEN+1] <= f_sgn_b[TLEN];\n"
 	"\tend\n"
-"\n"
+"\n");
+
+		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
 	"\tbegin\n"
 		"\t\tassert(sgn == (f_sgn_a[0] ^ f_sgn_b[0]));\n"
 		"\t\tassert(r_s[TLEN-1:0] == (f_sgn_a[TLEN:1] ^ f_sgn_b[TLEN:1]));\n"
 		"\t\tassert(r_s[TLEN-1:0] == (f_sgn_a[TLEN:1] ^ f_sgn_b[TLEN:1]));\n"
 	"\tend\n"
-"\n"
+"\n");
+
+		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
 	"\tif ((f_past_valid)&&($past(i_ce)))\n"
 	"\tbegin\n"
@@ -550,7 +574,9 @@ SLASHLINE
 		"\t\telse if ($past(i_b[BW-1]) == 1'b0)\n"
 			"\t\t\t`ASSERT(u_b == $past(i_b));\n"
 	"\tend\n"
-"\n"
+"\n");
+
+		fprintf(fp,
 	"\tgenerate // Keep track of intermediate values, before multiplying them\n"
 	"\tif (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)\n"
 	"\tbegin : ASSERT_GENCOPY\n"
@@ -564,7 +590,9 @@ SLASHLINE
 			"\t\t\t`ASSERT(r_b[k] == f_past_b[k]);\n"
 		"\t\tend\n"
 	"\tend endgenerate\n"
-"\n"
+"\n");
+
+		fprintf(fp,
 	"\tgenerate // The actual multiply and accumulate stage\n"
 	"\tif (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)\n"
 	"\tbegin : ASSERT_GENSTAGE\n"
@@ -585,49 +613,83 @@ SLASHLINE
 			"\t\t\tend\n"
 		"\t\tend\n"
 	"\tend endgenerate\n"
+"\n");
+
+		fprintf(fp,
+	"\twire	[AW-1:0]\tf_past_a_neg = - f_past_a[TLEN];\n"
+	"\twire	[BW-1:0]\tf_past_b_neg = - f_past_b[TLEN];\n"
 "\n"
-	"\twire	[BW-1:0]	f_past_b_neg = - f_past_b[TLEN];\n"
-"\n"
+	"\twire	[AW-1:0]\tf_past_a_pos = f_past_a[TLEN][AW-1]\n"
+				"\t\t\t\t\t? f_past_a_neg : f_past_a[TLEN];\n"
+	"\twire	[BW-1:0]\tf_past_b_pos = f_past_b[TLEN][BW-1]\n"
+				"\t\t\t\t\t? f_past_b_neg : f_past_b[TLEN];\n\n");
+
+		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
-	"\tif (f_past_a[TLEN]==0)\n"
-		"\t\t`ASSERT(o_r == 0);\n"
-	"\telse if ((f_past_valid)&&($past(i_ce))\n"
-		"\t\t&&(f_past_a[TLEN]==1)&&(!f_sgn_a[TLEN+1]))\n"
+	"\tif ((f_past_valid)&&($past(i_ce)))\n"
 	"\tbegin\n"
-		"\t\tif (!f_sgn_b[TLEN+1])\n"
+		"\t\tif ((f_past_a[TLEN]==0)||(f_past_b[TLEN]==0))\n"
+			"\t\t\t`ASSERT(o_r == 0);\n"
+		"\t\telse if (f_past_a[TLEN]==1)\n"
 		"\t\tbegin\n"
-			"\t\t\t`ASSERT(o_r[BW-1:0] == f_past_b[TLEN][BW-1:0]);\n"
-			"\t\t\t`ASSERT(o_r[AW+BW-1:BW] == 0);\n"
+			"\t\t\tif ((f_sgn_a[TLEN+1]^f_sgn_b[TLEN+1])==0)\n"
+			"\t\t\tbegin\n"
+				"\t\t\t\t`ASSERT(o_r[BW-1:0] == f_past_b_pos[BW-1:0]);\n"
+				"\t\t\t\t`ASSERT(o_r[AW+BW-1:BW] == 0);\n"
+			"\t\t\tend else begin // if (f_sgn_b[TLEN+1]) begin\n"
+				"\t\t\t\t`ASSERT(o_r[BW-1:0] == f_past_b_neg);\n"
+				"\t\t\t\t`ASSERT(o_r[AW+BW-1:BW]\n"
+					"\t\t\t\t\t== {(AW){f_past_b_neg[BW-1]}});\n"
+			"\t\t\tend\n"
+		"\t\tend else if (f_past_b[TLEN]==1)\n"
+		"\t\tbegin\n"
+			"\t\t\tif ((f_sgn_a[TLEN+1] ^ f_sgn_b[TLEN+1])==0)\n"
+			"\t\t\tbegin\n"
+				"\t\t\t\t`ASSERT(o_r[AW-1:0] == f_past_a_pos[AW-1:0]);\n"
+				"\t\t\t\t`ASSERT(o_r[AW+BW-1:AW] == 0);\n"
+			"\t\t\tend else begin\n"
+				"\t\t\t\t`ASSERT(o_r[AW-1:0] == f_past_a_neg);\n"
+				"\t\t\t\t`ASSERT(o_r[AW+BW-1:AW]\n"
+					"\t\t\t\t\t== {(BW){f_past_a_neg[AW-1]}});\n"
+			"\t\t\tend\n"
 		"\t\tend else begin\n"
-			"\t\t\t`ASSERT(o_r[BW-1:0] == f_past_b_neg);\n"
-			"\t\t\t`ASSERT(&o_r[AW+BW-1:BW]);\n"
+			"\t\t\t`ASSERT(o_r != 0);\n"
+			"\t\t\tif (!o_r[AW+BW-1:0])\n"
+			"\t\t\tbegin\n"
+				"\t\t\t\t`ASSERT((o_r[AW-1:0] != f_past_a[TLEN][AW-1:0])\n"
+					"\t\t\t\t\t||(o_r[AW+BW-1:AW]!=0));\n"
+				"\t\t\t\t`ASSERT((o_r[BW-1:0] != f_past_b[TLEN][BW-1:0])\n"
+					"\t\t\t\t\t||(o_r[AW+BW-1:BW]!=0));\n"
+			"\t\t\tend else begin\n"
+				"\t\t\t\t`ASSERT((o_r[AW-1:0] != f_past_a_neg[AW-1:0])\n"
+					"\t\t\t\t\t||(! (&o_r[AW+BW-1:AW])));\n"
+				"\t\t\t\t`ASSERT((o_r[BW-1:0] != f_past_b_neg[BW-1:0])\n"
+					"\t\t\t\t\t||(! (&o_r[AW+BW-1:BW]!=0)));\n"
+			"\t\t\tend\n"
 		"\t\tend\n"
 	"\tend\n"
-"\n"
-	"\twire	[AW-1:0]	f_past_a_neg = - f_past_a[TLEN];\n"
-"\n"
-	"\talways @(posedge i_clk)\n"
-	"\tif (f_past_b[TLEN]==0)\n"
-		"\t\t`ASSERT(o_r == 0);\n"
-	"\telse if ((f_past_valid)&&($past(i_ce))\n"
-		"\t\t&&(f_past_b[TLEN]==1)&&(!f_sgn_b[TLEN+1]))\n"
-	"\tbegin\n"
-		"\t\tif (!f_sgn_a[TLEN+1])\n"
-		"\t\tbegin\n"
-		"\t\t\t`ASSERT(o_r[AW-1:0] == f_past_a[TLEN][AW-1:0]);\n"
-		"\t\t\t`ASSERT(o_r[AW+BW-1:AW] == 0);\n"
-		"\t\tend else begin\n"
-		"\t\t\t`ASSERT(o_r[AW-1:0] == f_past_a_neg);\n"
-		"\t\t\t`ASSERT(&o_r[AW+BW-1:AW]);\n"
-		"\t\tend\n"
-	"\tend\n");
+"\n");
+
+		fprintf(fp,
+	"\tgenerate if (IAW <= IBW)\n"
+	"\tbegin : NO_PARAM_CHANGE\n"
+		"\t\tassign f_past_a_unsorted = (!f_sgn_a[TLEN+1])\n"
+				"\t\t\t\t\t? f_past_a[TLEN] : f_past_a_neg;\n"
+		"\t\tassign f_past_b_unsorted = (!f_sgn_b[TLEN+1])\n"
+				"\t\t\t\t\t? f_past_b[TLEN] : f_past_b_neg;\n"
+	"\tend else begin : SWAP_PARAMETERS\n"
+		"\t\tassign f_past_a_unsorted = (!f_sgn_b[TLEN+1])\n"
+				"\t\t\t\t\t? f_past_b[TLEN] : f_past_b_neg;\n"
+		"\t\tassign f_past_b_unsorted = (!f_sgn_a[TLEN+1])\n"
+				"\t\t\t\t\t? f_past_a[TLEN] : f_past_a_neg;\n"
+	"\tend endgenerate\n");
 
 	} else {
 		fprintf(fp, "// Formal properties have not been enabled\n");
 	}
 
 	fprintf(fp,
-"`endif\n"
+"`endif\t// FORMAL\n"
 "endmodule\n");
 
 	fclose(fp);

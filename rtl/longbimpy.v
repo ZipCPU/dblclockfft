@@ -46,7 +46,11 @@
 //
 `default_nettype	none
 //
-module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
+module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
+`ifdef	FORMAL
+	, f_past_a_unsorted, f_past_b_unsorted
+`endif
+		);
 	parameter	IAW=8,	// The width of i_a, min width is 5
 			IBW=12,	// The width of i_b, can be anything
 			// The following three parameters should not be changed
@@ -62,6 +66,11 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 	input	wire	[(IAW-1):0]	i_a_unsorted;
 	input	wire	[(IBW-1):0]	i_b_unsorted;
 	output	reg	[(AW+BW-1):0]	o_r;
+
+`ifdef	FORMAL
+	output	wire	[(IAW-1):0]	f_past_a_unsorted;
+	output	wire	[(IBW-1):0]	f_past_b_unsorted;
+`endif
 
 	//
 	// Swap parameter order, so that AW <= BW -- for performance
@@ -305,40 +314,69 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 		end
 	end endgenerate
 
+	wire	[AW-1:0]	f_past_a_neg = - f_past_a[TLEN];
 	wire	[BW-1:0]	f_past_b_neg = - f_past_b[TLEN];
 
+	wire	[AW-1:0]	f_past_a_pos = f_past_a[TLEN][AW-1]
+					? f_past_a_neg : f_past_a[TLEN];
+	wire	[BW-1:0]	f_past_b_pos = f_past_b[TLEN][BW-1]
+					? f_past_b_neg : f_past_b[TLEN];
+
 	always @(posedge i_clk)
-	if (f_past_a[TLEN]==0)
-		`ASSERT(o_r == 0);
-	else if ((f_past_valid)&&($past(i_ce))
-		&&(f_past_a[TLEN]==1)&&(!f_sgn_a[TLEN+1]))
+	if ((f_past_valid)&&($past(i_ce)))
 	begin
-		if (!f_sgn_b[TLEN+1])
+		if ((f_past_a[TLEN]==0)||(f_past_b[TLEN]==0))
+			`ASSERT(o_r == 0);
+		else if (f_past_a[TLEN]==1)
 		begin
-			`ASSERT(o_r[BW-1:0] == f_past_b[TLEN][BW-1:0]);
-			`ASSERT(o_r[AW+BW-1:BW] == 0);
+			if ((f_sgn_a[TLEN+1]^f_sgn_b[TLEN+1])==0)
+			begin
+				`ASSERT(o_r[BW-1:0] == f_past_b_pos[BW-1:0]);
+				`ASSERT(o_r[AW+BW-1:BW] == 0);
+			end else begin // if (f_sgn_b[TLEN+1]) begin
+				`ASSERT(o_r[BW-1:0] == f_past_b_neg);
+				`ASSERT(o_r[AW+BW-1:BW]
+					== {(AW){f_past_b_neg[BW-1]}});
+			end
+		end else if (f_past_b[TLEN]==1)
+		begin
+			if ((f_sgn_a[TLEN+1] ^ f_sgn_b[TLEN+1])==0)
+			begin
+				`ASSERT(o_r[AW-1:0] == f_past_a_pos[AW-1:0]);
+				`ASSERT(o_r[AW+BW-1:AW] == 0);
+			end else begin
+				`ASSERT(o_r[AW-1:0] == f_past_a_neg);
+				`ASSERT(o_r[AW+BW-1:AW]
+					== {(BW){f_past_a_neg[AW-1]}});
+			end
 		end else begin
-			`ASSERT(o_r[BW-1:0] == f_past_b_neg);
-			`ASSERT(&o_r[AW+BW-1:BW]);
+			`ASSERT(o_r != 0);
+			if (!o_r[AW+BW-1:0])
+			begin
+				`ASSERT((o_r[AW-1:0] != f_past_a[TLEN][AW-1:0])
+					||(o_r[AW+BW-1:AW]!=0));
+				`ASSERT((o_r[BW-1:0] != f_past_b[TLEN][BW-1:0])
+					||(o_r[AW+BW-1:BW]!=0));
+			end else begin
+				`ASSERT((o_r[AW-1:0] != f_past_a_neg[AW-1:0])
+					||(! (&o_r[AW+BW-1:AW])));
+				`ASSERT((o_r[BW-1:0] != f_past_b_neg[BW-1:0])
+					||(! (&o_r[AW+BW-1:BW]!=0)));
+			end
 		end
 	end
 
-	wire	[AW-1:0]	f_past_a_neg = - f_past_a[TLEN];
-
-	always @(posedge i_clk)
-	if (f_past_b[TLEN]==0)
-		`ASSERT(o_r == 0);
-	else if ((f_past_valid)&&($past(i_ce))
-		&&(f_past_b[TLEN]==1)&&(!f_sgn_b[TLEN+1]))
-	begin
-		if (!f_sgn_a[TLEN+1])
-		begin
-			`ASSERT(o_r[AW-1:0] == f_past_a[TLEN][AW-1:0]);
-			`ASSERT(o_r[AW+BW-1:AW] == 0);
-		end else begin
-			`ASSERT(o_r[AW-1:0] == f_past_a_neg);
-			`ASSERT(&o_r[AW+BW-1:AW]);
-		end
-	end
-`endif
+	generate if (IAW <= IBW)
+	begin : NO_PARAM_CHANGE
+		assign f_past_a_unsorted = (!f_sgn_a[TLEN+1])
+					? f_past_a[TLEN] : f_past_a_neg;
+		assign f_past_b_unsorted = (!f_sgn_b[TLEN+1])
+					? f_past_b[TLEN] : f_past_b_neg;
+	end else begin : SWAP_PARAMETERS
+		assign f_past_a_unsorted = (!f_sgn_b[TLEN+1])
+					? f_past_b[TLEN] : f_past_b_neg;
+		assign f_past_b_unsorted = (!f_sgn_a[TLEN+1])
+					? f_past_a[TLEN] : f_past_a_neg;
+	end endgenerate
+`endif	// FORMAL
 endmodule

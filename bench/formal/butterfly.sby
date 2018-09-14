@@ -4,18 +4,19 @@ ck2_r0
 ck2_r1
 ck3_r0
 ck3_r1
+ck3_r2
 
 [options]
 mode prove
 depth	30
 
 [engines]
-smtbmc
+smtbmc boolector
 
 [script]
-read_verilog -formal abs_mpy.v
 read_verilog -formal convround.v
-read_verilog -formal abs_longbimpy.v
+read_verilog -formal bimpy.v
+read_verilog -formal longbimpy.v
 read_verilog -formal butterfly.v
 
 # While I'd love to change the width of the inputs and the coefficients,
@@ -30,11 +31,10 @@ ck2_r1: chparam -set CKPCE 2 -set CWIDTH 16 -set IWIDTH 6 -set F_CHECK 0 butterf
 ck3_r0: chparam -set CKPCE 3 -set CWIDTH 16 -set IWIDTH 12 -set F_CHECK 0 butterfly
 ck3_r1: chparam -set CKPCE 3 -set CWIDTH 18 -set IWIDTH 14 -set F_CHECK 1 butterfly
 ck3_r2: chparam -set CKPCE 3 -set CWIDTH 20 -set IWIDTH 16 -set F_CHECK 2 butterfly
-
 prep -top butterfly
 
 [files]
-abs_mpy.v
-abs_longbimpy.v
+../../rtl/bimpy.v
+../../rtl/longbimpy.v
 ../../rtl/convround.v
 ../../rtl/butterfly.v
