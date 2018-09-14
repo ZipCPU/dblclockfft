@@ -55,7 +55,6 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 			OW=IAW+IBW;	// The output width
 	localparam	AW = (IAW<IBW) ? IAW : IBW,
 			BW = (IAW<IBW) ? IBW : IAW,
-			IW=(AW+1)&(-2),	// Internal width of A
 			LUTB=2,	// How many bits we can multiply by at once
 			TLEN=(AW+(LUTB-1))/LUTB; // Nmbr of rows in our tableau
 	input	wire			i_clk, i_ce;
@@ -83,128 +82,66 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 	assert(0);
 `endif
 
-	reg	[(IW-1):0]	u_a;
-	reg	[(BW-1):0]	u_b;
-	reg			sgn;
-
-	genvar k;
-
-	// First step:
-	// Switch to unsigned arithmetic for our multiply, keeping track
-	// of the along the way.  We'll then add the sign again later at
-	// the end.
-	//
-	// If we were forced to stay within two's complement arithmetic,
-	// taking the absolute value here would require an additional bit.
-	// However, because our results are now unsigned, we can stay
-	// within the number of bits given (for now).
-	initial u_a = 0;
-	generate if (IW > AW)
-	begin
-		always @(posedge i_clk)
-			if (i_ce)
-				u_a <= { 1'b0, (i_a[AW-1])?(-i_a):(i_a) };
-	end else begin
-		always @(posedge i_clk)
-			if (i_ce)
-				u_a <= (i_a[AW-1])?(-i_a):(i_a);
-	end endgenerate
-
-	initial sgn = 0;
-	initial u_b = 0;
-	always @(posedge i_clk)
-	if (i_ce)
-	begin
-		u_b <= (i_b[BW-1])?(-i_b):(i_b);
-		sgn <= i_a[AW-1] ^ i_b[BW-1];
-	end
-
-`ifdef	FORMAL
 	reg	f_past_valid;
 	initial	f_past_valid = 1'b0;
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
 
-`define	ASSERT	assume
-
-	reg	[AW-1:0]	f_past_a	[0:TLEN];
-	reg	[BW-1:0]	f_past_b	[0:TLEN];
-	reg	[TLEN+1:0]	f_sgn_a, f_sgn_b;
+	reg	[AW-1:0]	f_past_a	[0:TLEN+1];
+	reg	[BW-1:0]	f_past_b	[0:TLEN+1];
 
 	initial	f_past_a[0] = 0;
 	initial	f_past_b[0] = 0;
-	initial	f_sgn_a = 0;
-	initial	f_sgn_b = 0;
 	always @(posedge i_clk)
 	if (i_ce)
 	begin
-		f_past_a[0] <= u_a;
-		f_past_b[0] <= u_b;
-		f_sgn_a[0] <= i_a[AW-1];
-		f_sgn_b[0] <= i_b[BW-1];
+		f_past_a[0] <= i_a;
+		f_past_b[0] <= i_b;
 	end
 
-	generate for(k=0; k<TLEN; k=k+1)
+	genvar	k;
+
+	generate for(k=0; k<TLEN+1; k=k+1)
 	begin
 		initial	f_past_a[k+1] = 0;
 		initial	f_past_b[k+1] = 0;
-		initial	f_sgn_a[k+1] = 0;
-		initial	f_sgn_b[k+1] = 0;
 		always @(posedge i_clk)
 		if (i_ce)
 		begin
 			f_past_a[k+1] <= f_past_a[k];
 			f_past_b[k+1] <= f_past_b[k];
-
-			f_sgn_a[k+1]  <= f_sgn_a[k];
-			f_sgn_b[k+1]  <= f_sgn_b[k];
 		end
 	end endgenerate
 
-	always @(posedge i_clk)
-	if (i_ce)
+	// abs_mpy #(.AW(AW), .BW(BW)) thempy(f_past_a[TLEN+1], f_past_b[TLEN+1], o_r);
+	(* anyseq *) reg [AW+BW-1:0]	result;
+	wire	[AW+BW-1:0]	f_neg_a, f_neg_b;
+
+	assign	f_neg_a = - {{(BW){f_past_a[TLEN+1][AW-1]}}, f_past_a[TLEN+1]};
+	assign	f_neg_b = - {{(AW){f_past_b[TLEN+1][BW-1]}}, f_past_b[TLEN+1]};
+
+	always @(*)
+	if (f_past_a[TLEN+1] == 0)
+		assume(result == 0);
+	else if (f_past_b[TLEN+1] == 0)
+		assume(result == 0);
+	else if (f_past_a[TLEN+1] == 1)
 	begin
-		f_sgn_a[TLEN+1] <= f_sgn_a[TLEN];
-		f_sgn_b[TLEN+1] <= f_sgn_b[TLEN];
-	end
-
-	always @(posedge i_clk)
-		assert(sgn == (f_sgn_a[0] ^ f_sgn_b[0]));
-
-	wire	[BW-1:0]	f_past_b_neg = - f_past_b[TLEN];
-
-	always @(posedge i_clk)
-	if (f_past_a[TLEN]==0)
-		`ASSERT(o_r == 0);
-	else if ((f_past_valid)&&($past(i_ce))
-		&&(f_past_a[TLEN]==1)&&(!f_sgn_a[TLEN+1]))
+		assume(result[BW-1:0] == f_past_b[TLEN+1]);
+		assume(result[AW+BW-1:BW] == {(AW){f_past_b[TLEN+1][BW-1]}});
+	end else if (f_past_b[TLEN+1] == 1)
 	begin
-		if (!f_sgn_b[TLEN+1])
-		begin
-			`ASSERT(o_r[BW-1:0] == f_past_b[TLEN][BW-1:0]);
-			`ASSERT(o_r[AW+BW-1:BW] == 0);
-		end else begin
-			`ASSERT(o_r[BW-1:0] == f_past_b_neg);
-			`ASSERT(&o_r[AW+BW-1:BW]);
-		end
-	end
+		assume(result[AW-1:0] == f_past_a[TLEN+1]);
+		assume(result[AW+BW-1:AW] == {(BW){f_past_a[TLEN+1][AW-1]}});
+	end else if (&f_past_a[TLEN+1])
+		assume(result == f_neg_b);
+	else if (&f_past_b[TLEN+1])
+		assume(result == f_neg_a);
+	else
+		assume(result[AW+BW-1] == (f_past_a[TLEN+1][AW-1]
+					^f_past_b[TLEN+1][BW-1]));
 
-	wire	[AW-1:0]	f_past_a_neg = - f_past_a[TLEN];
 
-	always @(posedge i_clk)
-	if (f_past_b[TLEN]==0)
-		`ASSERT(o_r == 0);
-	else if ((f_past_valid)&&($past(i_ce))
-		&&(f_past_b[TLEN]==1)&&(!f_sgn_b[TLEN+1]))
-	begin
-		if (!f_sgn_a[TLEN+1])
-		begin
-			`ASSERT(o_r[AW-1:0] == f_past_a[TLEN][AW-1:0]);
-			`ASSERT(o_r[AW+BW-1:AW] == 0);
-		end else begin
-			`ASSERT(o_r[AW-1:0] == f_past_a_neg);
-			`ASSERT(&o_r[AW+BW-1:AW]);
-		end
-	end
-`endif
+	always @(*)
+		o_r = result;
 endmodule
