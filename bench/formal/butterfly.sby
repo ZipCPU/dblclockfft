@@ -14,10 +14,10 @@ depth	30
 smtbmc boolector
 
 [script]
-read_verilog -formal convround.v
-read_verilog -formal bimpy.v
-read_verilog -formal longbimpy.v
-read_verilog -formal butterfly.v
+read -formal -DBUTTERFLY convround.v
+read -formal -DBUTTERFLY bimpy.v
+read -formal -DBUTTERFLY longbimpy.v
+read -formal -DBUTTERFLY butterfly.v
 
 # While I'd love to change the width of the inputs and the coefficients,
 # doing so would adjust the width of the firmware multiplies, and so defeat
