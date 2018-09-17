@@ -344,16 +344,16 @@ assert(OWIDTH == IWIDTH+1);
 		unsigned long	oba, obb;
 
 		oba = ubits(
-		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_left_r,OWIDTH)
+		m_ftstage->VVAR(_HWBFLY__DOT__bfly__DOT__rnd_left_r),OWIDTH)
 				<<OWIDTH;
 		oba |= ubits(
-		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_left_i, OWIDTH);
+		m_ftstage->VVAR(_HWBFLY__DOT__bfly__DOT__rnd_left_i), OWIDTH);
 
 		obb = ubits(
-		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_right_r, OWIDTH)
+		m_ftstage->VVAR(_HWBFLY__DOT__bfly__DOT__rnd_right_r), OWIDTH)
 				<<OWIDTH;
 		obb |= ubits(
-		m_ftstage->v__DOT__HWBFLY__DOT__bfly__DOT__rnd_right_i, OWIDTH);
+		m_ftstage->VVAR(_HWBFLY__DOT__bfly__DOT__rnd_right_i), OWIDTH);
 
 		if ((gbl_debug)&&(m_ob_syncd))
 			printf(" [%d %10lx %10lx]",
