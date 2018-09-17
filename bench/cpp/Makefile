@@ -98,25 +98,14 @@ ifft_tb: ifft_tb.cpp twoc.cpp twoc.h fftsize.h $(IFTLB)
 	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(IFTLB) $(VSRCS) -lfftw3 -o $@
 
 .PHONY: HEX
-# HEX:	 cmem_e2048.hex  cmem_e1024.hex  cmem_e512.hex  cmem_e256.hex 
-# HEX:	 cmem_o2048.hex  cmem_o1024.hex  cmem_o512.hex  cmem_o256.hex 
-# HEX:	icmem_e2048.hex icmem_e1024.hex icmem_e512.hex icmem_e256.hex 
-# HEX:	icmem_o2048.hex icmem_o1024.hex icmem_o512.hex icmem_o256.hex 
-# HEX:	 cmem_e128.hex  cmem_e64.hex  cmem_e32.hex  cmem_e16.hex  cmem_e8.hex
-# HEX:	 cmem_o128.hex  cmem_o64.hex  cmem_o32.hex  cmem_o16.hex  cmem_o8.hex
-# HEX:	icmem_e128.hex icmem_e64.hex icmem_e32.hex icmem_e16.hex icmem_e8.hex
-# HEX:	icmem_o128.hex icmem_o64.hex icmem_o32.hex icmem_o16.hex icmem_o8.hex
-# cmem_%.hex: $(VSRCD)/cmem_%.hex
-	# echo ln -s $* $<
 HEX:
 	ln -sf $(VSRCD)/*.hex .
 
 .PHONY: test
 test: mpy_tb.pass bitreverse_tb.pass fftstage_tb.pass qtrstage_tb.pass
 test: laststage_tb.pass butterfly_tb.pass hwbfly_tb.pass
-test: fft_tb ifft_tb HEX
+test: fft_tb HEX # ifft_tb
 	./fft_tb
-	./ifft_tb
 
 mpy_tb.pass: mpy_tb
 	./mpy_tb
@@ -152,6 +141,6 @@ clean:
 	rm -f fftstage_tb fft_tb ifft_tb hwbfly_tb laststage_tb
 	rm -rf fft_tb.dbl ifft_tb.dbl
 	rm -rf *cmem_*.hex
-	rm -rf *.pass
+	rm -rf *.pass *.vcd
 
 include $(VERILATOR_ROOT)/include/verilated.mk

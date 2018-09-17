@@ -528,7 +528,7 @@ int	main(int argc, char **argv, char **envp) {
 		exit(-1);
 	}
 
-	fft->opentrace("fft.vcd");
+	// fft->opentrace("fft.vcd");
 	fft->reset();
 
 	{

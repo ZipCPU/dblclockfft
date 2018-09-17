@@ -364,7 +364,7 @@ assert(OWIDTH == IWIDTH+1);
 			fprintf(stderr, "Bad output sync (m_iaddr = %lx, m_offset = %x)\n",
 				(m_iaddr-m_offset) & SPANMASK, m_offset);
 			failed = true;
-		} printf("\n");
+		} if (gbl_debug) printf("\n");
 
 		if (m_syncd) {
 			if (m_out[raddr] != m_ftstage->o_data) {
@@ -396,7 +396,7 @@ int	main(int argc, char **argv, char **envp) {
 #define	STEP	1
 #endif
 
-	ftstage->opentrace("fftstage.vcd");
+	// ftstage->opentrace("fftstage.vcd");
 	ftstage->reset();
 
 	// Medium real (constant) value ... just for starters
@@ -441,5 +441,5 @@ int	main(int argc, char **argv, char **envp) {
 	printf("SUCCESS! (Offset = %d)\n", ftstage->m_offset);
 	delete	ftstage;
 
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
