@@ -610,6 +610,9 @@ SLASHLINE
 "\n");
 		if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
+		"\t\tassign fp_one_ic = f_rp2one_ic;\n"
+		"\t\tassign fp_one_id = f_rp2one_id;\n"
+"\n"
 		"\t\tassign fp_two_ic = (!MPYDELAY[0])? f_rp2two_ic : f_rptwo_ic;\n"
 		"\t\tassign fp_two_id = (!MPYDELAY[0])? f_rp2two_id : f_rptwo_id;\n"
 "\n"

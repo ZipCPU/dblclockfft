@@ -453,6 +453,9 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		// verilator lint_on  UNUSED
 
 `ifdef	FORMAL
+		assign fp_one_ic = f_rp2one_ic;
+		assign fp_one_id = f_rp2one_id;
+
 		assign fp_two_ic = (!MPYDELAY[0])? f_rp2two_ic : f_rptwo_ic;
 		assign fp_two_id = (!MPYDELAY[0])? f_rp2two_id : f_rptwo_id;
 

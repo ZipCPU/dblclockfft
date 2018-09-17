@@ -378,5 +378,55 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 		assign f_past_b_unsorted = (!f_sgn_a[TLEN+1])
 					? f_past_a[TLEN] : f_past_a_neg;
 	end endgenerate
+`ifdef	BUTTERFLY
+	// The following properties artificially restrict the inputs
+	// to this long binary multiplier to only those values whose
+	// absolute value is 0..7.  It is used by the formal proof of
+	// the BUTTERFLY to artificially limit the scope of the proof.
+	// By the time the butterfly sees this code, it will be known
+	// that the long binary multiply works.  At issue will no longer
+	// be whether or not this works, but rather whether it works in
+	// context.  For that purpose, we'll need to check timing, not
+	// results.  Checking against inputs of +/- 1 and 0 are perfect
+	// for that task.  The below assumptions (yes they are assumptions
+	// just go a little bit further.
+	//
+	// THEREFORE, THESE PROPERTIES ARE NOT NECESSARY TO PROVING THAT
+	// THIS MODULE WORKS, AND THEY WILL INTERFERE WITH THAT PROOF.
+	//
+	// This just limits the proof for the butterfly, the parent.
+	// module that calls this one
+	//
+	// Start by assuming that all inputs have an absolute value less
+	// than eight.
+	always @(*)
+		assume(u_a[AW-1:3] == 0);
+	always @(*)
+		assume(u_b[BW-1:3] == 0);
+
+	// If the inputs have these properties, then so too do many of
+	// our internal values.  ASSERT therefore that we never get out
+	// of bounds
+	generate for(k=0; k<TLEN; k=k+1)
+	begin
+		always @(*)
+		begin
+			assert(f_past_a[k][AW-1:3] == 0);
+			assert(f_past_b[k][BW-1:3] == 0);
+		end
+	end endgenerate
+
+	generate for(k=0; k<TLEN-1; k=k+1)
+	begin
+		always @(*)
+			assert(acc[k][IW+BW-1:6] == 0);
+	end endgenerate
+
+	generate for(k=0; k<TLEN-2; k=k+1)
+	begin
+		always @(*)
+			assert(r_b[k][BW-1:3] == 0);
+	end endgenerate
+`endif	// BUTTERFLY
 `endif	// FORMAL
 endmodule
