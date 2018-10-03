@@ -77,11 +77,7 @@ module	bimpy(i_clk, i_ce, i_a, i_b, o_r);
 	always @(posedge i_clk)
 	f_past_valid <= 1'b1;
 
-`ifdef	LONGBIMPY
 `define	ASSERT	assert
-`else
-`define	ASSERT	assume
-`endif
 
 	always @(posedge i_clk)
 	if ((f_past_valid)&&($past(i_ce)))

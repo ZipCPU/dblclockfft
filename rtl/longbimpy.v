@@ -207,14 +207,13 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
 
-`ifdef	LONGBIMPY
 `define	ASSERT	assert
+`ifdef	LONGBIMPY
 
 	always @(posedge i_clk)
 	if (!$past(i_ce))
 		assume(i_ce);
-`else
-`define	ASSERT	assume
+
 `endif
 
 	reg	[AW-1:0]	f_past_a	[0:TLEN];

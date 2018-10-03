@@ -237,11 +237,7 @@ SLASHLINE
 "\talways @(posedge i_clk)\n"
 "\tf_past_valid <= 1'b1;\n"
 "\n"
-"`ifdef	LONGBIMPY\n"
 "`define\tASSERT\tassert\n"
-"`else\n"
-"`define\tASSERT\tassume\n"
-"`endif\n"
 "\n");
 
 	// Now for our module specific assertions
@@ -490,14 +486,13 @@ SLASHLINE
 	"\talways @(posedge i_clk)\n"
 		"\t\tf_past_valid <= 1'b1;\n"
 "\n"
-"`ifdef	LONGBIMPY\n"
 "`define\tASSERT	assert\n"
+"`ifdef	LONGBIMPY\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (!$past(i_ce))\n"
 	"\t\tassume(i_ce);\n"
-"`else\n"
-"`define	ASSERT	assume\n"
+"\n"
 "`endif\n"
 "\n");
 

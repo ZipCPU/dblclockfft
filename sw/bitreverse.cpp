@@ -164,9 +164,9 @@ SLASHLINE
 	if (formal_property_flag) {
 		fprintf(fp,
 "`ifdef\tFORMAL\n"
+"`define\tASSERT	assert\n"
 "`ifdef	BITREVERSE\n"
-"`define\tASSUME	assume\n"
-"`define\tASSERT	assert\n");
+"`define\tASSUME	assume\n");
 		if (async_reset)
 			fprintf(fp,
 		"\n\talways @($global_clock)\n"
@@ -175,7 +175,6 @@ SLASHLINE
 		fprintf(fp,
 "`else\n"
 "`define\tASSUME	assert\n"
-"`define\tASSERT	assume\n"
 "`endif\n"
 "\n"
 	"\treg	f_past_valid;\n"
@@ -466,9 +465,9 @@ SLASHLINE
 	if (formal_property_flag) {
 		fprintf(fp,
 "`ifdef\tFORMAL\n"
+"`define\tASSERT	assert\n"
 "`ifdef	BITREVERSE\n"
-"`define\tASSUME	assume\n"
-"`define\tASSERT	assert\n");
+"`define\tASSUME	assume\n");
 		if (async_reset)
 			fprintf(fp,
 		"\n\talways @($global_clock)\n"
@@ -477,7 +476,6 @@ SLASHLINE
 		fprintf(fp,
 "`else\n"
 "`define\tASSUME	assert\n"
-"`define\tASSERT	assume\n"
 "`endif\n"
 "\n"
 	"\treg	f_past_valid;\n"
