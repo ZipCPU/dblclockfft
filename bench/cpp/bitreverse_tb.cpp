@@ -76,14 +76,14 @@ void	tick(TSTCLASS *brev) {
 
 	brev->i_clk = 0;
 	brev->eval();
-	if (trace)	trace->dump((uint64_t)(10ul*m_tickcount-2));
+	if (trace)	trace->dump((vluint64_t)(10ul*m_tickcount-2));
 	brev->i_clk = 1;
 	brev->eval();
-	if (trace)	trace->dump((uint64_t)(10ul*m_tickcount));
+	if (trace)	trace->dump((vluint64_t)(10ul*m_tickcount));
 	brev->i_clk = 0;
 	brev->eval();
 	if (trace) {
-		trace->dump((uint64_t)(10ul*m_tickcount+5));
+		trace->dump((vluint64_t)(10ul*m_tickcount+5));
 		trace->flush();
 	}
 

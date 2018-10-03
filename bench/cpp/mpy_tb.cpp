@@ -103,14 +103,14 @@ public:
 
 		m_mpy->i_clk = 0;
 		m_mpy->eval();
-		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount-2));
+		if (m_trace)	m_trace->dump((vluint64_t)(10ul*m_tickcount-2));
 		m_mpy->i_clk = 1;
 		m_mpy->eval();
-		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount));
+		if (m_trace)	m_trace->dump((vluint64_t)(10ul*m_tickcount));
 		m_mpy->i_clk = 0;
 		m_mpy->eval();
 		if (m_trace)	{
-			m_trace->dump((uint64_t)(10ul*m_tickcount+5));
+			m_trace->dump((vluint64_t)(10ul*m_tickcount+5));
 			m_trace->flush();
 		}
 	}

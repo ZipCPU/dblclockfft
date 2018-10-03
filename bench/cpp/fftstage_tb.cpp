@@ -135,14 +135,14 @@ assert(OWIDTH == IWIDTH+1);
 
 		m_ftstage->i_clk = 0;
 		m_ftstage->eval();
-		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount-2));
+		if (m_trace)	m_trace->dump((vluint64_t)(10ul*m_tickcount-2));
 		m_ftstage->i_clk = 1;
 		m_ftstage->eval();
-		if (m_trace)	m_trace->dump((uint64_t)(10ul*m_tickcount));
+		if (m_trace)	m_trace->dump((vluint64_t)(10ul*m_tickcount));
 		m_ftstage->i_clk = 0;
 		m_ftstage->eval();
 		if (m_trace) {
-			m_trace->dump((uint64_t)(10ul*m_tickcount+5));
+			m_trace->dump((vluint64_t)(10ul*m_tickcount+5));
 			m_trace->flush();
 		}
 	}
