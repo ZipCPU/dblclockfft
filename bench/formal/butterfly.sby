@@ -8,7 +8,7 @@ ck3_r2
 
 [options]
 mode prove
-depth	30
+depth	35
 
 [engines]
 smtbmc boolector
