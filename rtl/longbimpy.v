@@ -107,11 +107,11 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	// within the number of bits given (for now).
 	initial u_a = 0;
 	generate if (IW > AW)
-	begin
+	begin : ABS_AND_ADD_BIT_TO_A
 		always @(posedge i_clk)
 			if (i_ce)
 				u_a <= { 1'b0, (i_a[AW-1])?(-i_a):(i_a) };
-	end else begin
+	end else begin : ABS_A
 		always @(posedge i_clk)
 			if (i_ce)
 				u_a <= (i_a[AW-1])?(-i_a):(i_a);
@@ -121,7 +121,7 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	initial u_b = 0;
 	always @(posedge i_clk)
 	if (i_ce)
-	begin
+	begin : ABS_B
 		u_b <= (i_b[BW-1])?(-i_b):(i_b);
 		sgn <= i_a[AW-1] ^ i_b[BW-1];
 	end
