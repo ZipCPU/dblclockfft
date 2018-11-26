@@ -52,11 +52,8 @@ it from dev to master earlier, and come back to get the real only version.
 
 # Commercial Applications
 
-Should you find the GPLv3 license insufficient for your needs, other licenses
+Should you find the LGPLv3 license insufficient for your needs, other licenses
 can be purchased from Gisselquist Technology, LLC.
 
 Likewise, please contact us should you wish to fund the further development
 of this core.
-
-Watch this space if you are interested in a release under another license.
-I'm thinking about relicensing this with a more permissive license.
