@@ -53,9 +53,11 @@ module	bitreverse(i_clk, i_reset, i_ce, i_in, o_out, o_sync);
 	reg	[(2*WIDTH-1):0]	brmem	[0:((1<<(LGSIZE+1))-1)];
 
 	genvar	k;
-	generate for(k=0; k<LGSIZE; k=k+1)
+	generate begin : RDADDR
+	for(k=0; k<LGSIZE; k=k+1)
+	begin : DBL
 		assign rdaddr[k] = wraddr[LGSIZE-1-k];
-	endgenerate
+	end end endgenerate
 	assign	rdaddr[LGSIZE] = !wraddr[LGSIZE];
 
 	reg	in_reset;
