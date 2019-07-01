@@ -44,7 +44,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2018, Gisselquist Technology, LLC
+// Copyright (C) 2015-2019, Gisselquist Technology, LLC
 //
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -92,7 +92,8 @@ module fftmain(i_clk, i_reset, i_ce,
 
 
 	// Outputs of the FFT, ready for bit reversal.
-	wire	[(2*OWIDTH-1):0]	br_sample;
+	wire				br_sync;
+	wire	[(2*OWIDTH-1):0]	br_result;
 
 
 	wire		w_s2048;
@@ -169,9 +170,6 @@ module fftmain(i_clk, i_reset, i_ce,
 					w_s4, w_d4, w_d2, w_s2);
 
 
-	// Prepare for a (potential) bit-reverse stage.
-	assign	br_sample= w_d2;
-
 	wire	br_start;
 	reg	r_br_started;
 	initial	r_br_started = 1'b0;
@@ -183,25 +181,23 @@ module fftmain(i_clk, i_reset, i_ce,
 	assign	br_start = r_br_started || w_s2;
 
 	// Now for the bit-reversal stage.
-	wire	br_sync;
-	wire	[(2*OWIDTH-1):0]	br_o_result;
 	bitreverse	#(11,21)
 		revstage(i_clk, i_reset,
-			(i_ce & br_start), br_sample,
-			br_o_result, br_sync);
+			(i_ce & br_start), w_d2,
+			br_result, br_sync);
 
 
 	// Last clock: Register our outputs, we're done.
 	initial	o_sync  = 1'b0;
 	always @(posedge i_clk)
-		if (i_reset)
-			o_sync  <= 1'b0;
-		else if (i_ce)
-			o_sync  <= br_sync;
+	if (i_reset)
+		o_sync  <= 1'b0;
+	else if (i_ce)
+		o_sync  <= br_sync;
 
 	always @(posedge i_clk)
-		if (i_ce)
-			o_result  <= br_o_result;
+	if (i_ce)
+		o_result  <= br_result;
 
 
 endmodule

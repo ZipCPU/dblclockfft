@@ -14,7 +14,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2018, Gisselquist Technology, LLC
+// Copyright (C) 2015-2019, Gisselquist Technology, LLC
 //
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -65,18 +65,18 @@ module	laststage(i_clk, i_reset, i_ce, i_sync, i_val, o_val, o_sync);
 	initial	wait_for_sync = 1'b1;
 	initial	stage         = 1'b0;
 	always @(posedge i_clk)
-		if (i_reset)
-		begin
-			wait_for_sync <= 1'b1;
-			stage         <= 1'b0;
-		end else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))
-		begin
-			wait_for_sync <= 1'b0;
-			//
-			stage <= 1'b1;
-			//
-		end else if (i_ce)
-			stage <= 1'b0;
+	if (i_reset)
+	begin
+		wait_for_sync <= 1'b1;
+		stage         <= 1'b0;
+	end else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))
+	begin
+		wait_for_sync <= 1'b0;
+		//
+		stage <= 1'b1;
+		//
+	end else if (i_ce)
+		stage <= 1'b0;
 
 	initial	sync_pipe = 0;
 	always @(posedge i_clk)

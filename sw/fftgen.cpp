@@ -205,40 +205,30 @@ SLASHLINE
 	"\t\t\t\tdiff_i, rnd_diff_i);\n\n", rnd_string);
 	fprintf(fp, "\tassign n_rnd_diff_r = - rnd_diff_r;\n"
 		"\tassign n_rnd_diff_i = - rnd_diff_i;\n");
-/*
-	fprintf(fp,
-	"\twire	[(IWIDTH-1):0]	rnd;\n"
-	"\tgenerate\n"
-	"\tif ((ROUND)&&((IWIDTH+1-OWIDTH-SHIFT)>0))\n"
-		"\t\tassign rnd = { {(IWIDTH-1){1\'b0}}, 1\'b1 };\n"
-	"\telse\n"
-		"\t\tassign rnd = { {(IWIDTH){1\'b0}}};\n"
-	"\tendgenerate\n"
-"\n"
-*/
+
 	fprintf(fp,
 	"\tinitial wait_for_sync = 1\'b1;\n"
 	"\tinitial iaddr = 0;\n");
 	if (async_reset)
 		fprintf(fp,
 			"\talways @(posedge i_clk, negedge i_areset_n)\n"
-				"\t\tif (!i_reset)\n");
+			"\tif (!i_reset)\n");
 	else
 		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_reset)\n");
+	"\tif (i_reset)\n");
 	fprintf(fp,
-		"\t\tbegin\n"
-			"\t\t\twait_for_sync <= 1\'b1;\n"
-			"\t\t\tiaddr <= 0;\n"
-		"\t\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
-		"\t\tbegin\n"
-			"\t\t\tiaddr <= iaddr + { {(LGWIDTH-1){1\'b0}}, 1\'b1 };\n"
-			"\t\t\twait_for_sync <= 1\'b0;\n"
-		"\t\tend\n\n"
+	"\tbegin\n"
+		"\t\twait_for_sync <= 1\'b1;\n"
+		"\t\tiaddr <= 0;\n"
+	"\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
+	"\tbegin\n"
+		"\t\tiaddr <= iaddr + { {(LGWIDTH-1){1\'b0}}, 1\'b1 };\n"
+		"\t\twait_for_sync <= 1\'b0;\n"
+	"\tend\n\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-			"\t\t\timem <= i_data;\n"
+	"\tif (i_ce)\n"
+		"\t\timem <= i_data;\n"
 		"\n\n");
 	fprintf(fp,
 	"\t// Note that we don\'t check on wait_for_sync or i_sync here.\n"
@@ -248,26 +238,26 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
-		"\t\tif (!i_reset)\n");
+	"\tif (!i_reset)\n");
 	else
 		fprintf(fp,
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_reset)\n");
+	"\tif (i_reset)\n");
 
 	fprintf(fp,
-			"\t\t\tpipeline <= 4\'h0;\n"
-		"\t\telse if (i_ce) // is our pipeline process full?  Which stages?\n"
-			"\t\t\tpipeline <= { pipeline[2:0], iaddr[0] };\n\n");
+		"\t\tpipeline <= 4\'h0;\n"
+	"\telse if (i_ce) // is our pipeline process full?  Which stages?\n"
+		"\t\tpipeline <= { pipeline[2:0], iaddr[0] };\n\n");
 	fprintf(fp,
 	"\t// This is the pipeline[-1] stage, pipeline[0] will be set next.\n"
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif ((i_ce)&&(iaddr[0]))\n"
-		"\t\tbegin\n"
-			"\t\t\tsum_r  <= imem_r + i_data_r;\n"
-			"\t\t\tsum_i  <= imem_i + i_data_i;\n"
-			"\t\t\tdiff_r <= imem_r - i_data_r;\n"
-			"\t\t\tdiff_i <= imem_i - i_data_i;\n"
-		"\t\tend\n\n");
+	"\tif ((i_ce)&&(iaddr[0]))\n"
+	"\tbegin\n"
+		"\t\tsum_r  <= imem_r + i_data_r;\n"
+		"\t\tsum_i  <= imem_i + i_data_i;\n"
+		"\t\tdiff_r <= imem_r - i_data_r;\n"
+		"\t\tdiff_i <= imem_i - i_data_i;\n"
+	"\tend\n\n");
 	fprintf(fp,
 	"\t// pipeline[1] takes sum_x and diff_x and produces rnd_x\n\n");
 	fprintf(fp,
@@ -276,54 +266,116 @@ SLASHLINE
 	"\t// on the next clock.  Thus, we simplify this logic and do\n"
 	"\t// it independent of pipeline[2].\n"
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\tob_a <= { rnd_sum_r, rnd_sum_i };\n"
+		"\t\t// on Even, W = e^{-j2pi 1/4 0} = 1\n"
+		"\t\tif (ODD == 0)\n"
 		"\t\tbegin\n"
-			"\t\t\tob_a <= { rnd_sum_r, rnd_sum_i };\n"
-			"\t\t\t// on Even, W = e^{-j2pi 1/4 0} = 1\n"
-			"\t\t\tif (ODD == 0)\n"
-			"\t\t\tbegin\n"
-			"\t\t\t\tob_b_r <= rnd_diff_r;\n"
-			"\t\t\t\tob_b_i <= rnd_diff_i;\n"
-			"\t\t\tend else if (INVERSE==0) begin\n"
-			"\t\t\t\t// on Odd, W = e^{-j2pi 1/4} = -j\n"
-			"\t\t\t\tob_b_r <=   rnd_diff_i;\n"
-			"\t\t\t\tob_b_i <= n_rnd_diff_r;\n"
-			"\t\t\tend else begin\n"
-			"\t\t\t\t// on Odd, W = e^{j2pi 1/4} = j\n"
-			"\t\t\t\tob_b_r <= n_rnd_diff_i;\n"
-			"\t\t\t\tob_b_i <=   rnd_diff_r;\n"
-			"\t\t\tend\n"
-		"\t\tend\n\n");
+		"\t\t\tob_b_r <= rnd_diff_r;\n"
+		"\t\t\tob_b_i <= rnd_diff_i;\n"
+		"\t\tend else if (INVERSE==0) begin\n"
+		"\t\t\t// on Odd, W = e^{-j2pi 1/4} = -j\n"
+		"\t\t\tob_b_r <=   rnd_diff_i;\n"
+		"\t\t\tob_b_i <= n_rnd_diff_r;\n"
+		"\t\tend else begin\n"
+		"\t\t\t// on Odd, W = e^{j2pi 1/4} = j\n"
+		"\t\t\tob_b_r <= n_rnd_diff_i;\n"
+		"\t\t\tob_b_i <=   rnd_diff_r;\n"
+		"\t\tend\n"
+	"\tend\n\n");
 	fprintf(fp,
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-		"\t\tbegin // In sequence, clock = 3\n"
-			"\t\t\tif (pipeline[3])\n"
-			"\t\t\tbegin\n"
-				"\t\t\t\tomem <= ob_b;\n"
-				"\t\t\t\to_data <= ob_a;\n"
-			"\t\t\tend else\n"
-				"\t\t\t\to_data <= omem;\n"
-		"\t\tend\n\n");
+	"\tif (i_ce)\n"
+	"\tbegin // In sequence, clock = 3\n"
+		"\t\tif (pipeline[3])\n"
+		"\t\tbegin\n"
+			"\t\t\tomem <= ob_b;\n"
+			"\t\t\to_data <= ob_a;\n"
+		"\t\tend else\n"
+			"\t\t\to_data <= omem;\n"
+	"\tend\n\n");
 
 	fprintf(fp,
-	"\t// Don\'t forget in the sync check that we are running\n"
-	"\t// at two clocks per sample.  Thus we need to\n"
-	"\t// produce a sync every 2^(LGWIDTH-1) clocks.\n"
+	"\t// This algorithm takes five clocks to complete, therefore we can\n"
+	"\t// set o_sync any time the address counter iaddr == 5.\n"
+	"\t//\n"
+	"\t// Don\'t forget in the sync check that we are running at two\n"
+	"\t// clocks per sample.  Thus we need to produce a sync every\n"
+	"\t// 2^(LGWIDTH-1) clocks.\n\t//\n"
 	"\tinitial\to_sync = 1\'b0;\n");
 
-	if (async_reset)
-		fprintf(fp,
-	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
-		"\t\tif (!i_areset_n)\n");
-	else
-		fprintf(fp,
-	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_reset)\n");
 	fprintf(fp,
-		"\t\t\to_sync <= 1\'b0;\n"
+	"\tgenerate if (LGWIDTH == 3)\n"
+	"\tbegin\n\n");
+		fprintf(fp,
+		"\t\treg	o_sync_passed;\n\n"
+		"\t\tinitial	o_sync_passed = 1\'b0;\n");
+
+		if (async_reset)
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+		fprintf(fp,
+			"\t\t\to_sync_passed <= 1\'b0;\n"
+		"\t\telse if (i_ce && o_sync)\n"
+			"\t\t\to_sync_passed <= 1\'b1;\n\n");
+
+		if (async_reset)
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+		fprintf(fp,
+			"\t\t\to_sync <= 1\'b0;\n"
+		"\t\telse if (i_ce && (o_sync_passed || iaddr[2]))\n"
+			"\t\t\to_sync <= (iaddr[1:0] == 2'b01);\n");
+
+	fprintf(fp,
+	"\n\tend else if (LGWIDTH == 4)\n"
+	"\tbegin\n\n");
+
+		if (async_reset)
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+		fprintf(fp,
+			"\t\t\to_sync <= 1\'b0;\n"
 		"\t\telse if (i_ce)\n"
-			"\t\t\to_sync <= &(~iaddr[(LGWIDTH-2):3]) && (iaddr[2:0] == 3'b101);\n");
+			"\t\t\to_sync <= (iaddr[2:0] == 3'b101);\n");
+
+	fprintf(fp,
+	"\n\tend else begin\n\n");
+
+		if (async_reset)
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
+		"\t\talways\t@(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+		fprintf(fp,
+			"\t\t\to_sync <= 1\'b0;\n"
+		"\t\telse if (i_ce)\n"
+			"\t\t\t// As currently formulated, this line requires a\n"
+			"\t\t\t// transform of 32 points or greater.  Notice\n"
+			"\t\t\t// that the top bit is ignored, on purpose.\n"
+			"\t\t\to_sync <= (iaddr[(LGWIDTH-2):3] == 0) && (iaddr[2:0] == 3'b101);\n");
+
+	fprintf(fp, "\n\tend endgenerate\n\n");
+
 	fprintf(fp, "endmodule\n");
 }
 
@@ -466,27 +518,27 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 			"\talways @(posedge i_clk, negedge i_areset_n)\n"
-				"\t\tif (!i_reset)\n");
+			"\tif (!i_reset)\n");
 	else
 		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_reset)\n");
+	"\tif (i_reset)\n");
 
-	fprintf(fp, "\t\tbegin\n"
-			"\t\t\twait_for_sync <= 1\'b1;\n"
-			"\t\t\tiaddr <= 0;\n"
-		"\t\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
-		"\t\tbegin\n"
-			"\t\t\tiaddr <= iaddr + 1\'b1;\n"
-			"\t\t\twait_for_sync <= 1\'b0;\n"
-		"\t\tend\n\n"
+	fprintf(fp, "\tbegin\n"
+		"\t\twait_for_sync <= 1\'b1;\n"
+		"\t\tiaddr <= 0;\n"
+	"\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
+	"\tbegin\n"
+		"\t\tiaddr <= iaddr + 1\'b1;\n"
+		"\t\twait_for_sync <= 1\'b0;\n"
+	"\tend\n\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-		"\t\tbegin\n"
-			"\t\t\timem[0] <= i_data;\n"
-			"\t\t\timem[1] <= imem[0];\n"
-		"\t\tend\n"
-		"\n\n");
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\timem[0] <= i_data;\n"
+		"\t\timem[1] <= imem[0];\n"
+	"\tend\n"
+	"\n\n");
 	fprintf(fp,
 	"\t// Note that we don\'t check on wait_for_sync or i_sync here.\n"
 	"\t// Why not?  Because iaddr will always be zero until after the\n"
@@ -496,26 +548,26 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
-		"\t\tif (!i_reset)\n");
+	"\tif (!i_reset)\n");
 	else
 		fprintf(fp,
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_reset)\n");
+	"\tif (i_reset)\n");
 
 	fprintf(fp,
-			"\t\t\tpipeline <= 3\'h0;\n"
-		"\t\telse if (i_ce) // is our pipeline process full?  Which stages?\n"
-			"\t\t\tpipeline <= { pipeline[1:0], iaddr[1] };\n\n");
+		"\t\tpipeline <= 3\'h0;\n"
+	"\telse if (i_ce) // is our pipeline process full?  Which stages?\n"
+		"\t\tpipeline <= { pipeline[1:0], iaddr[1] };\n\n");
 	fprintf(fp,
 	"\t// This is the pipeline[-1] stage, pipeline[0] will be set next.\n"
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif ((i_ce)&&(iaddr[1]))\n"
-		"\t\tbegin\n"
-			"\t\t\tsum_r  <= imem_r + i_data_r;\n"
-			"\t\t\tsum_i  <= imem_i + i_data_i;\n"
-			"\t\t\tdiff_r <= imem_r - i_data_r;\n"
-			"\t\t\tdiff_i <= imem_i - i_data_i;\n"
-		"\t\tend\n\n");
+	"\tif ((i_ce)&&(iaddr[1]))\n"
+	"\tbegin\n"
+		"\t\tsum_r  <= imem_r + i_data_r;\n"
+		"\t\tsum_i  <= imem_i + i_data_i;\n"
+		"\t\tdiff_r <= imem_r - i_data_r;\n"
+		"\t\tdiff_i <= imem_i - i_data_i;\n"
+	"\tend\n\n");
 	fprintf(fp,
 	"\t// pipeline[1] takes sum_x and diff_x and produces rnd_x\n\n");
 
@@ -525,35 +577,35 @@ SLASHLINE
 	"\t// on the next clock.  Thus, we simplify this logic and do\n"
 	"\t// it independent of pipeline[2].\n"
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\tob_a <= { rnd_sum_r, rnd_sum_i };\n"
+		"\t\t// on Even, W = e^{-j2pi 1/4 0} = 1\n"
+		"\t\tif (!iaddr[0])\n"
 		"\t\tbegin\n"
-			"\t\t\tob_a <= { rnd_sum_r, rnd_sum_i };\n"
-			"\t\t\t// on Even, W = e^{-j2pi 1/4 0} = 1\n"
-			"\t\t\tif (!iaddr[0])\n"
-			"\t\t\tbegin\n"
-			"\t\t\t\tob_b_r <= rnd_diff_r;\n"
-			"\t\t\t\tob_b_i <= rnd_diff_i;\n"
-			"\t\t\tend else if (INVERSE==0) begin\n"
-			"\t\t\t\t// on Odd, W = e^{-j2pi 1/4} = -j\n"
-			"\t\t\t\tob_b_r <=   rnd_diff_i;\n"
-			"\t\t\t\tob_b_i <= n_rnd_diff_r;\n"
-			"\t\t\tend else begin\n"
-			"\t\t\t\t// on Odd, W = e^{j2pi 1/4} = j\n"
-			"\t\t\t\tob_b_r <= n_rnd_diff_i;\n"
-			"\t\t\t\tob_b_i <=   rnd_diff_r;\n"
-			"\t\t\tend\n"
-		"\t\tend\n\n");
+		"\t\t\tob_b_r <= rnd_diff_r;\n"
+		"\t\t\tob_b_i <= rnd_diff_i;\n"
+		"\t\tend else if (INVERSE==0) begin\n"
+		"\t\t\t// on Odd, W = e^{-j2pi 1/4} = -j\n"
+		"\t\t\tob_b_r <=   rnd_diff_i;\n"
+		"\t\t\tob_b_i <= n_rnd_diff_r;\n"
+		"\t\tend else begin\n"
+		"\t\t\t// on Odd, W = e^{j2pi 1/4} = j\n"
+		"\t\t\tob_b_r <= n_rnd_diff_i;\n"
+		"\t\t\tob_b_i <=   rnd_diff_r;\n"
+		"\t\tend\n"
+	"\tend\n\n");
 	fprintf(fp,
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-		"\t\tbegin // In sequence, clock = 3\n"
-			"\t\t\tomem[0] <= ob_b;\n"
-			"\t\t\tomem[1] <= omem[0];\n"
-			"\t\t\tif (pipeline[2])\n"
-				"\t\t\t\to_data <= ob_a;\n"
-			"\t\t\telse\n"
-				"\t\t\t\to_data <= omem[1];\n"
-		"\t\tend\n\n");
+	"\tif (i_ce)\n"
+	"\tbegin // In sequence, clock = 3\n"
+		"\t\tomem[0] <= ob_b;\n"
+		"\t\tomem[1] <= omem[0];\n"
+		"\t\tif (pipeline[2])\n"
+			"\t\t\to_data <= ob_a;\n"
+		"\t\telse\n"
+			"\t\t\to_data <= omem[1];\n"
+	"\tend\n\n");
 
 	fprintf(fp,
 	"\tinitial\to_sync = 1\'b0;\n");
@@ -561,15 +613,15 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
-		"\t\tif (!i_areset_n)\n");
+	"\tif (!i_areset_n)\n");
 	else
 		fprintf(fp,
 	"\talways\t@(posedge i_clk)\n"
-		"\t\tif (i_reset)\n");
+	"\tif (i_reset)\n");
 	fprintf(fp,
-		"\t\t\to_sync <= 1\'b0;\n"
-		"\t\telse if (i_ce)\n"
-			"\t\t\to_sync <= (iaddr[2:0] == 3'b101);\n\n");
+		"\t\to_sync <= 1\'b0;\n"
+		"\telse if (i_ce)\n"
+			"\t\to_sync <= (iaddr[2:0] == 3'b101);\n\n");
 
 	if (formal_property_flag) {
 		fprintf(fp,
@@ -789,19 +841,19 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
 	else
-		fprintf(fp, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
-"		begin\n"
-"			wait_for_sync <= 1'b1;\n"
-"			stage         <= 1'b0;\n"
-"		end else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))\n"
-"		begin\n"
-"			wait_for_sync <= 1'b0;\n"
-"			//\n"
-"			stage <= 1'b1;\n"
-"			//\n"
-"		end else if (i_ce)\n"
-"			stage <= 1'b0;\n\n");
+"	begin\n"
+"		wait_for_sync <= 1'b1;\n"
+"		stage         <= 1'b0;\n"
+"	end else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))\n"
+"	begin\n"
+"		wait_for_sync <= 1'b0;\n"
+"		//\n"
+"		stage <= 1'b1;\n"
+"		//\n"
+"	end else if (i_ce)\n"
+"		stage <= 1'b0;\n\n");
 
 	fprintf(fp, "\tinitial\tsync_pipe = 0;\n");
 	if (async_reset)
@@ -1470,8 +1522,9 @@ SLASHLINE
 	fprintf(vmain, "\n\n");
 
 	fprintf(vmain, "\t// Outputs of the FFT, ready for bit reversal.\n");
+	fprintf(vmain, "\twire\t\t\t\tbr_sync;\n");
 	if (single_clock)
-		fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_sample;\n");
+		fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_result;\n");
 	else
 		fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_left, br_right;\n");
 	int	tmp_size = fftsize, lgtmp = lgsize;
@@ -1491,10 +1544,53 @@ SLASHLINE
 			fprintf(vmain, "\t\t\tbr_start <= 1\'b1;\n");
 		}
 		fprintf(vmain, "\n\n");
-		fprintf(vmain, "\tlaststage\t#(IWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
-		fprintf(vmain, "\t\t\t(%s%s), i_left, i_right, br_left, br_right);\n",
+		fprintf(vmain, "\twire\t\tw_s2;\n");
+		if (single_clock) {
+			fprintf(vmain, "\twire\t[%d:0]\tw_d2;\n",
+				2*nbitsout-1);
+			fprintf(vmain, "\tlaststage\t#(IWIDTH,OWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
+			fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d2, w_s2);\n",
+				(async_reset)?"":"!", resetw.c_str());
+		} else {
+			fprintf(vmain, "\twire\t[%d:0]\tw_e2, w_o2;\n",
+				2*nbitsout-1);
+			fprintf(vmain, "\tlaststage\t#(IWIDTH,OWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
+			fprintf(vmain, "\t\t\t(%s%s), i_left, i_right, w_e2, w_o2, w_s2);\n",
+				(async_reset)?"":"!", resetw.c_str());
+		}
+		fprintf(vmain, "\n\n");
+	} else if (fftsize == 4) {
+		if (!single_clock) {
+			fprintf(stderr, "ERR: The two-clocks per sample FFT does not support 4-pt FFTs\n");
+			exit(EXIT_FAILURE);
+		}
+
+		if (bitreverse) {
+			fprintf(vmain, "\treg\tbr_start;\n");
+			fprintf(vmain, "\tinitial br_start = 1\'b0;\n");
+			if (async_reset) {
+				fprintf(vmain, "\talways @(posedge i_clk, negedge i_arese_n)\n");
+				fprintf(vmain, "\t\tif (!i_areset_n)\n");
+			} else {
+				fprintf(vmain, "\talways @(posedge i_clk)\n");
+				fprintf(vmain, "\t\tif (i_reset)\n");
+			}
+			fprintf(vmain, "\t\t\tbr_start <= 1\'b0;\n");
+			fprintf(vmain, "\t\telse if (i_ce)\n");
+			fprintf(vmain, "\t\t\tbr_start <= 1\'b1;\n");
+		}
+		fprintf(vmain, "\n\n");
+		fprintf(vmain, "\twire\t\tw_s4;\n");
+		fprintf(vmain, "\twire\t[%d:0]\tw_d4;\n", 2*nbitsout-1);
+		fprintf(vmain, "\tqtrstage\t#(IWIDTH,OWIDTH)\tstage_4(i_clk, %s, i_ce,\n", resetw.c_str());
+		fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d4, w_s4);\n",
 			(async_reset)?"":"!", resetw.c_str());
 		fprintf(vmain, "\n\n");
+
+		fprintf(vmain, "\twire\t\tw_s2;\n");
+		fprintf(vmain, "\twire\t[%d:0]\tw_d2;\n", 2*nbitsout-1);
+		fprintf(vmain, "\tlaststage\t#(OWIDTH,OWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
+		fprintf(vmain, "\t\t\tw_s4, w_d4, w_d2, w_s2);\n");
 	} else {
 		int	nbits = nbitsin, dropbit=0;
 		int	obits = nbits+1+xtrapbits;
@@ -1760,14 +1856,13 @@ SLASHLINE
 			nbits = obits;
 		}
 
-		fprintf(vmain, "\t// Prepare for a (potential) bit-reverse stage.\n");
-		if (single_clock)
-			fprintf(vmain, "\tassign\tbr_sample= w_d2;\n");
-		else {
-			fprintf(vmain, "\tassign\tbr_left  = w_e2;\n");
-			fprintf(vmain, "\tassign\tbr_right = w_o2;\n");
-		}
-		fprintf(vmain, "\n");
+//		if (single_clock)
+//			fprintf(vmain, "\tassign\tbr_sample= w_d2;\n");
+//		else {
+//			fprintf(vmain, "\tassign\tbr_left  = w_e2;\n");
+//			fprintf(vmain, "\tassign\tbr_right = w_o2;\n");
+//		}
+//		fprintf(vmain, "\n");
 		if (bitreverse) {
 			fprintf(vmain, "\twire\tbr_start;\n");
 			fprintf(vmain, "\treg\tr_br_started;\n");
@@ -1789,25 +1884,28 @@ SLASHLINE
 
 	fprintf(vmain, "\n");
 	fprintf(vmain, "\t// Now for the bit-reversal stage.\n");
-	fprintf(vmain, "\twire\tbr_sync;\n");
 	if (bitreverse) {
 		if (single_clock) {
-			fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_o_result;\n");
 			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
-			fprintf(vmain, "\t\t\t(i_ce & br_start), br_sample,\n");
-			fprintf(vmain, "\t\t\tbr_o_result, br_sync);\n");
+			fprintf(vmain, "\t\t\t(i_ce & br_start), w_d2,\n");
+			fprintf(vmain, "\t\t\tbr_result, br_sync);\n");
 		} else {
-			fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_o_left, br_o_right;\n");
 			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
-			fprintf(vmain, "\t\t\t(i_ce & br_start), br_left, br_right,\n");
-			fprintf(vmain, "\t\t\tbr_o_left, br_o_right, br_sync);\n");
+			fprintf(vmain, "\t\t\t(i_ce & br_start), w_e2, w_o2,\n");
+			fprintf(vmain, "\t\t\tbr_left, br_right, br_sync);\n");
 		}
-	} else if (single_clock) {
-		fprintf(vmain, "\tassign\tbr_o_result = br_result;\n");
-		fprintf(vmain, "\tassign\tbr_sync     = w_s2;\n");
 	} else {
-		fprintf(vmain, "\tassign\tbr_o_left  = br_left;\n");
-		fprintf(vmain, "\tassign\tbr_o_right = br_right;\n");
+		fprintf(vmain, "\t//\n"
+"\t// Since the bit-reversal stage isn\'t included, according to the current\n"
+"\t// settings, this will just be a stub instead of the actual bit-reversal\n"
+"\t// logic.\n"
+"\t//\n");
+		if (single_clock) {
+			fprintf(vmain, "\tassign\tbr_result   = w_d2;\n");
+		} else {
+			fprintf(vmain, "\tassign\tbr_left  = w_e2;\n");
+			fprintf(vmain, "\tassign\tbr_right = w_o2;\n");
+		}
 		fprintf(vmain, "\tassign\tbr_sync    = w_s2;\n");
 	}
 
@@ -1820,24 +1918,24 @@ SLASHLINE
 "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
 	else {
 		fprintf(vmain,
-"\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+"\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	}
 
 	fprintf(vmain,
-"\t\t\to_sync  <= 1\'b0;\n"
-"\t\telse if (i_ce)\n"
-"\t\t\to_sync  <= br_sync;\n"
+"\t\to_sync  <= 1\'b0;\n"
+"\telse if (i_ce)\n"
+"\t\to_sync  <= br_sync;\n"
 "\n"
 "\talways @(posedge i_clk)\n"
-"\t\tif (i_ce)\n");
+"\tif (i_ce)\n");
 	if (single_clock) {
-		fprintf(vmain, "\t\t\to_result  <= br_o_result;\n");
+		fprintf(vmain, "\t\to_result  <= br_result;\n");
 	} else {
 		fprintf(vmain,
-"\t\tbegin\n"
-"\t\t\to_left  <= br_o_left;\n"
-"\t\t\to_right <= br_o_right;\n"
-"\t\tend\n");
+"\tbegin\n"
+"\t\to_left  <= br_left;\n"
+"\t\to_right <= br_right;\n"
+"\tend\n");
 	}
 
 	fprintf(vmain,

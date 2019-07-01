@@ -15,7 +15,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2015-2018, Gisselquist Technology, LLC
+// Copyright (C) 2015-2019, Gisselquist Technology, LLC
 //
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -56,8 +56,9 @@ module	bitreverse(i_clk, i_reset, i_ce, i_in, o_out, o_sync);
 
 	genvar	k;
 	generate for(k=0; k<LGSIZE; k=k+1)
+	begin : DBL
 		assign rdaddr[k] = wraddr[LGSIZE-1-k];
-	endgenerate
+	end endgenerate
 	assign	rdaddr[LGSIZE] = !wraddr[LGSIZE];
 
 	reg	in_reset;
