@@ -6,9 +6,9 @@ depth	20
 smtbmc boolector
 
 [script]
-read_verilog -formal -DQTRSTAGE convround.v
-read_verilog -formal -DQTRSTAGE qtrstage.v
-chparam -set IWIDTH 3 -set OWIDTH 4 qtrstage
+read -formal -DQTRSTAGE convround.v
+read -formal -DQTRSTAGE qtrstage.v
+hierarchy -top qtrstage -chparam IWIDTH 3 -chparam OWIDTH 4 -chparam ODD 1
 prep -top qtrstage
 
 [files]
