@@ -12,7 +12,7 @@ cover: depth 60
 smtbmc
 
 [script]
-read_verilog -formal -DWINDOWFN windowfn.v
+read -formal -DWINDOWFN windowfn.v
 prep -top windowfn
 
 [files]
