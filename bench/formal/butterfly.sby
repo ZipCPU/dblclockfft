@@ -1,14 +1,22 @@
 [tasks]
 ck1
-ck2_r0
-ck2_r1
-ck3_r0
-ck3_r1
-ck3_r2
+ck2_r0 ck2
+ck2_r1 ck2
+ck3_r0 ck3
+ck3_r1 ck3
+ck3_r2 ck3
 
 [options]
 mode prove
-depth	35
+depth	23
+ck1: depth 22
+ck2: depth 22
+# ck3_r0 succeeds in 35-8 steps in 17min (induction only)
+# ck3_r1 succeeds in 35-5 steps in 38min (induction only)
+# ck3_r2 succeeds in 35-1 steps in 40min (induction only)
+ck3_r0: depth 28
+ck3_r1: depth 30
+ck3_r2: depth 34
 
 [engines]
 smtbmc boolector

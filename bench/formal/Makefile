@@ -40,34 +40,77 @@
 ##
 TARGETS := bimpy longbimpy fftstage hwbfly butterfly qtrstage laststage bitreverse
 .PHONY: $(TARGETS)
-all: bimpy longbimpy hwbfly fftstage qtrstage laststage bitreverse # butterfly
+all: bimpy longbimpy hwbfly fftstage qtrstage laststage bitreverse butterfly
+RTL := ../../rtl
 
-bimpy:
+.PHONY: bimpy
+bimpy: bimpy/PASS
+bimpy/PASS: bimpy.sby ../../rtl/bimpy.v
 	sby -f bimpy.sby
 
-longbimpy:
+longbimpy: longbimpy/PASS
+longbimpy/PASS: longbimpy.sby ../../rtl/longbimpy.v
 	sby -f longbimpy.sby
 
-fftstage:
-	sby -f fftstage.sby
+fftstage: fftstage_s2/PASS fftstage_s3/PASS fftstage_s4/PASS fftstage_s5/PASS fftstage_s6/PASS
+fftstage_s2/PASS: fftstage.sby $(RTL)/fftstage.v
+	sby -f fftstage.sby s2
+fftstage_s3/PASS: fftstage.sby $(RTL)/fftstage.v
+	sby -f fftstage.sby s2
+fftstage_s4/PASS: fftstage.sby $(RTL)/fftstage.v
+	sby -f fftstage.sby s4
+fftstage_s5/PASS: fftstage.sby $(RTL)/fftstage.v
+	sby -f fftstage.sby s5
+fftstage_s6/PASS: fftstage.sby $(RTL)/fftstage.v
+	sby -f fftstage.sby s6
 
-hwbfly:
-	sby -f hwbfly.sby
+hwbfly: hwbfly_one/PASS hwbfly_two/PASS hwbfly_three/PASS
+hwbfly_one/PASS: hwbfly.sby $(RTL)/hwbfly.v
+	sby -f hwbfly.sby one
+hwbfly_two/PASS: hwbfly.sby $(RTL)/hwbfly.v
+	sby -f hwbfly.sby two
+hwbfly_three/PASS: hwbfly.sby $(RTL)/hwbfly.v
+	sby -f hwbfly.sby three
 
-butterfly:
-	sby -f butterfly.sby
+.PHONY: butterfly_ck1 butterfly_ck2 butterfly_ck3
+butterfly: butterfly_ck1 butterfly_ck2 butterfly_ck3
 
-qtrstage:
+butterfly_ck1: butterfly_ck1/PASS
+butterfly_ck2: butterfly_ck2_r0/PASS butterfly_ck2_r1/PASS
+butterfly_ck3: butterfly_ck3_r0/PASS butterfly_ck3_r1/PASS butterfly_ck3_r2/PASS
+
+SOFTMPY := $(RTL)/longbimpy.v $(RTL)/bimpy.v $(RTL)/convround.v
+
+butterfly_ck1/PASS: butterfly.sby    $(SOFTMPY)
+	sby -f butterfly.sby ck1
+butterfly_ck2_r0/PASS: butterfly.sby $(SOFTMPY)
+	sby -f butterfly.sby ck2_r0
+butterfly_ck2_r1/PASS: butterfly.sby $(SOFTMPY)
+	sby -f butterfly.sby ck2_r1
+butterfly_ck3_r0/PASS: butterfly.sby $(SOFTMPY)
+	sby -f butterfly.sby ck3_r0
+butterfly_ck3_r1/PASS: butterfly.sby $(SOFTMPY)
+	sby -f butterfly.sby ck3_r1
+butterfly_ck3_r2/PASS: butterfly.sby $(SOFTMPY)
+	sby -f butterfly.sby ck3_r2
+
+qtrstage: qtrstage/PASS
+qtrstage/PASS: qtrstage.sby $(RTL)/qtrstage.v
 	sby -f qtrstage.sby
 
-laststage:
+laststage: laststage/PASS
+laststage/PASS: laststage.sby $(RTL)/laststage.v
 	sby -f laststage.sby
 
-bitreverse:
+bitreverse: bitreverse/PASS
+bitreverse/PASS: bitreverse.sby $(RTL)/bitreverse.v
 	sby -f bitreverse.sby
 
-windowfn:
-	sby -f windowfn.sby
+windowfn: windowfn_cvr/PASS windowfn_proof/PASS
+windowfn_cvr/PASS: windowfn.sby $(RTL)/windowfn.v
+	sby -f windowfn.sby cvr
+windowfn_proof/PASS: windowfn.sby $(RTL)/windowfn.v
+	sby -f windowfn.sby proof
 
 clean:
 	rm -rf bimpy/ longbimpy/
