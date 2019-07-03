@@ -8,7 +8,7 @@ smtbmc boolector
 [script]
 read -formal -DQTRSTAGE convround.v
 read -formal -DQTRSTAGE qtrstage.v
-hierarchy -top qtrstage -chparam IWIDTH 3 -chparam OWIDTH 4 -chparam ODD 1
+hierarchy -top qtrstage -chparam IWIDTH 3 -chparam OWIDTH 4
 prep -top qtrstage
 
 [files]
