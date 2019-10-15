@@ -644,7 +644,7 @@ SLASHLINE
 	"\t\treg\t\t\tmpy_pipe_v;\n"
 	"\t\treg\t\t[2:0]\tce_phase;\n"
 	"\n"
-	"\t\treg\tsigned	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
+	"\t\twire\tsigned	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
 "\n");
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
@@ -1549,7 +1549,7 @@ SLASHLINE
 		"\t\treg			ce_phase;\n"
 "\n"
 		"\t\treg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
-		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
+		"\t\twire	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
 "\n"
 "\n"
 		"\t\tinitial	ce_phase = 1'b1;\n"
