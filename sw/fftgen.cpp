@@ -1128,6 +1128,10 @@ int main(int argc, char **argv) {
 		case 'h':	usage(); exit(EXIT_SUCCESS);	break;
 		case 'i':	inverse = true;			break;
 		case 'k':	ckpce = atoi(optarg);
+				// After CKPCE=3, there's no advantage
+				// only bits lost, so keep CKPCE <=3 here
+				if (ckpce > 3)
+					ckpce = 3;
 				single_clock = true;
 				break;
 		case 'm':	maxbitsout = atoi(optarg);	break;
