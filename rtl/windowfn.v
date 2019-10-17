@@ -354,9 +354,15 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	///////
 	//
 	// Assumptions about the input
+`ifdef	VERIFIC
+	restrict property (@(posedge i_clk)
+		i_reset && !i_ce
+		|=> $stable(i_sample));
+`else
 	always @(posedge i_clk)
 	if ((f_past_valid)&&(!$past(i_reset))&&(!$past(i_ce)))
 		restrict($stable(i_sample));
+`endif
 
 	always @(*)
 	if (tapwidx != 0)
@@ -489,7 +495,7 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		assert(tidx == 1);
 
 
-	wire	[LGNFFT:0]	f_phase_plus_one;
+	reg	[LGNFFT:0]	f_phase_plus_one;
 	always @(*)
 		f_phase_plus_one = f_phase + 1;
 	/*
@@ -570,7 +576,7 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 ////////////////////////////////////////////////////////////////////////////////
 	// Gin up a really quick abstract multiply for formal testing
 	// only.  always @(posedge i_clk)
-	(* anyconst *) signed reg [IW+TW-1:0] pre_product;
+	(* anyconst *) reg signed [IW+TW-1:0] pre_product;
 	always @(posedge i_clk)
 	if (data == 0)
 		assume(pre_product == 0);
@@ -592,13 +598,23 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 //  Arbitrary memory test
 //
 ////////////////////////////////////////////////////////////////////////////////
-	(* anyconst *)		reg	[LGNFFT-1:0]	f_addr;
-			signed	reg	[TW-1:0]	f_tap;
-			signed	reg	[IW-1:0]	f_value, f_tap;
-				reg			f_this_dce, f_this_pce,
+	(* anyconst *)	reg		[LGNFFT-1:0]	f_addr;
+			reg	signed	[TW-1:0]	f_tap;
+			reg	signed	[IW-1:0]	f_value;
+			reg				f_this_dce, f_this_pce,
 							f_this_oce, f_this_tap;
-
+`ifdef	VERIFIC
+	always @(*)
+	if (!f_past_valid)
+	begin
+		assume(f_tap == cmem[f_addr]);
+		assume(dmem[f_addr] == f_value);
+	end
+`else
 	initial	assume(f_tap == cmem[f_addr]);
+	initial	assume(dmem[f_addr] == f_value);
+`endif
+
 	always @(*)
 		assert(f_tap == cmem[f_addr]);
 	always @(posedge i_clk)
@@ -606,7 +622,6 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		f_tap <= i_tap;
 
 	initial	f_value = 0;
-	initial	assume(dmem[f_addr] == f_value);
 	always @(*)
 		assert(f_value == dmem[f_addr]);
 	always @(posedge i_clk)
