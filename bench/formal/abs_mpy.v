@@ -49,8 +49,7 @@ module	abs_mpy(i_a, i_b, o_result);
 	input	wire	[(BW-1):0]	i_b;
 	output	wire	[(AW+BW-1):0]	o_result;
 
-	wire	[(AW+BW-1):0]	any_result;
-	assign	any_result = $anyseq;
+	(* anyseq *)	wire	[(AW+BW-1):0]	any_result;
 
 	reg	[AW-1:0]	u_a;
 	reg	[BW-1:0]	u_b;
