@@ -80,10 +80,10 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	wire	[AW-1:0]	i_a;
 	wire	[BW-1:0]	i_b;
 	generate if (IAW <= IBW)
-	begin : NO_PARAM_CHANGE
+	begin : NO_PARAM_CHANGE_I
 		assign i_a = i_a_unsorted;
 		assign i_b = i_b_unsorted;
-	end else begin : SWAP_PARAMETERS
+	end else begin : SWAP_PARAMETERS_I
 		assign i_a = i_b_unsorted;
 		assign i_b = i_a_unsorted;
 	end endgenerate
@@ -368,12 +368,12 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	end
 
 	generate if (IAW <= IBW)
-	begin : NO_PARAM_CHANGE
+	begin : NO_PARAM_CHANGE_II
 		assign f_past_a_unsorted = (!f_sgn_a[TLEN+1])
 					? f_past_a[TLEN] : f_past_a_neg;
 		assign f_past_b_unsorted = (!f_sgn_b[TLEN+1])
 					? f_past_b[TLEN] : f_past_b_neg;
-	end else begin : SWAP_PARAMETERS
+	end else begin : SWAP_PARAMETERS_II
 		assign f_past_a_unsorted = (!f_sgn_b[TLEN+1])
 					? f_past_b[TLEN] : f_past_b_neg;
 		assign f_past_b_unsorted = (!f_sgn_a[TLEN+1])

@@ -174,13 +174,13 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 	reg	signed	[CWIDTH-1:0]	f_dlycoeff_i [0:F_DEPTH-1];
 	reg	signed	[F_DEPTH-1:0]	f_dlyaux;
 
-	wire	signed	[IWIDTH:0]		f_predifr, f_predifi;
+	reg	signed	[IWIDTH:0]		f_predifr, f_predifi;
 	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_predifrx, f_predifix;
-	wire	signed	[CWIDTH:0]		f_sumcoef;
-	wire	signed	[IWIDTH+1:0]		f_sumdiff;
-	wire	signed	[IWIDTH:0]		f_sumr, f_sumi;
+	reg	signed	[CWIDTH:0]		f_sumcoef;
+	reg	signed	[IWIDTH+1:0]		f_sumdiff;
+	reg	signed	[IWIDTH:0]		f_sumr, f_sumi;
 	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_sumrx, f_sumix;
-	wire	signed	[IWIDTH:0]		f_difr, f_difi;
+	reg	signed	[IWIDTH:0]		f_difr, f_difi;
 	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;
 	wire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;
 
@@ -480,7 +480,7 @@ module	butterfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		reg			mpy_pipe_v;
 		reg		[2:0]	ce_phase;
 
-		reg	signed	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
+		wire	signed	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
 
 `ifdef	FORMAL
 		wire	[CWIDTH:0]	f_past_ic;
