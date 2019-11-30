@@ -235,7 +235,7 @@ module	hwbfly(i_clk, i_reset, i_ce, i_coef, i_left, i_right, i_aux,
 		reg			ce_phase;
 
 		reg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;
-		wire	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
+		reg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
 
 
 		initial	ce_phase = 1'b1;
