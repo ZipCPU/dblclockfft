@@ -1549,7 +1549,7 @@ SLASHLINE
 		"\t\treg			ce_phase;\n"
 "\n"
 		"\t\treg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
-		"\t\twire	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
+		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
 "\n"
 "\n"
 		"\t\tinitial	ce_phase = 1'b1;\n"
