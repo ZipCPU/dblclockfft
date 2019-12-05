@@ -56,7 +56,7 @@ fftstage: fftstage_s2/PASS fftstage_s3/PASS fftstage_s4/PASS fftstage_s5/PASS ff
 fftstage_s2/PASS: fftstage.sby $(RTL)/fftstage.v
 	sby -f fftstage.sby s2
 fftstage_s3/PASS: fftstage.sby $(RTL)/fftstage.v
-	sby -f fftstage.sby s2
+	sby -f fftstage.sby s3
 fftstage_s4/PASS: fftstage.sby $(RTL)/fftstage.v
 	sby -f fftstage.sby s4
 fftstage_s5/PASS: fftstage.sby $(RTL)/fftstage.v
