@@ -1,6 +1,6 @@
 [options]
 mode prove
-depth	20
+depth	11
 
 [engines]
 smtbmc yices
