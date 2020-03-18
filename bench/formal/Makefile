@@ -12,7 +12,7 @@
 ##
 ################################################################################
 ##
-## Copyright (C) 2018, Gisselquist Technology, LLC
+## Copyright (C) 2020, Gisselquist Technology, LLC
 ##
 ## This file is part of the general purpose pipelined FFT project.
 ##
@@ -38,9 +38,9 @@
 ################################################################################
 ##
 ##
-TARGETS := bimpy longbimpy fftstage hwbfly butterfly qtrstage laststage bitreverse
+TARGETS := bimpy longbimpy fftstage hwbfly butterfly qtrstage laststage bitreverse windowfn
 .PHONY: $(TARGETS)
-all: bimpy longbimpy hwbfly fftstage qtrstage laststage bitreverse butterfly
+all: $(TARGETS)
 RTL := ../../rtl
 
 .PHONY: bimpy
@@ -106,11 +106,11 @@ bitreverse: bitreverse/PASS
 bitreverse/PASS: bitreverse.sby $(RTL)/bitreverse.v
 	sby -f bitreverse.sby
 
-windowfn: windowfn_cvr/PASS windowfn_proof/PASS
+windowfn: windowfn_cvr/PASS windowfn_prf/PASS
 windowfn_cvr/PASS: windowfn.sby $(RTL)/windowfn.v
 	sby -f windowfn.sby cvr
-windowfn_proof/PASS: windowfn.sby $(RTL)/windowfn.v
-	sby -f windowfn.sby proof
+windowfn_prf/PASS: windowfn.sby $(RTL)/windowfn.v
+	sby -f windowfn.sby prf
 
 clean:
 	rm -rf bimpy/ longbimpy/
@@ -124,4 +124,4 @@ clean:
 	rm -rf fftstage_s2/ fftstage_s3/ fftstage_s4/ fftstage_s5/ fftstage_s6/
 	rm -rf hwbfly_one/ hwbfly_two/ hwbfly_three/
 	rm -rf laststage/ qtrstage/
-	rm -rf windowfn_cover/ windowfn_proof/
+	rm -rf windowfn_cvr/ windowfn_prf/

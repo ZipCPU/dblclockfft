@@ -1,0 +1,92 @@
+[*]
+[*] GTKWave Analyzer v3.3.86 (w)1999-2017 BSI
+[*] Sun Dec 22 22:00:44 2019
+[*]
+[dumpfile] "(null)"
+[timestart] 0
+[size] 1920 1021
+[pos] -1 -1
+*-3.760617 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] windowfn.
+[sst_width] 270
+[signals_width] 280
+[sst_expanded] 1
+[sst_vpaned_height] 290
+@28
+windowfn.i_clk
+windowfn.i_reset
+@200
+-
+@28
+windowfn.i_tap_wr
+@22
+windowfn.i_tap[15:0]
+@200
+-
+@28
+windowfn.i_alt_ce
+windowfn.i_ce
+@22
+windowfn.i_sample[15:0]
+@200
+-
+@28
+windowfn.o_ce
+windowfn.o_frame
+@22
+windowfn.o_sample[15:0]
+@200
+-
+@28
+windowfn.d_ce
+windowfn.p_ce
+@22
+windowfn.didx[3:0]
+windowfn.tidx[3:0]
+@23
+windowfn.f_phase[4:0]
+@200
+-
+@22
+windowfn.cmem<0>[15:0]
+windowfn.data[15:0]
+windowfn.dmem<0>[15:0]
+windowfn.dwidx[3:0]
+windowfn.f_addr[3:0]
+windowfn.f_diff_idx[3:0]
+@28
+windowfn.f_first_block
+@22
+windowfn.f_past_data[15:0]
+windowfn.f_past_tap[15:0]
+@28
+windowfn.f_past_valid
+@22
+windowfn.f_phase_plus_one[4:0]
+@28
+windowfn.f_second_frame
+@22
+windowfn.f_tap[15:0]
+@28
+windowfn.f_this_dce
+windowfn.f_this_oce
+windowfn.f_this_pce
+windowfn.f_this_tap
+@22
+windowfn.f_tidx[3:0]
+windowfn.f_value[15:0]
+@28
+windowfn.f_waiting_for_first_frame
+windowfn.first_block
+windowfn.frame_count[1:0]
+@22
+windowfn.pre_product[31:0]
+windowfn.product[31:0]
+windowfn.tap[15:0]
+windowfn.tapwidx[3:0]
+@28
+windowfn.top_of_block
+@22
+windowfn.unused[3:0]
+[pattern_trace] 1
+[pattern_trace] 0

@@ -1,12 +1,12 @@
 [tasks]
-cover
-proof
+cvr
+prf
 
 [options]
-proof: mode prove
-proof: depth 10
-cover: mode cover
-cover: depth 60
+prf: mode prove
+prf: depth 10
+cvr: mode cover
+cvr: depth 60
 
 [engines]
 smtbmc
