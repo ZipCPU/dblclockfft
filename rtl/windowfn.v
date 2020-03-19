@@ -53,7 +53,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Copyright (C) 2018, Gisselquist Technology, LLC
+// Copyright (C) 2018-2020, Gisselquist Technology, LLC
 //
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -87,6 +87,15 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	parameter		IW=16, OW=16, TW=16, LGNFFT = 4;
 	parameter	[0:0]	OPT_FIXED_TAPS = 1'b0;
 	parameter		INITIAL_COEFFS = "";
+	//
+	// OPT_TLAST_FRAME
+	//
+	// This core can be a challenge to use with an AXI stream interface,
+	// simply because the o_frame output normally indicates the *first*
+	// value of any frame, not the last.  Set OPT_TLAST_FRAME high to adjust
+	// this behavior and make o_frame a reference to the last data sample
+	// in any FFT frame.
+	parameter [0:0]	OPT_TLAST_FRAME = 1'b0;
 	//
 	localparam	AW=IW+TW;
 	//
@@ -144,15 +153,20 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	end endgenerate
 
 
-	reg		[LGNFFT-1:0]	dwidx, didx;
-	reg		[LGNFFT-1:0]	tidx;
+	reg		[LGNFFT-1:0]	dwidx, didx; // Data indices: write&read
+	reg		[LGNFFT-1:0]	tidx;	// Coefficient index
 	reg				top_of_block, first_block;
 	reg		[1:0]		frame_count;
 	reg				p_ce, d_ce;
 	reg	signed	[IW-1:0]	data;
 	reg	signed	[TW-1:0]	tap;
 
-
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Clock #0: Incoming data
+	//	Write data to memory, so we can come back to it later to get
+	//	the other half of our 50% overlap.
+	//
 
 	//
 	//
@@ -169,16 +183,39 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		dwidx <= 0;
 	else if (i_ce)
 		dwidx <= dwidx + 1'b1;
+
 	always @(posedge i_clk)
 	if (i_ce)
 		dmem[dwidx] <= i_sample;
 
+	//
+	// first_block is our attempt to make certain that the entire first
+	// FFT's worth of data is repressed.  This is the data that wouldn't
+	// be valid, due to the data in memory not being valid.  In the case
+	// of a first_block, we do everything like we otherwise would--only
+	// we don't output either o_ce or o_frame--hence none of the following
+	// processing should operate on our outputs until we have a full and
+	// valid frame of data.
+	//
 	initial	first_block = 1'b1;
 	always @(posedge i_clk)
 	if (i_reset)
 		first_block <= 1'b1;
 	else if ((i_alt_ce)&&(&tidx)&&(dwidx==0))
 		first_block <= 1'b0;
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Clock #0: Sample arrives
+	//
+	//	Indicator signals:	i_ce, or i_alt_ce
+	//
+	//	Valid signals:
+	//		This is the state machine stage.  Signals here are
+	//		valid from clock to clock
+	//
+	//		first_block
+	//
 
 
 	//
@@ -199,30 +236,56 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	//
 	// Data and coefficient memory indices.
 	//
+	// The data index goes from 0:(1<<LGNFFT)-1 for the first FFT, and then
+	// (1<<(LGNFFT-1)):(1<<LGNFFT)-1,0:(1<<(LGNFFT-1))-1 for the overlapped
+	// FFT.  During these same two runs, the tap (coefficient) index goes
+	// from 0:(1<<LGNFFT)-1 each time, so the bottom (LGNFFT-1) bits can
+	// be shared between the two pointers.
+	//
+	// Note that each of these pointers is set the clock before the data
+	// actually arrives (as it should be)
+	//
 	initial	didx = 0;
 	always @(posedge i_clk)
 	if (i_reset)
 		didx <= 0;
 	else if ((i_alt_ce)&&(dwidx[LGNFFT-2:0]==0))
 	begin
+		// Restart on the first point of the next FFT
 		didx[LGNFFT-2:0] <= 0;
+		// Maintain the top bit, so as to keep
+		// the overlap working properly
 		didx[LGNFFT-1] <= dwidx[LGNFFT-1];
 	end else if ((i_ce)||(i_alt_ce))
 		// Process the next point in this FFT
 		didx <= didx + 1'b1;
 
-	initial	tidx = 0;
+	always @(*)
+		tidx[LGNFFT-2:0] = didx[LGNFFT-2:0];
+
+	initial	tidx[LGNFFT-1] = 0;
 	always @(posedge i_clk)
 	if (i_reset)
-		tidx <= 0;
+		tidx[LGNFFT-1] <= 0;
 	else if ((i_alt_ce)&&(dwidx[LGNFFT-2:0]==0))
 	begin
-		// // At the beginning of processing for a given FFT
-		tidx <= 0;
+		// Restart the counter for the first point
+		// of the next FFT.
+		tidx[LGNFFT-1] <= 0;
 	end else if ((i_ce)||(i_alt_ce))
+	begin
 		// Process the next point in the window function
-		tidx <= tidx + 1'b1;
+		//
+		// Here we implement the carry only
+		if (&tidx[LGNFFT-2:0])
+			tidx[LGNFFT-1] <= !tidx[LGNFFT-1];
+	end
 
+	//
+	// frame_count is based uff of the first index at the top of the
+	// block.  It's used to make certain that the o_frame output is
+	// properly aligned with the first valid clock of the output.
+	//
 	initial	frame_count = 0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -231,15 +294,6 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		frame_count <= 3;
 	else if (frame_count != 0)
 		frame_count <= frame_count - 1'b1;
-
-	initial	o_frame = 1'b0;
-	always @(posedge i_clk)
-	if (i_reset)
-		o_frame <= 1'b0;
-	else if (frame_count == 2)
-		o_frame <= 1'b1;
-	else
-		o_frame <= 1'b0;
 
 	//
 	// Following any initial i_ce, ...
@@ -251,7 +305,15 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	if (i_reset)
 		{ p_ce, d_ce } <= 2'h0;
 	else
-		{ p_ce, d_ce } <= { d_ce, (!first_block)&&((i_ce)||(i_alt_ce)) };
+		{ p_ce, d_ce } <= { d_ce, (!first_block)&&((i_ce)||(i_alt_ce))};
+
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Clock #1
+	//
+	//	Indicator signals: (i_ce || i_alt_ce)
+	//	Valid signals:	didx, tidx, top_of_block
+	//
 
 	// Read the data sample point, and the filter coefficient, from block
 	// RAM.  Because this is block RAM, we have to be careful not to
@@ -264,6 +326,14 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		tap  <= cmem[tidx];
 	end
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Clock #2
+	//
+	//	Indicator signals: d_ce
+	//	Valid signals:	data, tap
+	//
+
 	//
 	// Multiply the two values together
 	 reg	signed	[IW+TW-1:0]	product;
@@ -275,8 +345,18 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		product <= data * tap;
 `endif
 
+	////////////////////////////////////////////////////////////////////////
 	//
-	// Output CE
+	// Clock #3
+	//
+	//	Indicator signals:	p_ce
+	//	Valid signals:		product, (frame_count)
+	//
+
+	//
+	// Output CE.  This value will be true exactly two clocks after any
+	//	(i_ce || i_alt_ce) input, indicating that we have a new valid
+	//	output sample.
 	//
 	initial	o_ce = 0;
 	always @(posedge i_clk)
@@ -284,6 +364,24 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		o_ce <= 0;
 	else
 		o_ce <= p_ce;
+
+	//
+	// o_frame is the indicator that this is the first clock cycle of a
+	// new FFT frame.  It's *like* TLAST in its function, but acts on the
+	// first cycle, rather than the last.  If you want to use this with
+	// an AXI stream, you can set OPT_TLAST_FRAME above, and then o_frame
+	// will be set on the last o_ce clock cycle of any outgoing frame.
+	//
+	initial	o_frame = 1'b0;
+	always @(posedge i_clk)
+	if (i_reset)
+		o_frame <= 1'b0;
+	else if ((OPT_TLAST_FRAME && frame_count == 1)
+		||(!OPT_TLAST_FRAME && frame_count == 2))
+		o_frame <= 1'b1;
+	else
+		o_frame <= 1'b0;
+
 
 	generate if (OW == AW)
 	begin : BIT_ADJUSTMENT_NONE
@@ -326,6 +424,15 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 
 	end endgenerate
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Clock #4: All done
+	//
+	//	Indicator signals:	o_ce
+	//	Valid signals:		o_sample
+	//
+
+
 	// Make Verilator happy
 	// verilator lint_off UNUSED
 	wire	[LGNFFT-1:0]	unused;
@@ -333,13 +440,29 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	// verilator lint_on  UNUSED
 
 `ifdef	FORMAL
-	reg	f_past_valid;
+	reg			f_past_valid;
+	reg			f_waiting_for_first_frame;
+	reg	[LGNFFT-1:0]	f_tidx;
+	reg	[LGNFFT:0]	f_phase_plus_one;
+	reg	[LGNFFT:0]	f_phase;
+	wire	[LGNFFT-1:0]	f_diff_idx;
+	reg	f_first_block;
+	(* anyconst *)	reg		[LGNFFT-1:0]	f_addr;
+			reg	signed	[TW-1:0]	f_tap;
+			reg	signed	[IW-1:0]	f_value;
+			reg				f_this_dce, f_this_pce,
+							f_this_oce, f_this_tap;
+	reg	signed	[IW-1:0]	f_past_data;
+	reg	signed	[TW-1:0]	f_past_tap;
+
 	initial	f_past_valid = 1'b0;
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
 
-	// Keep track of the phase of this operation
-	reg	[LGNFFT:0]	f_phase;
+	// Keep track of where we are at in this operation
+	// f_phase is a one up counter starting from reset, to which
+	// we will attach all of our other counters via assertions
+	//
 
 	initial	f_phase = 0;
 	always @(posedge i_clk)
@@ -351,9 +474,10 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	else if ((i_ce)||(i_alt_ce))
 		f_phase <= f_phase + 1;
 
-	///////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Assumptions about the input
+	//
 `ifdef	VERIFIC
 	restrict property (@(posedge i_clk)
 		i_reset && !i_ce
@@ -364,10 +488,26 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		restrict($stable(i_sample));
 `endif
 
+	//
+	// Only accept data after the coefficients have been written
+	//
 	always @(*)
 	if (tapwidx != 0)
 		assume(!i_ce);
 
+	always @(*)
+	if (i_tap_wr)
+		assume((!i_ce)&&(!i_alt_ce));
+
+	//
+	// Assume the user isn't writing to our taps at all
+	//
+	always @(*)
+		assume(!i_tap_wr);
+
+	//
+	// Insist that the various CE's alternate: i_ce, i_alt_ce, i_ce, etc.
+	//
 	always @(posedge i_clk)
 	if (f_phase[0])
 		assume(!i_ce);
@@ -377,12 +517,20 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		assume(!i_alt_ce);
 
 	always @(*)
-	if (i_tap_wr)
-		assume((!i_ce)&&(!i_alt_ce));
+		assume(!i_ce || !i_alt_ce);
 
-	always @(*)
-		assume(!i_tap_wr);
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
+	//
+	// Our top_of_block signal should only be high when we are ready to
+	// accept a new FFT.  That is, when the data write index is zero,
+	// otherwise top_of_block should be zero
+	//
 	always @(*)
 	if ((i_ce)&&(top_of_block))
 	begin
@@ -401,39 +549,21 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	if ((f_past_valid)&&($past(first_block))&&(!first_block))
 		assert(top_of_block);
 
-	/*
-	always @(posedge i_clk)
-	if (f_past_valid)
-	begin
-		if ($past(i_reset))
-			assert(!top_of_block);
-		else if ($past(i_ce))
-			assert(top_of_block == ((!first_block)&&(dwidx[LGNFFT-2:0]==0)));
-		else
-
-			assert(top_of_block == ((!first_block)&&(&dwidx[LGNFFT-2:1])));
-	end
-	*/
-
 	always @(posedge i_clk)
 	if ((f_past_valid)&&($past(first_block))&&(!$past(first_block)))
 		assert(top_of_block);
 
-	//////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Assertions about our outputs
 	//
-	/////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	//
-//	always @(*)
-//	if (o_frame)
-//		assert(o_ce);
+
 	always @(*)
 	if (first_block)
 		assert(!o_ce);
-
-	reg	f_waiting_for_first_frame;
 
 	initial	f_waiting_for_first_frame = 1;
 	always @(posedge i_clk)
@@ -445,6 +575,7 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	always @(*)
 	if ((f_waiting_for_first_frame)&&(o_ce))
 		assert(o_frame);
+
 	always @(*)
 	if (f_phase == 0)
 		assert((top_of_block)||(first_block));
@@ -464,6 +595,7 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		end else if ((f_phase > 0)&&(!first_block))
 			assert(|{o_ce, p_ce, d_ce });
 		else if ((frame_count != 0)||(first_block))
+			// Never get here
 			assert(!o_frame);
 		else
 			assert(o_frame);
@@ -473,21 +605,14 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	if ((f_past_valid)&&(!$past(i_reset)))
 		assert(o_ce || $stable(o_sample));
 
-	/*
-	always @(*)
-		assert(m_ce == (f_phase == 0));
-	always @(*)
-		assert(d_ce == (f_phase == 1));
-	always @(*)
-		assert(p_ce == (f_phase == 2));
-	always @(*)
-		assert(o_ce == (f_phase == 3));
-	always @(*)
-		assert(o_frame == (f_phase == 3));
-	*/
-
 	always @(*)
 		assert(didx[LGNFFT-2:0] == tidx[LGNFFT-2:0]);
+
+	always @(*)
+		f_tidx = f_phase;
+
+	always @(*)
+		assert(f_tidx == tidx);
 
 	always @(posedge i_clk)
 	if ((f_past_valid)&&(!$past(i_reset))
@@ -495,38 +620,15 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		assert(tidx == 1);
 
 
-	reg	[LGNFFT:0]	f_phase_plus_one;
 	always @(*)
 		f_phase_plus_one = f_phase + 1;
-	/*
-	end else if ($past(i_ce))
-	begin
-// 1 0		// 0	0		Top of block	0
-// 2 1		// 1	1	ALT			0
-// 3 1		// 2	1				1
-// 4 2		// 3	2	ALT			1
-// 5 2		// 4	2				2
-// 6 3		// 5	3	ALT			2
-// 7 3		// 6	3				3
-// 0 4		// 7	4	ALT			3
-// 1		// 4	4		Top of block	0
-// 2		// 5	5				0
-//		// 6	5	ALT			1
-//		// 7	6				1
-//		// 0	6	ALT			2
-//		// 1	7				2
-//		// 2	7	ALT
-//		// 3	0
-//		// 0	0	ALT	Top of block
-//		// 1	1
-//		// 2	1
-//		// 3	2
-//		// 4	2
-	*/
+
+	//
+	// Assert the relationship between dwidx and f_phase
+	//
 	always @(*)
 	       assert(f_phase_plus_one[LGNFFT:1] == dwidx[LGNFFT-1:0]);
-	always @(*)
-		assert(f_phase[0] == didx[0]);
+
 	always @(*)
 	if (f_phase[LGNFFT])
 	begin
@@ -543,7 +645,7 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		assert(f_phase[LGNFFT-1:0] == tidx[LGNFFT-1:0]);
 	always @(*)
 		assert(f_phase[LGNFFT-2:0] == didx[LGNFFT-2:0]);
-	wire	[LGNFFT-1:0]	f_diff_idx;
+
 	assign	f_diff_idx = didx - dwidx;
 	always @(*)
 	if (!first_block)
@@ -554,11 +656,16 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 		if (top_of_block)
 			assert(!first_block);
 
-	reg	f_first_block;
 	initial	f_first_block = 1'b1;
 	always @(posedge i_clk)
-	if (i_ce)
+	if (i_reset)
+		f_first_block <= 1'b1;
+	else if (i_ce)
 		f_first_block <= first_block;
+
+	always @(*)
+	if (first_block)
+		assert(f_first_block);
 
 	always @(*)
 	if ((top_of_block)&&(i_ce)&&(!f_first_block))
@@ -576,33 +683,31 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 ////////////////////////////////////////////////////////////////////////////////
 	// Gin up a really quick abstract multiply for formal testing
 	// only.  always @(posedge i_clk)
-	(* anyconst *) reg signed [IW+TW-1:0] pre_product;
+	(* anyconst *) reg signed [IW+TW-1:0] f_pre_product;
 	always @(posedge i_clk)
 	if (data == 0)
-		assume(pre_product == 0);
+		assume(f_pre_product == 0);
 	always @(posedge i_clk)
 	if (tap == 0)
-		assume(pre_product == 0);
+		assume(f_pre_product == 0);
 	always @(posedge i_clk)
 	if (data == 1)
-		assume(pre_product == tap);
+		assume(f_pre_product == tap);
 	always @(posedge i_clk)
 	if (tap == 1)
-		assume(pre_product == data);
+		assume(f_pre_product == data);
 	always @(posedge i_clk)
-	if ((i_ce)||(i_alt_ce))
-		product <= pre_product;
+	if ($stable(data) && $stable(tap))
+		assume($stable(f_pre_product));
+	always @(posedge i_clk)
+		product <= f_pre_product;
 
 ////////////////////////////////////////////////////////////////////////////////
 //
 //  Arbitrary memory test
 //
 ////////////////////////////////////////////////////////////////////////////////
-	(* anyconst *)	reg		[LGNFFT-1:0]	f_addr;
-			reg	signed	[TW-1:0]	f_tap;
-			reg	signed	[IW-1:0]	f_value;
-			reg				f_this_dce, f_this_pce,
-							f_this_oce, f_this_tap;
+
 `ifdef	VERIFIC
 	always @(*)
 	if (!f_past_valid)
@@ -624,17 +729,18 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	initial	f_value = 0;
 	always @(*)
 		assert(f_value == dmem[f_addr]);
+
 	always @(posedge i_clk)
 	if ((i_ce)&&(dwidx == f_addr))
 		f_value <= i_sample;
+
 	initial	{ f_this_oce, f_this_pce, f_this_dce } = 3'h0;
 	always @(posedge i_clk)
 	if ((i_reset)||(i_tap_wr))
 		{ f_this_oce, f_this_pce, f_this_dce } <= 3'h0;
 	else 
 		{ f_this_oce, f_this_pce, f_this_dce }
-			<= { f_this_pce, f_this_dce,
-				(((i_ce)||(i_alt_ce))
+			<= { f_this_pce, f_this_dce, (((i_ce)||(i_alt_ce))
 					&&(f_past_valid)&&(f_addr == didx)) };
 	initial f_this_tap = 0;
 	always @(posedge i_clk)
@@ -654,13 +760,10 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 	if ((f_past_valid)&&(f_this_dce))
 		assert(data == $past(f_value));
 
-	reg	signed	[IW-1:0]	f_past_data;
-	reg	signed	[TW-1:0]	f_past_tap;
-
 	always @(posedge i_clk)
 	begin
 		f_past_data <= data;
-		f_past_tap <= tap;
+		f_past_tap  <= tap;
 	end
 
 	always @(posedge i_clk)
@@ -682,13 +785,14 @@ module	windowfn(i_clk, i_reset, i_tap_wr, i_tap,
 //  Cover tests
 //
 ////////////////////////////////////////////////////////////////////////////////
-	reg	f_second_frame;
-	initial	f_second_frame = 1'b0;
+	reg	cvr_second_frame;
+
+	initial	cvr_second_frame = 1'b0;
 	always @(posedge i_clk)
 	if ((o_ce)&&(o_frame))
-		f_second_frame <= 1'b1;
+		cvr_second_frame <= 1'b1;
 
 	always @(posedge i_clk)
-		cover((o_ce)&&(o_frame)&&(f_second_frame));
+		cover((o_ce)&&(o_frame)&&(cvr_second_frame));
 `endif
 endmodule
