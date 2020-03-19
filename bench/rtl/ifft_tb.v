@@ -41,29 +41,62 @@
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
-module	ifft_tb(i_clk, i_rst, i_ce, i_left, i_right, o_left, o_right, o_sync);
-	parameter	IWIDTH=16, MIDWIDTH=22, OWIDTH=28;
+//
+//
+`default_nettype none
+//
+// `define	DBLCLK
+//
+module	ifft_tb(i_clk, i_rst, i_ce,
+`ifdef	DBLCLK
+		i_left, i_right, o_left, o_right,
+`else
+		i_sample, o_sample,
+`endif
+		o_sync);
+	parameter	IWIDTH=15, MIDWIDTH=21, OWIDTH=21;
 	input					i_clk, i_rst, i_ce;
+`ifdef	DBLCLK
 	input		[(2*IWIDTH-1):0]	i_left, i_right;
 	output	wire	[(2*OWIDTH-1):0]	o_left, o_right;
+`else
+	input		[(2*IWIDTH-1):0]	i_sample;
+	output	wire	[(2*OWIDTH-1):0]	o_sample;
+`endif
 	output	wire				o_sync;
 
 	wire				m_sync;
+`ifdef	DBLCLK
 	wire	[(2*MIDWIDTH-1):0]	m_left, m_right;
 	fftmain	fft(i_clk, i_rst, i_ce, i_left, i_right,
 				m_left, m_right, m_sync);
+`else
+	wire	[(2*MIDWIDTH-1):0]	m_sample;
+	fftmain	fft(i_clk, i_rst, i_ce, i_sample,
+				m_sample, m_sync);
+`endif
 
 	wire	w_syncd;
 	reg	r_syncd;
 	always @(posedge i_clk)
-		if (i_rst)
-			r_syncd <= 1'b0;
-		else
-			r_syncd <= r_syncd || m_sync;
+	if (i_rst)
+		r_syncd <= 1'b0;
+	else
+		r_syncd <= r_syncd || m_sync;
+
 	assign	w_syncd = r_syncd || m_sync;
-	
+
+`ifdef	DBLCLK
 	ifftmain	ifft(i_clk, i_rst, (i_ce)&&(w_syncd), m_left, m_right,
 				o_left, o_right, o_sync);
-	
+`else
+	ifftmain	ifft(i_clk, i_rst, (i_ce)&&(w_syncd),
+				{ m_sample[2*MIDWIDTH-1:2*MIDWIDTH-IWIDTH],
+					m_sample[MIDWIDTH-1:MIDWIDTH-IWIDTH] },
+				o_sample, o_sync);
 
+	wire unused;
+	assign unused = &{ 1'b0, m_sample[2*MIDWIDTH-IWIDTH-1:MIDWIDTH],
+			m_sample[MIDWIDTH-IWIDTH-1:0] };
+`endif
 endmodule

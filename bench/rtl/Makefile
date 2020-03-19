@@ -45,7 +45,7 @@ all: ifft_tb
 ##
 # This is really simple ...
 all: ifft_tb
-CORED := fft-core
+.DELETE_ON_ERROR:
 ifneq ($(VERILATOR_ROOT),)
 VERILATOR:=$(VERILATOR_ROOT)/bin/verilator
 else
@@ -54,7 +54,7 @@ VERILATOR_ROOT ?= $(shell bash -c 'verilator -V|grep VERILATOR_ROOT | head -1 | 
 endif
 export	$(VERILATOR)
 VROOT   := $(VERILATOR_ROOT)
-VSRCD   := ../../sw/$(CORED)
+VSRCD   := ../../rtl
 VFLAGS  := -Wall -MMD --trace -y $(VSRCD) -cc
 
 LCLDR:= obj_dir
