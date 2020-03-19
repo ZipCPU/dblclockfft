@@ -125,6 +125,10 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	reg	[LGSPAN:0]		oaddr;
 	reg	[(2*OWIDTH-1):0]	omem	[0:((1<<LGSPAN)-1)];
 
+	reg				idle;
+	reg	[(LGSPAN-1):0]		nxt_oaddr;
+	reg	[(2*OWIDTH-1):0]	pre_ovalue;
+
 	initial wait_for_sync = 1'b1;
 	initial iaddr = 0;
 	always @(posedge i_clk)
@@ -162,8 +166,8 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		ib_sync <= (iaddr==(1<<(LGSPAN)));
 	end
 
-	// Read the values from our input memory, and use them to feed first of two
-	// butterfly inputs
+	// Read the values from our input memory, and use them to feed
+	// first of two butterfly inputs
 	always	@(posedge i_clk)
 	if (i_ce)
 	begin
@@ -185,7 +189,6 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	// within a Verilator simulation context when chasing a bug.
 	// In this limited environment, the non-zero answers will stand
 	// in a trace making it easier to highlight a bug.
-	reg	idle;
 	generate if (ZERO_ON_IDLE)
 	begin
 		initial	idle = 1;
@@ -209,22 +212,27 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	//
 	generate if (OPT_HWMPY)
 	begin : HWBFLY
+
 		hwbfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),
 				.CKPCE(CKPCE), .SHIFT(BFLYSHIFT))
-			bfly(i_clk, i_reset, i_ce, (idle)?0:ib_c,
-				(idle || (!i_ce)) ? 0:ib_a,
-				(idle || (!i_ce)) ? 0:ib_b,
-				(ib_sync)&&(i_ce),
+			bfly(i_clk, i_reset, i_ce,
+				(idle && !i_ce) ? 0:ib_c,
+				(idle && !i_ce) ? 0:ib_a,
+				(idle && !i_ce) ? 0:ib_b,
+				(ib_sync && i_ce),
 				ob_a, ob_b, ob_sync);
+
 	end else begin : FWBFLY
+
 		butterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),
 				.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))
 			bfly(i_clk, i_reset, i_ce,
-					(idle||(!i_ce))?0:ib_c,
-					(idle||(!i_ce))?0:ib_a,
-					(idle||(!i_ce))?0:ib_b,
-					(ib_sync&&i_ce),
-					ob_a, ob_b, ob_sync);
+				(idle && !i_ce)?0:ib_c,
+				(idle && !i_ce)?0:ib_a,
+				(idle && !i_ce)?0:ib_b,
+				(ib_sync && i_ce),
+				ob_a, ob_b, ob_sync);
+
 	end endgenerate
 `endif
 
@@ -251,12 +259,11 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		if (ob_sync||b_started)
 			oaddr <= oaddr + 1'b1;
 		if ((ob_sync)&&(!oaddr[LGSPAN]))
-			// If b_started is true, then a butterfly output is available
+			// If b_started is true, then a butterfly output
+			// is available
 			b_started <= 1'b1;
 	end
 
-	reg	[(LGSPAN-1):0]		nxt_oaddr;
-	reg	[(2*OWIDTH-1):0]	pre_ovalue;
 	always @(posedge i_clk)
 	if (i_ce)
 		nxt_oaddr[0] <= oaddr[0];
@@ -319,8 +326,8 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	wire	[LGSPAN:0]			f_next_addr;
 
 	always @(posedge i_clk)
-	if ((!$past(i_ce))&&(!$past(i_ce,2))&&(!$past(i_ce,3))&&(!$past(i_ce,4)))
-	assume(!i_ce);
+	if (!$past(i_ce) && !$past(i_ce,2) && !$past(i_ce,3) && !$past(i_ce,4))
+		assume(!i_ce);
 
 	always @(*)
 		assume(f_addr[LGSPAN]==1'b0);
@@ -346,7 +353,8 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		f_right <= i_data;
 
 	always @(posedge i_clk)
-	if ((i_ce)&&(!wait_for_sync)&&(f_last_addr == { 1'b1, f_addr[LGSPAN-1:0]}))
+	if (i_ce && !wait_for_sync
+		&& (f_last_addr == { 1'b1, f_addr[LGSPAN-1:0]}))
 	begin
 		assert(ib_a == f_left);
 		assert(ib_b == f_right);
