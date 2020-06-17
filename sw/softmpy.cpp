@@ -199,10 +199,10 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	bimpy(i_clk, i_ce, i_a, i_b, o_r);\n"
+"module	bimpy(i_clk, i_reset, i_ce, i_a, i_b, o_r);\n"
 "\tparameter\tBW=18; // Number of bits in i_b\n"
 "\tlocalparam\tLUTB=2; // Number of bits in i_a for our LUT multiply\n"
-"\tinput\twire\t\t\ti_clk, i_ce;\n"
+"\tinput\twire\t\t\ti_clk, i_reset, i_ce;\n"
 "\tinput\twire\t[(LUTB-1):0]\ti_a;\n"
 "\tinput\twire\t[(BW-1):0]\ti_b;\n"
 "\toutput\treg\t[(BW+LUTB-1):0]	o_r;\n"
@@ -217,7 +217,9 @@ SLASHLINE
 "\n"
 "\tinitial o_r = 0;\n"
 "\talways @(posedge i_clk)\n"
-"\tif (i_ce)\n"
+"\tif (i_reset)\n"
+"\t\to_r <= 0;\n"
+"\telse if (i_ce)\n"
 "\t\to_r <= w_r + { c, 2'b0 };\n"
 "\n");
 
@@ -404,8 +406,8 @@ SLASHLINE
 	"\t// For the next round, we'll then have a previous sum to accumulate\n"
 	"\t// with new and subsequent product, and so only do one product at\n"
 	"\t// a time can follow this--but the first clock can do two at a time.\n"
-	"\tbimpy\t#(BW) lmpy_0(i_clk,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);\n"
-	"\tbimpy\t#(BW) lmpy_1(i_clk,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);\n"
+	"\tbimpy\t#(BW) lmpy_0(i_clk,1\'b0,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);\n"
+	"\tbimpy\t#(BW) lmpy_1(i_clk,1\'b0,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);\n"
 	"\n"
 	"\tinitial r_s    = 0;\n"
 	"\tinitial r_a[0] = 0;\n"
@@ -443,7 +445,7 @@ SLASHLINE
 		"\t\twire\t[(BW+LUTB-1):0] genp;\n"
 		"\n"
 		"\t\t// First, the multiply: 2-bits times BW bits\n"
-		"\t\tbimpy #(BW) genmpy(i_clk,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);\n"
+		"\t\tbimpy #(BW) genmpy(i_clk,1\'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);\n"
 "\n"
 		"\t\t// Then the accumulate step -- on the next clock\n"
 		"\t\tinitial acc[k+1] = 0;\n"

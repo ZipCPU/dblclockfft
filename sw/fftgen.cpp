@@ -1960,10 +1960,6 @@ SLASHLINE
 			ckpce, async_reset);
 
 		{
-			// To make debugging easier, we build both of these
-			fname = coredir + "/shiftaddmpy.v";
-			build_multiply(fname.c_str());
-
 			fname = coredir + "/longbimpy.v";
 			build_longbimpy(fname.c_str());
 			fname = coredir + "/bimpy.v";

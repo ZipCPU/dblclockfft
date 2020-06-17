@@ -51,10 +51,10 @@
 //
 `default_nettype	none
 //
-module	bimpy(i_clk, i_ce, i_a, i_b, o_r);
+module	bimpy(i_clk, i_reset, i_ce, i_a, i_b, o_r);
 	parameter	BW=18; // Number of bits in i_b
 	localparam	LUTB=2; // Number of bits in i_a for our LUT multiply
-	input	wire			i_clk, i_ce;
+	input	wire			i_clk, i_reset, i_ce;
 	input	wire	[(LUTB-1):0]	i_a;
 	input	wire	[(BW-1):0]	i_b;
 	output	reg	[(BW+LUTB-1):0]	o_r;
@@ -69,7 +69,9 @@ module	bimpy(i_clk, i_ce, i_a, i_b, o_r);
 
 	initial o_r = 0;
 	always @(posedge i_clk)
-	if (i_ce)
+	if (i_reset)
+		o_r <= 0;
+	else if (i_ce)
 		o_r <= w_r + { c, 2'b0 };
 
 `ifdef	FORMAL

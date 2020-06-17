@@ -138,8 +138,8 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	// For the next round, we'll then have a previous sum to accumulate
 	// with new and subsequent product, and so only do one product at
 	// a time can follow this--but the first clock can do two at a time.
-	bimpy	#(BW) lmpy_0(i_clk,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);
-	bimpy	#(BW) lmpy_1(i_clk,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);
+	bimpy	#(BW) lmpy_0(i_clk,1'b0,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);
+	bimpy	#(BW) lmpy_1(i_clk,1'b0,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);
 
 	initial r_s    = 0;
 	initial r_a[0] = 0;
@@ -177,7 +177,7 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 		wire	[(BW+LUTB-1):0] genp;
 
 		// First, the multiply: 2-bits times BW bits
-		bimpy #(BW) genmpy(i_clk,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);
+		bimpy #(BW) genmpy(i_clk,1'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);
 
 		// Then the accumulate step -- on the next clock
 		initial acc[k+1] = 0;
