@@ -77,7 +77,7 @@ fftgen: $(OBJECTS)
 	$(CXX) $(CFLAGS) $^ -o $@
 
 .PHONY: test
-test: fft ifft butterfly fftstage hwbfly shiftaddmpy longbimpy qtrstage
+test: fft ifft butterfly fftstage hwbfly longbimpy qtrstage
 test: bitreverse laststage
 
 #
@@ -124,16 +124,6 @@ $(VOBJDR)/Vifftmain.h: $(CORED)/ifftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) ifftmain.v
 $(VOBJDR)/Vifftmain__ALL.so: $(VOBJDR)/Vifftmain.h
 	cd $(VOBJDR); make -f Vifftmain.mk
-
-.PHONY: shiftaddmpy
-shiftaddmpy: $(VOBJDR)/Vshiftaddmpy__ALL.a
-
-$(CORED)/shiftaddmpy.v: fft
-$(VOBJDR)/Vshiftaddmpy.cpp $(VOBJDR)/Vshiftaddmpy.h: $(CORED)/shiftaddmpy.v
-	cd $(CORED)/; $(VERILATOR) $(VFLAGS) shiftaddmpy.v
-$(VOBJDR)/Vshiftaddmpy__ALL.a: $(VOBJDR)/Vshiftaddmpy.h
-$(VOBJDR)/Vshiftaddmpy__ALL.a: $(VOBJDR)/Vshiftaddmpy.cpp
-	cd $(VOBJDR)/; make -f Vshiftaddmpy.mk
 
 .PHONY: longbimpy
 longbimpy: $(VOBJDR)/Vlongbimpy__ALL.a
