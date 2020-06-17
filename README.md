@@ -35,6 +35,27 @@ built, go ahead and run ``fftgen`` without any arguments.  This will cause
 ``fftgen`` to print a usage statement to the screen.  Review the usage
 statement, and run ``fftgen`` a second time with the arguments you need.
 
+# Windows Users
+
+My test platform is an Ubuntu system.  I don't normally test the core
+generator on Windows platforms.  Others have used it on Windows platforms
+quite successfully.  There are two problems they have encountered when doing
+so:
+
+1. I use a `mkdir(dirname, chmod)` function in the core generator to make a
+   directory in which to place the generated core.  Windows doesn't seem to
+   support this function, but rather a similar `mkdir(dirname)` function.
+   Switching between the two is simple enough.
+
+2. The generator also uses the `lstat(path, statbuf)` function to make certain
+   that it doesn't overwrite any pre-existing files having the same name as
+   the directory it wishes to create.  This function can be replaced with the
+   constant `1` or boolean `true` in order to bypass the check and build the
+   design on a Windows system.
+
+There is a `#define` option set at the top of the generator that applies these
+changes for some versions of Microsoft Visual C++.
+
 # Current State
 
 This particular version of the FFT core now passes all my tests.  It has
