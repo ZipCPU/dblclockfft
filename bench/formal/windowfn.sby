@@ -1,18 +1,22 @@
 [tasks]
-cvr
 prf
+prflst prf opt_tlast
+cvr
+cvrlst cvr opt_tlast
 
 [options]
 prf: mode prove
 prf: depth 3
 cvr: mode cover
-cvr: depth 60
+cvr: depth 70
 
 [engines]
 smtbmc
 
 [script]
 read -formal -DWINDOWFN windowfn.v
+opt_tlast:  hierarchy -top windowfn -chparam OPT_TLAST_FRAME 1
+~opt_tlast: hierarchy -top windowfn -chparam OPT_TLAST_FRAME 0
 prep -top windowfn
 
 [files]
