@@ -1,7 +1,7 @@
 ################################################################################
 ##
 ## Filename: 	doc/Makefile
-##
+## {{{
 ## Project:	A General Purpose Pipelined FFT Implementation
 ##
 ## Purpose:	This simple Makefile builds the documentation for the Pipelined
@@ -16,9 +16,9 @@
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2018-2020, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2018-2021, Gisselquist Technology, LLC
+## {{{
 ## This file is part of the general purpose pipelined FFT project.
 ##
 ## The pipelined FFT project is free software (firmware): you can redistribute
@@ -35,14 +35,14 @@
 ## along with this program.  (It's in the $(ROOT)/doc directory.  Run make
 ## with no target there if the PDF file isn't present.)  If not, see
 ## <http://www.gnu.org/licenses/> for a copy.
-##
+## }}}
 ## License:	LGPL, v3, as defined and found on www.gnu.org,
+## {{{
 ##		http://www.gnu.org/licenses/lgpl.html
-##
 ##
 ################################################################################
 ##
-##
+## }}}
 .PHONY: all license spec pdf gpl lgpl
 all:	lgpl spec
 license: lgpl
@@ -56,13 +56,17 @@ DSRC := src
 .DELETE_ON_ERROR:
 
 LICENSE := lgpl-3.0
+## {{{
 $(LICENSE).pdf: $(DSRC)/$(LICENSE).tex
 	latex $(DSRC)/$(LICENSE).tex
 	latex $(DSRC)/$(LICENSE).tex
 	dvips -q -z -t letter -P pdf -o $(LICENSE).ps $(LICENSE).dvi
 	ps2pdf -dAutoRotatePages=/All $(LICENSE).ps $(LICENSE).pdf
 	rm -f $(LICENSE).dvi $(LICENSE).log $(LICENSE).aux $(LICENSE).ps
+## }}}
 
+## spec.pdf
+## {{{
 spec.pdf: $(DSRC)/spec.tex $(DSRC)/gqtekspec.cls
 	cd $(DSRC)/; latex spec.tex
 	cd $(DSRC)/; latex spec.tex
@@ -72,4 +76,4 @@ spec.pdf: $(DSRC)/spec.tex $(DSRC)/gqtekspec.cls
 	rm -f $(DSRC)/spec.aux $(DSRC)/spec.toc
 	rm -f $(DSRC)/spec.lof $(DSRC)/spec.lot
 	rm -f spec.ps
-
+## }}}

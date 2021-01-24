@@ -53,7 +53,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2018-2020, Gisselquist Technology, LLC
+// Copyright (C) 2018-2021, Gisselquist Technology, LLC
 // {{{
 // This file is part of the general purpose pipelined FFT project.
 //

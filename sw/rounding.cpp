@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	rounding.cpp
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	To create one of a series of modules to handle dropping bits
@@ -11,9 +11,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -28,14 +28,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #define	_CRT_SECURE_NO_WARNINGS	// ms vs 2012 doesn't like fopen
 
 #include <stdio.h>
@@ -52,7 +53,8 @@
 
 #define	SLASHLINE "////////////////////////////////////////////////////////////////////////////////\n"
 
-
+// build_truncator
+// {{{
 void	build_truncator(const char *fname) {
 	printf("TRUNCATING!\n");
 	FILE	*fp = fopen(fname, "w");
@@ -66,7 +68,7 @@ void	build_truncator(const char *fname) {
 SLASHLINE
 "//\n"
 "// Filename:\ttruncate.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:	Truncation is one of several options that can be used\n"
@@ -101,7 +103,10 @@ SLASHLINE
 "\n"
 "endmodule\n");
 }
+// }}}
 
+// build_roundhalfup
+// {{{
 void	build_roundhalfup(const char *fname) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -114,7 +119,7 @@ void	build_roundhalfup(const char *fname) {
 SLASHLINE
 "//\n"
 "// Filename:\troundhalfup.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tRounding half up is the way I was always taught to round in\n"
@@ -145,13 +150,13 @@ SLASHLINE
 	"\t//\t\tvalue.\n"
 	"\tgenerate\n"
 	"\tif (IWID-SHIFT == OWID)\n"
-	"\tbegin // No truncation or rounding, output drops no bits\n"
+	"\tbegin : NO_ROUNDING // No truncation or rounding, output drops no bits\n"
 "\n"
 		"\t\talways @(posedge i_clk)\n"
 			"\t\t\tif (i_ce)\to_val <= i_val[(IWID-SHIFT-1):0];\n"
 "\n"
 	"\tend else // if (IWID-SHIFT-1 >= OWID)\n"
-	"\tbegin // Output drops one bit, can only add one or ... not.\n"
+	"\tbegin : DROP_ONE_BIT // Output drops one bit, can only add one or ... not.\n"
 		"\t\twire\t[(OWID-1):0]	truncated_value, rounded_up;\n"
 		"\t\twire\t\t\tlast_valid_bit, first_lost_bit;\n"
 		"\t\tassign\ttruncated_value=i_val[(IWID-1-SHIFT):(IWID-SHIFT-OWID)];\n"
@@ -172,7 +177,10 @@ SLASHLINE
 "\n"
 "endmodule\n");
 }
+// }}}
 
+// build_roundfromzero
+// {{{
 void	build_roundfromzero(const char *fname) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -185,7 +193,7 @@ void	build_roundfromzero(const char *fname) {
 SLASHLINE
 "//\n"
 "// Filename:\troundfromzero.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:	%s\n"
 "//\n"
 "// Purpose:	Truncation is one of several options that can be used\n"
@@ -227,21 +235,25 @@ SLASHLINE
 	"\t//\t\thalfway between the two.  In the halfway case, we\n"
 	"\t//\t\tround away from zero.\n"
 	"\tgenerate\n"
-	"\tif (IWID == OWID) // In this case, the shift is irrelevant and\n"
-	"\tbegin // cannot be applied.  No truncation or rounding takes\n"
-	"\t// effect here.\n"
+	"\tif (IWID == OWID)\n"
+	"\tbegin : NO_ROUNDING\n"
+		"\t\t// In this case, the shift is irrelevant and cannot be\n"
+		"\t\t// applied. No truncation or rounding takes place here.\n"
 "\n"
 		"\t\talways @(posedge i_clk)\n"
-			"\t\t\tif (i_ce)\to_val <= i_val[(IWID-1):0];\n"
+		"\t\tif (i_ce)\to_val <= i_val[(IWID-1):0];\n"
 "\n"
 	"\tend else if (IWID-SHIFT == OWID)\n"
-	"\tbegin // No truncation or rounding, output drops no bits\n"
+	"\tbegin : SHIFT_ONE_BIT\n"
+	"\t\t// No truncation or rounding, output drops no bits\n"
 "\n"
 		"\t\talways @(posedge i_clk)\n"
-			"\t\t\tif (i_ce)\to_val <= i_val[(IWID-SHIFT-1):0];\n"
+		"\t\tif (i_ce)\to_val <= i_val[(IWID-SHIFT-1):0];\n"
 "\n"
 	"\tend else if (IWID-SHIFT-1 == OWID)\n"
-	"\tbegin // Output drops one bit, can only add one or ... not.\n"
+	"\tbegin : DROP_ONE_BIT\n"
+	"\t\t// Output drops one bit, can only add one or ... not.\n"
+	"\n"
 	"\t\twire\t[(OWID-1):0]\ttruncated_value, rounded_up;\n"
 	"\t\twire\t\t\tsign_bit, first_lost_bit;\n"
 	"\t\tassign\ttruncated_value=i_val[(IWID-1-SHIFT):(IWID-SHIFT-OWID)];\n"
@@ -250,18 +262,18 @@ SLASHLINE
 	"\t\tassign\tsign_bit = i_val[(IWID-1)];\n"
 "\n"
 	"\t\talways @(posedge i_clk)\n"
-		"\t\t\tif (i_ce)\n"
-		"\t\t\tbegin\n"
-			"\t\t\t\tif (!first_lost_bit) // Round down / truncate\n"
-				"\t\t\t\t\to_val <= truncated_value;\n"
-			"\t\t\t\telse if (sign_bit)\n"
-				"\t\t\t\t\to_val <= truncated_value;\n"
-			"\t\t\t\telse\n"
-				"\t\t\t\t\to_val <= rounded_up;\n"
-		"\t\t\tend\n"
+	"\t\tif (i_ce)\n"
+	"\t\tbegin\n"
+		"\t\t\tif (!first_lost_bit) // Round down / truncate\n"
+			"\t\t\t\to_val <= truncated_value;\n"
+		"\t\t\telse if (sign_bit)\n"
+			"\t\t\t\to_val <= truncated_value;\n"
+		"\t\t\telse\n"
+			"\t\t\t\to_val <= rounded_up;\n"
+	"\t\tend\n"
 "\n"
-	"\tend else // If there's more than one bit we are dropping\n"
-	"\tbegin\n"
+	"\tend else begin : ROUND_RESULT\n"
+		"\t\t// If there's more than one bit we are dropping\n"
 		"\t\twire\t[(OWID-1):0]\ttruncated_value, rounded_up;\n"
 		"\t\twire\t\t\tsign_bit, first_lost_bit;\n"
 		"\t\tassign\ttruncated_value=i_val[(IWID-1-SHIFT):(IWID-SHIFT-OWID)];\n"
@@ -273,23 +285,26 @@ SLASHLINE
 		"\t\tassign\tother_lost_bits = i_val[(IWID-SHIFT-OWID-2):0];\n"
 "\n"
 		"\t\talways @(posedge i_clk)\n"
-			"\t\t\tif (i_ce)\n"
-			"\t\t\tbegin\n"
-			"\t\t\t\tif (!first_lost_bit) // Round down / truncate\n"
-				"\t\t\t\t\to_val <= truncated_value;\n"
-			"\t\t\t\telse if (|other_lost_bits) // Round up to\n"
-				"\t\t\t\t\to_val <= rounded_up; // closest value\n"
-			"\t\t\t\telse if (sign_bit)\n"
-				"\t\t\t\t\to_val <= truncated_value;\n"
-			"\t\t\t\telse\n"
-				"\t\t\t\t\to_val <= rounded_up;\n"
-			"\t\t\tend\n"
+		"\t\tif (i_ce)\n"
+		"\t\tbegin\n"
+			"\t\t\tif (!first_lost_bit) // Round down / truncate\n"
+				"\t\t\t\to_val <= truncated_value;\n"
+			"\t\t\telse if (|other_lost_bits) // Round up to\n"
+				"\t\t\t\to_val <= rounded_up; // closest value\n"
+			"\t\t\telse if (sign_bit)\n"
+				"\t\t\t\to_val <= truncated_value;\n"
+			"\t\t\telse\n"
+				"\t\t\t\to_val <= rounded_up;\n"
+		"\t\tend\n"
 	"\tend\n"
 	"\tendgenerate\n"
 "\n"
 "endmodule\n");
 }
+// }}}
 
+// build_convround
+// {{{
 void	build_convround(const char *fname) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -302,7 +317,7 @@ void	build_convround(const char *fname) {
 SLASHLINE
 "//\n"
 "// Filename: 	convround.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:	%s\n"
 "//\n"
 "// Purpose:	A convergent rounding routine, also known as banker\'s\n"
@@ -339,7 +354,7 @@ SLASHLINE
 "\tgenerate\n"
 // What if IWID < OWID?  We should expand here ... somehow
 	"\tif (IWID == OWID) // In this case, the shift is irrelevant and\n"
-	"\tbegin // cannot be applied.  No truncation or rounding takes\n"
+	"\tbegin : NO_ROUNDING // cannot be applied.  No truncation or rounding takes\n"
 	"\t// effect here.\n"
 "\n"
 		"\t\talways @(posedge i_clk)\n"
@@ -347,14 +362,15 @@ SLASHLINE
 "\n"
 // What if IWID-SHIFT < OWID?  Shouldn't we also shift here as well?
 "\tend else if (IWID-SHIFT < OWID)\n"
-"\tbegin // No truncation or rounding, output drops no bits\n"
+"\tbegin : ADD_BITS_TO_OUTPUT // No truncation or rounding, output drops no bits\n"
 "\t// Instead, we need to stuff the bits in the output\n"
 "\n"
 "\t\talways @(posedge i_clk)\n"
 "\t\tif (i_ce)\to_val <= { {(OWID-IWID+SHIFT){i_val[IWID-SHIFT-1]}}, i_val[(IWID-SHIFT-1):0] };\n"
 "\n"
 "\tend else if (IWID-SHIFT == OWID)\n"
-"\tbegin // No truncation or rounding, output drops no bits\n"
+"\tbegin : SHIFT_ONE_BIT\n"
+"\t// No truncation or rounding, output drops no bits\n"
 "\n"
 "\t\talways @(posedge i_clk)\n"
 "\t\tif (i_ce)\to_val <= i_val[(IWID-SHIFT-1):0];\n"
@@ -363,7 +379,7 @@ SLASHLINE
 // Is there any way to limit the number of bits that are examined here, for the
 // purpose of simplifying/reducing logic?  I mean, if we go from 32 to 16 bits,
 // must we check all 15 bits for equality to zero?
-"\tbegin // Output drops one bit, can only add one or ... not.\n"
+"\tbegin : DROP_ONE_BIT // Output drops one bit, can only add one or ... not.\n"
 "\t\twire\t[(OWID-1):0]	truncated_value, rounded_up;\n"
 "\t\twire\t\t\tlast_valid_bit, first_lost_bit;\n"
 "\t\tassign\ttruncated_value=i_val[(IWID-1-SHIFT):(IWID-SHIFT-OWID)];\n"
@@ -383,7 +399,7 @@ SLASHLINE
 "\t\tend\n"
 "\n"
 "\tend else // If there's more than one bit we are dropping\n"
-"\tbegin\n"
+"\tbegin : ROUND_RESULT \n"
 "\t\twire\t[(OWID-1):0]	truncated_value, rounded_up;\n"
 "\t\twire\t\t\tlast_valid_bit, first_lost_bit;\n\n"
 "\t\tassign\ttruncated_value=i_val[(IWID-1-SHIFT):(IWID-SHIFT-OWID)];\n"
@@ -411,4 +427,5 @@ SLASHLINE
 "\n"
 "endmodule\n");
 }
+// }}}
 

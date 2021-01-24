@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	../rtl/longbimpy.v
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A portable shift and add multiply, built with the knowledge
@@ -19,9 +19,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This file is part of the general purpose pipelined FFT project.
 //
 // The pipelined FFT project is free software (firmware): you can redistribute
@@ -38,11 +38,12 @@
 // along with this program.  (It's in the $(ROOT)/doc directory.  Run make
 // with no target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	LGPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/lgpl.html
 //
-//
+// }}}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -54,11 +55,11 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 `endif
 		);
 	parameter	IAW=8,	// The width of i_a, min width is 5
-			IBW=12,	// The width of i_b, can be anything
+			IBW=12;	// The width of i_b, can be anything
 			// The following three parameters should not be changed
 			// by any implementation, but are based upon hardware
 			// and the above values:
-			OW=IAW+IBW;	// The output width
+			// OW=IAW+IBW;	// The output width
 	localparam	AW = (IAW<IBW) ? IAW : IBW,
 			BW = (IAW<IBW) ? IBW : IAW,
 			IW=(AW+1)&(-2),	// Internal width of A

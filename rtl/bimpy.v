@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	../rtl/bimpy.v
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A simple 2-bit multiply based upon the fact that LUT's allow
@@ -22,9 +22,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This file is part of the general purpose pipelined FFT project.
 //
 // The pipelined FFT project is free software (firmware): you can redistribute
@@ -41,11 +41,12 @@
 // along with this program.  (It's in the $(ROOT)/doc directory.  Run make
 // with no target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	LGPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/lgpl.html
 //
-//
+// }}}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -84,7 +85,9 @@ module	bimpy(i_clk, i_reset, i_ce, i_a, i_b, o_r);
 `define	ASSERT	assert
 
 	always @(posedge i_clk)
-	if ((f_past_valid)&&($past(i_ce)))
+	if ((!f_past_valid)||($past(i_reset)))
+		`ASSERT(o_r == 0);
+	else if ($past(i_ce))
 	begin
 		if ($past(i_a)==0)
 			`ASSERT(o_r == 0);

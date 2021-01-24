@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	bldstage.cpp
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	Builds the logic necessary to implement a single stage of an
@@ -14,9 +14,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -31,14 +31,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #define _CRT_SECURE_NO_WARNINGS   //  ms vs 2012 doesn't like fopen
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,7 +68,8 @@
 #include "rounding.h"
 #include "bldstage.h"
 
-//
+// build_dblstage
+// {{{
 // Builds the penultimate FFT stage, using integer operations only.
 // This stage is called laststage elsewhere.
 //
@@ -99,7 +101,7 @@ void	build_dblstage(const char *fname, ROUND_T rounding,
 SLASHLINE
 "//\n"
 "// Filename:\tlaststage%s.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tThis is part of an FPGA implementation that will process\n"
@@ -268,7 +270,10 @@ SLASHLINE
 "endmodule\n");
 	fclose(fp);
 }
+// }}}
 
+// build_stage
+// {{{
 void	build_stage(const char *fname,
 		int stage, int nwide, int offset,
 		int nbits, int xtra, int ckpce,
@@ -296,7 +301,7 @@ void	build_stage(const char *fname,
 SLASHLINE
 "//\n"
 "// Filename:\tfftstage%s.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tThis file is (almost) a Verilog source file.  It is meant to\n"
@@ -703,7 +708,7 @@ SLASHLINE
 
 	fprintf(fstage,
 	"\talways @(*)\n"
-		"\t\tf_oaddr = iaddr - f_mpydelay + {1'b1,{(LGSPAN-1){1'b0}}};\n"
+		"\t\tf_oaddr = iaddr - f_mpydelay + {1'b1,{(LGSPAN-1){1'b0}} };\n"
 "\n"
 	"\tassign\tf_oaddr_m1 = f_oaddr - 1'b1;\n"
 "\n");
@@ -793,3 +798,4 @@ SLASHLINE
 
 	fprintf(fstage, "endmodule\n");
 }
+// }}}

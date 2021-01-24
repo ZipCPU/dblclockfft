@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	convround.v
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A convergent rounding routine, also known as banker's
@@ -16,9 +16,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This file is part of the general purpose pipelined FFT project.
 //
 // The pipelined FFT project is free software (firmware): you can redistribute
@@ -35,11 +35,12 @@
 // along with this program.  (It's in the $(ROOT)/doc directory.  Run make
 // with no target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	LGPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/lgpl.html
 //
-//
+// }}}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -64,27 +65,28 @@ module	convround(i_clk, i_ce, i_val, o_val);
 	//		to the nearest even number.
 	generate
 	if (IWID == OWID) // In this case, the shift is irrelevant and
-	begin // cannot be applied.  No truncation or rounding takes
+	begin : NO_ROUNDING // cannot be applied.  No truncation or rounding takes
 	// effect here.
 
 		always @(posedge i_clk)
 		if (i_ce)	o_val <= i_val[(IWID-1):0];
 
 	end else if (IWID-SHIFT < OWID)
-	begin // No truncation or rounding, output drops no bits
+	begin : ADD_BITS_TO_OUTPUT // No truncation or rounding, output drops no bits
 	// Instead, we need to stuff the bits in the output
 
 		always @(posedge i_clk)
 		if (i_ce)	o_val <= { {(OWID-IWID+SHIFT){i_val[IWID-SHIFT-1]}}, i_val[(IWID-SHIFT-1):0] };
 
 	end else if (IWID-SHIFT == OWID)
-	begin // No truncation or rounding, output drops no bits
+	begin : SHIFT_ONE_BIT
+	// No truncation or rounding, output drops no bits
 
 		always @(posedge i_clk)
 		if (i_ce)	o_val <= i_val[(IWID-SHIFT-1):0];
 
 	end else if (IWID-SHIFT-1 == OWID)
-	begin // Output drops one bit, can only add one or ... not.
+	begin : DROP_ONE_BIT // Output drops one bit, can only add one or ... not.
 		wire	[(OWID-1):0]	truncated_value, rounded_up;
 		wire			last_valid_bit, first_lost_bit;
 		assign	truncated_value=i_val[(IWID-1-SHIFT):(IWID-SHIFT-OWID)];
@@ -104,7 +106,7 @@ module	convround(i_clk, i_ce, i_val, o_val);
 		end
 
 	end else // If there's more than one bit we are dropping
-	begin
+	begin : ROUND_RESULT 
 		wire	[(OWID-1):0]	truncated_value, rounded_up;
 		wire			last_valid_bit, first_lost_bit;
 

@@ -2,7 +2,7 @@ all: ifft_tb
 ################################################################################
 ##
 ## Filename: 	Makefile
-##
+## {{{
 ## Project:	A General Purpose Pipelined FFT Implementation
 ##
 ## Purpose:	This programs the build process for part of the ifft_tb test
@@ -18,9 +18,9 @@ all: ifft_tb
 ##		Gisselquist Technology, LLC
 ##
 ################################################################################
-##
-## Copyright (C) 2015-2020, Gisselquist Technology, LLC
-##
+## }}}
+## Copyright (C) 2015-2021, Gisselquist Technology, LLC
+## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
 ## by the Free Software Foundation, either version 3 of the License, or (at
@@ -35,14 +35,15 @@ all: ifft_tb
 ## with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 ## target there if the PDF file isn't present.)  If not, see
 ## <http://www.gnu.org/licenses/> for a copy.
-##
+## }}}
 ## License:	GPL, v3, as defined and found on www.gnu.org,
+## {{{
 ##		http://www.gnu.org/licenses/gpl.html
 ##
 ##
 ################################################################################
 ##
-##
+## }}}
 # This is really simple ...
 all: ifft_tb
 .DELETE_ON_ERROR:
@@ -61,15 +62,19 @@ LCLDR:= obj_dir
 IFTLB:= $(LCLDR)/Vifft_tb__ALL.a
 
 .PHONY: ifft_tb
+## {{{
 ifft_tb: $(IFTLB)
 
 $(IFTLB): $(LCLDR)/Vifft_tb.cpp
 	cd $(LCLDR); make -f Vifft_tb.mk
 $(LCLDR)/Vifft_tb.cpp: ifft_tb.v $(VSRCD)/fftmain.v $(VSRCD)/ifftmain.v
 	$(VERILATOR) $(VFLAGS) ifft_tb.v
+## }}}
 
 .PHONY: clean
+## {{{
 clean:
 	rm -rf $(LCLDR)
+## }}}
 
 -include $(VERILATOR_ROOT)/include/verilated.mk

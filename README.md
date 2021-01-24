@@ -71,6 +71,18 @@ has a real-FFT capability before releasing it back into the master branch,
 I'm actually so excited that I got it to this point that I'm going to move
 it from dev to master earlier, and come back to get the real only version.
 
+# Common Confusions
+
+This core does not contain any overflow protection.  Should you send it data
+large enough to overflow its internal registers, you will likely get something
+unexpected in return.
+
+This is perhaps for the best.  While overflow detection is a possible addition,
+overflow protection will only minimize an already bad situation.  It would be
+better to avoid that bad situation in the first place by providing the core
+with enough bits of precision to do its mathematics with.
+
+
 # Commercial Applications
 
 Should you find the LGPLv3 license insufficient for your needs, other licenses

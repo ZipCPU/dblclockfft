@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	fftgen.cpp
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	This is the core generator for the project.  Every part
@@ -26,9 +26,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -43,14 +43,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #define _CRT_SECURE_NO_WARNINGS   //  ms vs 2012 doesn't like fopen
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,6 +104,8 @@ int lstat(const char *filename, struct stat *buf) { return 1; };
 #include "softmpy.h"
 #include "butterfly.h"
 
+// build_dblquarters
+// {{{
 void	build_dblquarters(const char *fname, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -125,7 +128,7 @@ void	build_dblquarters(const char *fname, ROUND_T rounding, const bool async_res
 SLASHLINE
 "//\n"
 "// Filename:\tqtrstage%s.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:	This file encapsulates the 4 point stage of a decimation in\n"
@@ -378,7 +381,10 @@ SLASHLINE
 
 	fprintf(fp, "endmodule\n");
 }
+// }}}
 
+// build_snglquarters
+// {{{
 void	build_snglquarters(const char *fname, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -401,7 +407,7 @@ void	build_snglquarters(const char *fname, ROUND_T rounding, const bool async_re
 SLASHLINE
 "//\n"
 "// Filename:\tqtrstage%s.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:	This file encapsulates the 4 point stage of a decimation in\n"
@@ -782,8 +788,10 @@ SLASHLINE
 
 	fprintf(fp, "endmodule\n");
 }
+// }}}
 
-
+// build_sngllast
+// {{{
 void	build_sngllast(const char *fname, const bool async_reset = false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -800,7 +808,7 @@ void	build_sngllast(const char *fname, const bool async_reset = false) {
 SLASHLINE
 "//\n"
 "// Filename:\tlaststage.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:	%s\n"
 "//\n"
 "// Purpose:	This is part of an FPGA implementation that will process\n"
@@ -1008,7 +1016,10 @@ SLASHLINE
 
 	fclose(fp);
 }
+// }}}
 
+// usage()
+// {{{
 void	usage(void) {
 	fprintf(stderr,
 "USAGE:\tfftgen [-f <size>] [-d dir] [-c cbits] [-n nbits] [-m mxbits] [-s]\n"
@@ -1065,6 +1076,7 @@ void	usage(void) {
 */
 	DEF_XTRACBITS, DEF_COREDIR, DEF_NBITSIN, DEF_XTRAPBITS);
 }
+// }}}
 
 // Features still needed:
 //	Interactivity.
@@ -1087,6 +1099,8 @@ int main(int argc, char **argv) {
 	bool	dbg = false;
 	int	dbgstage = 128;
 
+	// Argument processing
+	// {{{
 	if (argc <= 1)
 		usage();
 
@@ -1149,7 +1163,10 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 	}}
+	// }}}
 
+	// verbose: Repeat back our chosen arguments
+	// {{{
 	if (verbose_flag) {
 		if (inverse)
 			printf("Building a %d point inverse FFT module, with %s outputs\n",
@@ -1173,7 +1190,10 @@ int main(int argc, char **argv) {
 		// nummpy
 		// xtrapbits
 	}
+	// }}}
 
+	// Argument sanity checks
+	// {{{
 	if (real_fft) {
 		printf("The real FFT option is not implemented yet, but still on\nmy to do list.  Please try again later.\n");
 		exit(EXIT_FAILURE);
@@ -1216,7 +1236,10 @@ int main(int argc, char **argv) {
 		}
 		exit(EXIT_FAILURE);
 	}
+	// }}}
 
+	// nbitsout, bitreverse, and tmp_size
+	// {{{
 	// Calculate how many output bits we'll have, and what the log
 	// based two size of our FFT is.
 	{
@@ -1239,7 +1262,10 @@ int main(int argc, char **argv) {
 			bitreverse = false;
 	} if ((maxbitsout > 0)&&(nbitsout > maxbitsout))
 		nbitsout = maxbitsout;
+	// }}}
 
+	// Reflect our bit-width calcualtion
+	// {{{
 	if (verbose_flag) {
 		printf("Output samples will be %d bits wide\n", nbitsout);
 		printf("This %sFFT will take %d-bit samples in, and produce %d samples out\n", (inverse)?"i":"", nbitsin, nbitsout);
@@ -1250,8 +1276,10 @@ int main(int argc, char **argv) {
 		if (!bitreverse)
 		printf("  The output will be left in bit-reversed order\n");
 	}
+	// }}}
 
 	// Figure out how many multiply stages to use, and how many to skip
+	// {{{
 	if (!single_clock) {
 		nmpypstage = 6;
 	} else if (ckpce <= 1) {
@@ -1264,7 +1292,10 @@ int main(int argc, char **argv) {
 	mpy_stages = nummpy / nmpypstage;
 	if (mpy_stages > lgval(fftsize)-2)
 		mpy_stages = lgval(fftsize)-2;
+	// }}}
 
+	// Create an output directory
+	// {{{
 	{
 		struct stat	sbuf;
 		if (lstat(coredir.c_str(), &sbuf)==0) {
@@ -1281,7 +1312,10 @@ int main(int argc, char **argv) {
 			exit(EXIT_FAILURE);
 		}
 	}
+	// }}}
 
+	// Write a header file with our chosen parameters
+	// {{{
 	if (hdrname.length() > 0) {
 		FILE	*hdr = fopen(hdrname.c_str(), "w");
 		if (hdr == NULL) {
@@ -1294,7 +1328,7 @@ int main(int argc, char **argv) {
 SLASHLINE
 "//\n"
 "// Filename:\t%s\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:	This simple header file captures the internal constants\n"
@@ -1379,7 +1413,14 @@ SLASHLINE
 		fprintf(hdr, "\n" "#endif\n\n");
 		fclose(hdr);
 	}
+	// }}}
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Build FFTMAIN
+	// {{{
+	// Open the file
+	// {{{
 	{
 		std::string	fname_string;
 
@@ -1398,12 +1439,15 @@ SLASHLINE
 		if (verbose_flag)
 			printf("Opened %s\n", fname_string.c_str());
 	}
+	// }}}
 
+	// Give it a header
+	// {{{
 	fprintf(vmain,
 SLASHLINE
 "//\n"
 "// Filename:\t%sfftmain.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:	%s\n"
 "//\n"
 "// Purpose:	This is the main module in the General Purpose FPGA FFT\n"
@@ -1484,8 +1528,10 @@ SLASHLINE
 	fprintf(vmain, "//\n");
 	fprintf(vmain, "%s", cpyleft);
 	fprintf(vmain, "//\n//\n`default_nettype\tnone\n//\n");
+	// }}}
 
-
+	// Module declaration
+	// {{{
 	std::string	resetw("i_reset");
 	if (async_reset)
 		resetw = "i_areset_n";
@@ -1509,7 +1555,7 @@ SLASHLINE
 	"\t// changed.  (These values can be adjusted by running the core\n"
 	"\t// generator again.)  The reason is simply that these values have\n"
 	"\t// been hardwired into the core at several places.\n");
-	fprintf(vmain, "\tlocalparam\tIWIDTH=%d, OWIDTH=%d, LGWIDTH=%d;\n\t//\n", nbitsin, nbitsout, lgsize);
+	fprintf(vmain, "\tlocalparam\tIWIDTH=%d, OWIDTH=%d; // LGWIDTH=%d;\n\t//\n", nbitsin, nbitsout, lgsize);
 	assert(lgsize > 0);
 	fprintf(vmain, "\tinput\twire\t\t\t\ti_clk, %s, i_ce;\n\t//\n",
 		resetw.c_str());
@@ -1524,6 +1570,7 @@ SLASHLINE
 	if (dbg)
 		fprintf(vmain, "\toutput\twire\t[33:0]\t\to_dbg;\n");
 	fprintf(vmain, "\n\n");
+	// }}}
 
 	fprintf(vmain, "\t// Outputs of the FFT, ready for bit reversal.\n");
 	fprintf(vmain, "\twire\t\t\t\tbr_sync;\n");
@@ -1531,8 +1578,10 @@ SLASHLINE
 		fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_result;\n");
 	else
 		fprintf(vmain, "\twire\t[(2*OWIDTH-1):0]\tbr_left, br_right;\n");
+
 	int	tmp_size = fftsize, lgtmp = lgsize;
-	if (fftsize == 2) {
+	if (fftsize == 2) { // Special case
+		// {{{
 		if (bitreverse) {
 			fprintf(vmain, "\treg\tbr_start;\n");
 			fprintf(vmain, "\tinitial br_start = 1\'b0;\n");
@@ -1563,7 +1612,9 @@ SLASHLINE
 				(async_reset)?"":"!", resetw.c_str());
 		}
 		fprintf(vmain, "\n\n");
-	} else if (fftsize == 4) {
+		// }}}
+	} else if (fftsize == 4) { // Special case
+		// {{{
 		if (!single_clock) {
 			fprintf(stderr, "ERR: The two-clocks per sample FFT does not support 4-pt FFTs\n");
 			exit(EXIT_FAILURE);
@@ -1595,7 +1646,9 @@ SLASHLINE
 		fprintf(vmain, "\twire\t[%d:0]\tw_d2;\n", 2*nbitsout-1);
 		fprintf(vmain, "\tlaststage\t#(OWIDTH,OWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
 		fprintf(vmain, "\t\t\tw_s4, w_d4, w_d2, w_s2);\n");
-	} else {
+		// }}}
+	} else { // General case -- build the FFT stages
+		// {{{
 		int	nbits = nbitsin, dropbit=0;
 		int	obits = nbits+1+xtrapbits;
 		std::string	cmem;
@@ -1605,6 +1658,7 @@ SLASHLINE
 			obits = maxbitsout;
 
 		// Always do a first stage
+		// {{{
 		{
 			bool	mpystage;
 
@@ -1617,6 +1671,7 @@ SLASHLINE
 				fprintf(vmain, "\t// A hardware optimized FFT stage\n");
 			fprintf(vmain, "\twire\t\tw_s%d;\n", fftsize);
 			if (single_clock) {
+				// {{{
 				fprintf(vmain, "\twire\t[%d:0]\tw_d%d;\n", 2*(obits+xtrapbits)-1, fftsize);
 				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 1, 0, inverse);
 				cmemfp = gen_coeff_open(cmem.c_str());
@@ -1633,7 +1688,9 @@ SLASHLINE
 					fftsize, fftsize,
 					((dbg)&&(dbgstage == fftsize))
 						? ", o_dbg":"");
+				// }}}
 			} else {
+				// {{{
 				fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os%d;\n\t// verilator lint_on  UNUSED\n", fftsize);
 				fprintf(vmain, "\twire\t[%d:0]\tw_e%d, w_o%d;\n", 2*(obits+xtrapbits)-1, fftsize, fftsize);
 				cmem = gen_coeff_fname(coredir.c_str(), fftsize, 2, 0, inverse);
@@ -1662,8 +1719,11 @@ SLASHLINE
 				fprintf(vmain, "\t\t\t(%s%s), i_right, w_o%d, w_os%d);\n",
 					(async_reset)?"":"!",resetw.c_str(),
 					fftsize, fftsize);
+				// }}}
 			}
 
+			// Build the logic for the FFT stage
+			// {{{
 			std::string	fname;
 
 			fname = coredir + "/";
@@ -1691,8 +1751,12 @@ SLASHLINE
 				build_stage(fname.c_str(), fftsize, 2, 1,
 					nbits, xtracbits, ckpce, async_reset, false);
 			}
+			// }}}
 		}
+		// }}}
 
+		// Build all following stages, up to the two last ones
+		// {{{
 		nbits = obits;	// New number of input bits
 		tmp_size >>= 1; lgtmp--;
 		dropbit = 0;
@@ -1713,6 +1777,7 @@ SLASHLINE
 				fprintf(vmain, "\twire\t\tw_s%d;\n",
 					tmp_size);
 				if (single_clock) {
+					// {{{
 					fprintf(vmain,"\twire\t[%d:0]\tw_d%d;\n",
 						2*(obits+xtrapbits)-1,
 						tmp_size);
@@ -1735,7 +1800,9 @@ SLASHLINE
 						tmp_size, tmp_size,
 						((dbg)&&(dbgstage == tmp_size))
 							?", o_dbg":"");
+					// }}}
 				} else {
+					// {{{
 					fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os%d;\n\t// verilator lint_on  UNUSED\n",
 						tmp_size);
 					fprintf(vmain,"\twire\t[%d:0]\tw_e%d, w_o%d;\n",
@@ -1778,6 +1845,7 @@ SLASHLINE
 					fprintf(vmain, "\t\t\tw_s%d, w_o%d, w_o%d, w_os%d);\n",
 						tmp_size<<1, tmp_size<<1,
 						tmp_size, tmp_size);
+					// }}}
 				}
 				fprintf(vmain, "\n");
 			}
@@ -1787,7 +1855,10 @@ SLASHLINE
 			nbits = obits;
 			tmp_size >>= 1; lgtmp--;
 		}
+		// }}}
 
+		// The Quarter stage : 90 degrees, adds and subtracts only
+		// {{{
 		if (tmp_size == 4) {
 			obits = nbits+((dropbit)?0:1);
 
@@ -1796,6 +1867,7 @@ SLASHLINE
 
 			fprintf(vmain, "\twire\t\tw_s4;\n");
 			if (single_clock) {
+				// {{{
 				fprintf(vmain, "\twire\t[%d:0]\tw_d4;\n",
 					2*(obits+xtrapbits)-1);
 				fprintf(vmain, "\tqtrstage%s\t#(%d,%d,%d,%d,%d)\tstage_4(i_clk, %s, i_ce,\n",
@@ -1805,7 +1877,9 @@ SLASHLINE
 					resetw.c_str());
 				fprintf(vmain, "\t\t\t\t\t\tw_s8, w_d8, w_d4, w_s4%s);\n",
 					((dbg)&&(dbgstage==4))?", o_dbg":"");
+				// }}}
 			} else {
+				// {{{
 				fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os4;\n\t// verilator lint_on  UNUSED\n");
 				fprintf(vmain, "\twire\t[%d:0]\tw_e4, w_o4;\n", 2*(obits+xtrapbits)-1);
 				fprintf(vmain, "\tqtrstage%s\t#(%d,%d,%d,0,%d,%d)\tstage_e4(i_clk, %s, i_ce,\n",
@@ -1819,12 +1893,16 @@ SLASHLINE
 					nbits+xtrapbits, obits+xtrapbits, lgsize, (inverse)?1:0, (dropbit)?0:0,
 					resetw.c_str());
 				fprintf(vmain, "\t\t\t\t\t\tw_s8, w_o8, w_o4, w_os4);\n");
+				// }}}
 			}
 			dropbit ^= 1;
 			nbits = obits;
 			tmp_size >>= 1; lgtmp--;
 		}
+		// }}}
 
+		// The last stage : adds and subtracts only
+		// {{{
 		{
 			obits = nbits+((dropbit)?0:1);
 			if (obits > nbitsout)
@@ -1845,29 +1923,28 @@ SLASHLINE
 			*/
 
 			if (single_clock) {
+				// {{{
 				fprintf(vmain, "\tlaststage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
 					nbits+xtrapbits, obits,(dropbit)?0:1,
 					resetw.c_str());
 				fprintf(vmain, "\t\t\t\t\tw_s4, w_d4, w_d2, w_s2);\n");
+				// }}}
 			} else {
+				// {{{
 				fprintf(vmain, "\tlaststage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
 					nbits+xtrapbits, obits,(dropbit)?0:1,
 					resetw.c_str());
 				fprintf(vmain, "\t\t\t\t\tw_s4, w_e4, w_o4, w_e2, w_o2, w_s2);\n");
+				// }}}
 			}
 
 			fprintf(vmain, "\n\n");
 			nbits = obits;
 		}
+		// }}}
 
-//		if (single_clock)
-//			fprintf(vmain, "\tassign\tbr_sample= w_d2;\n");
-//		else {
-//			fprintf(vmain, "\tassign\tbr_left  = w_e2;\n");
-//			fprintf(vmain, "\tassign\tbr_right = w_o2;\n");
-//		}
-//		fprintf(vmain, "\n");
-		if (bitreverse) {
+		if (bitreverse) {	// Prep for bit reversal
+			// {{{
 			fprintf(vmain, "\twire\tbr_start;\n");
 			fprintf(vmain, "\treg\tr_br_started;\n");
 			fprintf(vmain, "\tinitial\tr_br_started = 1\'b0;\n");
@@ -1882,10 +1959,13 @@ SLASHLINE
 			fprintf(vmain, "\t\telse if (i_ce)\n");
 			fprintf(vmain, "\t\t\tr_br_started <= r_br_started || w_s2;\n");
 			fprintf(vmain, "\tassign\tbr_start = r_br_started || w_s2;\n");
+			// }}}
 		}
+		// }}}
 	}
 
-
+	// Bit-reversal stage
+	// {{{
 	fprintf(vmain, "\n");
 	fprintf(vmain, "\t// Now for the bit-reversal stage.\n");
 	if (bitreverse) {
@@ -1912,7 +1992,10 @@ SLASHLINE
 		}
 		fprintf(vmain, "\tassign\tbr_sync    = w_s2;\n");
 	}
+	// }}}
 
+	// Register the final outputs and we're done
+	// {{{
 	fprintf(vmain,
 "\n\n"
 "\t// Last clock: Register our outputs, we\'re done.\n"
@@ -1946,26 +2029,44 @@ SLASHLINE
 "\n\n"
 "endmodule\n");
 	fclose(vmain);
-
-
+	// }}}
+	// }}}
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Build the component modules
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 	{
 		std::string	fname;
 
+		// Butterfly
+		// {{{
 		fname = coredir + "/butterfly.v";
 		build_butterfly(fname.c_str(), xtracbits, rounding,
 			ckpce, async_reset);
+		// }}}
 
+		// The hardware assisted butterfly
+		// {{{
 		fname = coredir + "/hwbfly.v";
 		build_hwbfly(fname.c_str(), xtracbits, rounding,
 			ckpce, async_reset);
+		// }}}
 
+		// The binary multiply the hardware assisted multiply depends on
+		// {{{
 		{
 			fname = coredir + "/longbimpy.v";
 			build_longbimpy(fname.c_str());
 			fname = coredir + "/bimpy.v";
 			build_bimpy(fname.c_str());
 		}
+		// }}}
 
+		// Quarter stage
+		// {{{
 		if ((dbg)&&(dbgstage == 4)) {
 			fname = coredir + "/qtrstage_dbg.v";
 			if (single_clock)
@@ -1982,8 +2083,10 @@ SLASHLINE
 		else
 			build_dblquarters(fname.c_str(), rounding,
 					async_reset, false);
+		// }}}
 
-
+		// Last stage
+		// {{{
 		if (single_clock) {
 			fname = coredir + "/laststage.v";
 			build_sngllast(fname.c_str(), async_reset);
@@ -1995,7 +2098,10 @@ SLASHLINE
 			build_dblstage(fname.c_str(), rounding,
 				async_reset, (dbg)&&(dbgstage==2));
 		}
+		// }}}
 
+		// Bit reversal logic
+		// {{{
 		if (bitreverse) {
 			fname = coredir + "/bitreverse.v";
 			if (single_clock)
@@ -2003,7 +2109,10 @@ SLASHLINE
 			else
 				build_dblreverse(fname.c_str(), async_reset);
 		}
+		// }}}
 
+		// Rounding
+		// {{{
 		const	char	*rnd_string = "";
 		switch(rounding) {
 			case RND_TRUNCATE:	rnd_string = "/truncate.v"; break;
@@ -2019,8 +2128,9 @@ SLASHLINE
 			default:
 				build_convround(fname.c_str()); break;
 		}
-
+		// }}}
 	}
+	// }}}
 
 	if (verbose_flag)
 		printf("All done -- success\n");

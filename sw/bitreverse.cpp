@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	bitreverse.cpp
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #define _CRT_SECURE_NO_WARNINGS   //  ms vs 2012 doesn't like fopen
 #include <stdio.h>
 #include <stdlib.h>
@@ -61,6 +62,8 @@
 #include "legal.h"
 #include "bitreverse.h"
 
+// build_snglbrev(fname, async_reset)
+// {{{
 void	build_snglbrev(const char *fname, const bool async_reset) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -83,7 +86,7 @@ void	build_snglbrev(const char *fname, const bool async_reset) {
 SLASHLINE
 "//\n"
 "// Filename:\t%s.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tThis module bitreverses a pipelined FFT input.  It differes\n"
@@ -290,7 +293,10 @@ SLASHLINE
 	fclose(fp);
 	free(modulename);
 }
+// }}}
 
+// build_dblreverse(fname, async_reset)
+// {{{
 void	build_dblreverse(const char *fname, const bool async_reset) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -313,7 +319,7 @@ void	build_dblreverse(const char *fname, const bool async_reset) {
 SLASHLINE
 "//\n"
 "// Filename:\t%s.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tThis module bitreverses a pipelined FFT input.  Operation is\n"
@@ -670,3 +676,4 @@ SLASHLINE
 	fclose(fp);
 	free(modulename);
 }
+// }}}

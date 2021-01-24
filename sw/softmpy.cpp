@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	softmpy.cpp
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	If the chip doesn't have any hardware multiplies, you'll need
@@ -12,9 +12,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -29,14 +29,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #define _CRT_SECURE_NO_WARNINGS   //  ms vs 2012 doesn't like fopen
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,6 +60,8 @@
 #include "legal.h"
 #include "softmpy.h"
 
+// build_multiply
+// {{{
 void	build_multiply(const char *fname) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -71,7 +74,7 @@ void	build_multiply(const char *fname) {
 SLASHLINE
 "//\n"
 "// Filename:\tshiftaddmpy.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tA portable shift and add multiply.\n"
@@ -164,7 +167,10 @@ SLASHLINE
 
 	fclose(fp);
 }
+// }}}
 
+// build_bimpy -- the binary sub-multiply (everything else is addition)
+// {{{
 void	build_bimpy(const char *fname) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -177,7 +183,7 @@ void	build_bimpy(const char *fname) {
 SLASHLINE
 "//\n"
 "// Filename:\t%s\n"
-"//\n"
+"// {{{\n" // }}}
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tA simple 2-bit multiply based upon the fact that LUT's allow\n"
@@ -226,8 +232,8 @@ SLASHLINE
 	// Formal properties
 	//
 	// This module is formally verified as part of longbimpy.v
-	// Hence, we'll use an ifdef LONGBIMPY to capture if it is being verified as part of
-	// LONGBIMPY, or placed within another module.
+	// Hence, we'll use an ifdef LONGBIMPY to capture if it is being
+	// verified as part of LONGBIMPY, or placed within another module.
 	fprintf(fp,
 "`ifdef	FORMAL\n");
 
@@ -242,11 +248,13 @@ SLASHLINE
 "`define\tASSERT\tassert\n"
 "\n");
 
-	// Now for our module specific assertions
-	// These properties will be assumed if this proof is not part of LONGBIMPY's proof
+	// Now for our module specific assertions.  These properties will be
+	// assumed if this proof is not part of LONGBIMPY's proof
 	fprintf(fp,
 	"\talways @(posedge i_clk)\n"
-	"\tif ((f_past_valid)&&($past(i_ce)))\n"
+	"\tif ((!f_past_valid)||($past(i_reset)))\n"
+		"\t\t`ASSERT(o_r == 0);\n"
+	"\telse if ($past(i_ce))\n"
 	"\tbegin\n"
 		"\t\tif ($past(i_a)==0)\n"
 			"\t\t\t`ASSERT(o_r == 0);\n"
@@ -271,7 +279,10 @@ SLASHLINE
 
 	fclose(fp);
 }
+// }}}
 
+// build_longbimpy
+// {{{
 void	build_longbimpy(const char *fname) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -284,7 +295,7 @@ void	build_longbimpy(const char *fname) {
 SLASHLINE
 "//\n"
 "// Filename: 	%s\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:	%s\n"
 "//\n"
 "// Purpose:	A portable shift and add multiply, built with the knowledge\n"
@@ -319,11 +330,11 @@ SLASHLINE
 	fprintf(fp, "IAW");
 #endif
 
-	fprintf(fp, ",	// The width of i_b, can be anything\n"
+	fprintf(fp, ";	// The width of i_b, can be anything\n"
 			"\t\t\t// The following three parameters should not be changed\n"
 			"\t\t\t// by any implementation, but are based upon hardware\n"
 			"\t\t\t// and the above values:\n"
-			"\t\t\tOW=IAW+IBW;	// The output width\n");
+			"\t\t\t// OW=IAW+IBW;	// The output width\n");
 	fprintf(fp,
 	"\tlocalparam	AW = (IAW<IBW) ? IAW : IBW,\n"
 			"\t\t\tBW = (IAW<IBW) ? IBW : IAW,\n"
@@ -744,4 +755,5 @@ SLASHLINE
 
 	fclose(fp);
 }
+// }}}
 

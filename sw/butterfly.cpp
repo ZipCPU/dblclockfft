@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	butterfly.cpp
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	Builds one of two butterflies: either a butterfly implementation
@@ -12,9 +12,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This file is part of the general purpose pipelined FFT project.
 //
 // The pipelined FFT project is free software (firmware): you can redistribute
@@ -31,14 +31,15 @@
 // along with this program.  (It's in the $(ROOT)/doc directory.  Run make
 // with no target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	LGPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/lgpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #define _CRT_SECURE_NO_WARNINGS   //  ms vs 2012 doesn't like fopen
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,6 +92,8 @@ int lstat(const char *filename, struct stat *buf) { return 1; };
 #include "softmpy.h"
 #include "butterfly.h"
 
+// build_butterfly
+// {{{
 void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding,
 			int	ckpce, const bool async_reset) {
 	FILE	*fp = fopen(fname, "w");
@@ -123,7 +126,7 @@ void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding,
 SLASHLINE
 "//\n"
 "// Filename:\tbutterfly.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tThis routine caculates a butterfly for a decimation\n"
@@ -1274,7 +1277,10 @@ SLASHLINE
 "endmodule\n");
 	fclose(fp);
 }
+// }}}
 
+// build_hwbfly
+// {{{
 void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding,
 		int ckpce, const bool async_reset) {
 	FILE	*fp = fopen(fname, "w");
@@ -1303,7 +1309,7 @@ void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding,
 SLASHLINE
 "//\n"
 "// Filename:\thwbfly.v\n"
-"//\n"
+"// {{{\n" // "}}}"
 "// Project:\t%s\n"
 "//\n"
 "// Purpose:\tThis routine is identical to the butterfly.v routine found\n"
@@ -2096,3 +2102,4 @@ SLASHLINE
 
 	fclose(fp);
 }
+// }}}

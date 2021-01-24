@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename: 	fftlib.cpp
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	
@@ -10,9 +10,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -27,14 +27,15 @@
 // with this program.  (It's in the $(ROOT)/doc directory.  Run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
+// }}}
 #define _CRT_SECURE_NO_WARNINGS   //  ms vs 2012 doesn't like fopen
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,6 +69,8 @@ long long llround(double d) {
 #include "fftlib.h"
 
 
+// lgval(vl) -- returns ceil(log_2(val))
+// {{{
 int	lgval(int vl) {
 	int	lg;
 
@@ -75,7 +78,10 @@ int	lgval(int vl) {
 		;
 	return lg;
 }
+// }}}
 
+// nextlg(vl) -- returns log_2(ceil(log_2(val)))
+// {{{
 int	nextlg(int vl) {
 	int	r;
 
@@ -83,7 +89,10 @@ int	nextlg(int vl) {
 		;
 	return r;
 }
+// }}}
 
+// bflydelay -- Clocks used in the butterfly
+// {{{
 int	bflydelay(int nbits, int xtra) {
 	int	cbits = nbits + xtra;
 	int	delay;
@@ -102,7 +111,10 @@ int	bflydelay(int nbits, int xtra) {
 	}
 	return delay;
 }
+// }}}
 
+// lgdelay -- log of thebutterfly delay (i.e. bits needed to hold the value)
+// {{{
 int	lgdelay(int nbits, int xtra) {
 	// The butterfly code needs to compare a valid address, of this
 	// many bits, with an address two greater.  This guarantees we
@@ -111,7 +123,10 @@ int	lgdelay(int nbits, int xtra) {
 	// redesign that's just what we'll deal with.
 	return lgval(bflydelay(nbits, xtra)+3);
 }
+// }}}
 
+// gen_coeffs -- generate twiddle factors
+// {{{
 void	gen_coeffs(FILE *cmem, int stage, int cbits,
 			int nwide, int offset, bool inv) {
 	//
@@ -142,7 +157,10 @@ void	gen_coeffs(FILE *cmem, int stage, int cbits,
 		//
 	} fclose(cmem);
 }
+// }}}
 
+// gen_coef_fname -- Generates the hex file name for the twiddle factors
+// {{{
 std::string	gen_coeff_fname(const char *coredir,
 			int stage, int nwide, int offset, bool inv) {
 	std::string	result;
@@ -171,7 +189,10 @@ std::string	gen_coeff_fname(const char *coredir,
 	delete[] memfile;
 	return	result;
 }
+// }}}
 
+// gen_coeff_open
+// {{{
 FILE	*gen_coeff_open(const char *fname) {
 	FILE	*cmem;
 
@@ -185,7 +206,10 @@ FILE	*gen_coeff_open(const char *fname) {
 
 	return cmem;
 }
+// }}}
 
+// gen_coeff_file
+// {{{
 void	gen_coeff_file(const char *coredir, const char *fname,
 			int stage, int cbits, int nwide, int offset, bool inv) {
 	std::string	fstr;
@@ -195,3 +219,4 @@ void	gen_coeff_file(const char *coredir, const char *fname,
 	cmem = gen_coeff_open(fstr.c_str());
 	gen_coeffs(cmem, stage,  cbits, nwide, offset, inv);
 }
+// }}}

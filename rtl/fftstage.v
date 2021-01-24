@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Filename:	fftstage.v
-//
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	This file is (almost) a Verilog source file.  It is meant to
@@ -32,9 +32,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This file is part of the general purpose pipelined FFT project.
 //
 // The pipelined FFT project is free software (firmware): you can redistribute
@@ -51,11 +51,12 @@
 // along with this program.  (It's in the $(ROOT)/doc directory.  Run make
 // with no target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	LGPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/lgpl.html
 //
-//
+// }}}
 ////////////////////////////////////////////////////////////////////////////////
 //
 //
@@ -372,7 +373,7 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	wire	[LGSPAN:0]	f_oaddr_m1 = f_oaddr - 1'b1;
 
 	always @(*)
-		f_oaddr = iaddr - f_mpydelay + {1'b1,{(LGSPAN-1){1'b0}}};
+		f_oaddr = iaddr - f_mpydelay + {1'b1,{(LGSPAN-1){1'b0}} };
 
 	assign	f_oaddr_m1 = f_oaddr - 1'b1;
 

@@ -1,7 +1,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 %% Filename: 	doc/src/spec.tex
-%%
+%% {{{
 %% Project:	A General Purpose Pipelined FFT Implementation
 %%
 %% Purpose:	This file contains the LaTeX instructions necessary to build
@@ -13,9 +13,9 @@
 %%		Gisselquist Technology, LLC
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%
-%% Copyright (C) 2018-2020, Gisselquist Technology, LLC
-%%
+%% }}}
+%% Copyright (C) 2018-2021, Gisselquist Technology, LLC
+%% {{{
 %% This file is part of the general purpose pipelined FFT project.
 %%
 %% The pipelined FFT project is free software (firmware): you can redistribute
@@ -32,14 +32,15 @@
 %% along with this program.  (It's in the $(ROOT)/doc directory.  Run make
 %% with no target there if the PDF file isn't present.)  If not, see
 %% <http://www.gnu.org/licenses/> for a copy.
-%%
+%% }}}
 %% License:	LGPL, v3, as defined and found on www.gnu.org,
+%% {{{
 %%		http://www.gnu.org/licenses/lgpl.html
 %%
 %%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
-%%
+%% }}}
 \documentclass{gqtekspec}
 \project{Pipelined FFT}
 \title{Specification}
@@ -447,7 +448,7 @@ according to the size of the FFT they represent.  Therefore the first stage
 is numbered $N$ and represents the first stage of an $N$ point FFT.  The
 second stage is labeled $N/2$, then $N/4$, and so on down to $N=8$.  The
 four sample stage and the two sample stages are different, however.  These
-two stages, representing three blocks on Fig.~\ref{fig:white-box}, can be
+two stages, representing three blocks on Fig.~\ref{fig:white-box-dbl}, can be
 accomplished without any multiplies.  Therefore they have been accomplished
 separately.  Likewise all of the stages, save the double stage at the bottom,
 operate on one data sample per clock.  Only the last stage, prior to the

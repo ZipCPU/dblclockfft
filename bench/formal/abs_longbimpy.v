@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// Filename: 	../rtl/abs_longbimpy.v
-//
+// Filename: 	bench/formal/abs_longbimpy.v
+// {{{
 // Project:	A General Purpose Pipelined FFT Implementation
 //
 // Purpose:	A portable shift and add multiply, built with the knowledge
@@ -19,9 +19,9 @@
 //		Gisselquist Technology, LLC
 //
 ////////////////////////////////////////////////////////////////////////////////
-//
-// Copyright (C) 2015-2020, Gisselquist Technology, LLC
-//
+// }}}
+// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
 // by the Free Software Foundation, either version 3 of the License, or (at
@@ -36,8 +36,9 @@
 // with this program.  (It's in the $(ROOT)/doc directory, run make with no
 // target there if the PDF file isn't present.)  If not, see
 // <http://www.gnu.org/licenses/> for a copy.
-//
+// }}}
 // License:	GPL, v3, as defined and found on www.gnu.org,
+// {{{
 //		http://www.gnu.org/licenses/gpl.html
 //
 //
@@ -45,28 +46,41 @@
 //
 //
 `default_nettype	none
-//
-module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
-	parameter	IAW=8,	// The width of i_a, min width is 5
-			IBW=12,	// The width of i_b, can be anything
-			// The following three parameters should not be changed
-			// by any implementation, but are based upon hardware
-			// and the above values:
-			OW=IAW+IBW;	// The output width
-	localparam	AW = (IAW<IBW) ? IAW : IBW,
-			BW = (IAW<IBW) ? IBW : IAW,
-			LUTB=2,	// How many bits we can multiply by at once
-			TLEN=(AW+(LUTB-1))/LUTB; // Nmbr of rows in our tableau
-	input	wire			i_clk, i_ce;
-	input	wire	[(IAW-1):0]	i_a_unsorted;
-	input	wire	[(IBW-1):0]	i_b_unsorted;
-	output	reg	[(AW+BW-1):0]	o_r;
+// }}}
+module	longbimpy #(
+		// {{{
+		parameter	IAW=8,	// The width of i_a, min width is 5
+				IBW=12,	// The width of i_b, can be anything
+				// The following three parameters should not be
+				// changed by any implementation, but are based
+				// upon hardware and the above values:
+				// OW=IAW+IBW;	// The output width
+		localparam	AW = (IAW<IBW) ? IAW : IBW,
+				BW = (IAW<IBW) ? IBW : IAW,
+				LUTB=2,	// How many bits we can mpy by at once
+				TLEN=(AW+(LUTB-1))/LUTB // Nbr rows in tableau
+		// }}}
+	) (
+		// {{{
+		input	wire			i_clk, i_ce,
+		input	wire	[(IAW-1):0]	i_a_unsorted,
+		input	wire	[(IBW-1):0]	i_b_unsorted,
+		output	reg	[(AW+BW-1):0]	o_r
+		// }}}
+	);
 
-	//
-	// Swap parameter order, so that AW <= BW -- for performance
-	// reasons
+	// Signal declarations
+	// {{{
+	reg	f_past_valid;
 	wire	[AW-1:0]	i_a;
 	wire	[BW-1:0]	i_b;
+	reg	[AW-1:0]	f_past_a	[0:TLEN+1];
+	reg	[BW-1:0]	f_past_b	[0:TLEN+1];
+
+	// }}}
+
+	// Swap parameter order, so that AW <= BW -- for performance reasons
+	// {{{
 	generate if (IAW <= IBW)
 	begin : NO_PARAM_CHANGE
 		assign i_a = i_a_unsorted;
@@ -75,6 +89,7 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 		assign i_a = i_b_unsorted;
 		assign i_b = i_a_unsorted;
 	end endgenerate
+	// }}}
 
 `ifndef	FORMAL
 	// This file should only be used in a formal context.
@@ -82,14 +97,12 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 	assert(0);
 `endif
 
-	reg	f_past_valid;
 	initial	f_past_valid = 1'b0;
 	always @(posedge i_clk)
 		f_past_valid <= 1'b1;
 
-	reg	[AW-1:0]	f_past_a	[0:TLEN+1];
-	reg	[BW-1:0]	f_past_b	[0:TLEN+1];
-
+	// f_past_a, f_past_b
+	// {{{
 	initial	f_past_a[0] = 0;
 	initial	f_past_b[0] = 0;
 	always @(posedge i_clk)
@@ -112,14 +125,20 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 			f_past_b[k+1] <= f_past_b[k];
 		end
 	end endgenerate
+	// }}}
 
 	// abs_mpy #(.AW(AW), .BW(BW)) thempy(f_past_a[TLEN+1], f_past_b[TLEN+1], o_r);
 	(* anyseq *) reg [AW+BW-1:0]	result;
 	wire	[AW+BW-1:0]	f_neg_a, f_neg_b;
 
+	// Negate f_past_a and f_past_b
+	// {{{
 	assign	f_neg_a = - {{(BW){f_past_a[TLEN+1][AW-1]}}, f_past_a[TLEN+1]};
 	assign	f_neg_b = - {{(AW){f_past_b[TLEN+1][BW-1]}}, f_past_b[TLEN+1]};
+	// }}}
 
+	// Assumptions about the result
+	// {{{
 	always @(*)
 	if (f_past_a[TLEN+1] == 0)
 		assume(result == 0);
@@ -140,7 +159,7 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r);
 	else
 		assume(result[AW+BW-1] == (f_past_a[TLEN+1][AW-1]
 					^f_past_b[TLEN+1][BW-1]));
-
+	// }}}
 
 	always @(*)
 		o_r = result;
