@@ -15,6 +15,7 @@ ck2: depth 22
 # ck3_r1 succeeds in 35-5 steps in 38min (induction only)
 # ck3_r2 succeeds in 35-1 steps in 40min (induction only)
 ck3_r0: depth 26
+ck3_r0: depth 28
 ck3_r1: depth 30
 ck3_r2: depth 34
 
