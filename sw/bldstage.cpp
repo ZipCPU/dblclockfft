@@ -155,42 +155,56 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module\tlaststage%s(i_clk, %s, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
-	"\tparameter\tIWIDTH=%d,OWIDTH=IWIDTH+1, SHIFT=%d;\n"
-	"\tinput\twire\ti_clk, %s, i_ce, i_sync;\n"
-	"\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
-	"\toutput\treg\t[(2*OWIDTH-1):0]\to_left, o_right;\n"
-	"\toutput\treg\t\t\to_sync;\n"
-	"\n", (dbg)?"_dbg":"", resetw.c_str(), (dbg)?", o_dbg":"",
+"module\tlaststage%s #(\n"
+	"\t\t// {{{\n"
+	// (i_clk, %s, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
+	"\t\tparameter\tIWIDTH=%d,OWIDTH=IWIDTH+1, SHIFT=%d\n"
+	"\t\t// }}}\n"
+	"\t) (\n"
+	"\t\t// {{{\n"
+	"\t\tinput\twire\ti_clk, %s, i_ce, i_sync,\n"
+	"\t\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right,\n"
+	"\t\toutput\treg\t[(2*OWIDTH-1):0]\to_left, o_right,\n"
+	"\t\toutput\treg\t\t\to_sync%s\n"
+	"\n", (dbg)?"_dbg":"", // resetw.c_str(), (dbg)?", o_dbg":"",
 	TST_DBLSTAGE_IWIDTH, TST_DBLSTAGE_SHIFT,
-		resetw.c_str());
+		resetw.c_str(), (dbg) ? ",":"");
 
-	if (dbg) { fprintf(fp, "\toutput\twire\t[33:0]\t\t\to_dbg;\n"
-		"\tassign\to_dbg = { ((o_sync)&&(i_ce)), i_ce, o_left[(2*OWIDTH-1):(2*OWIDTH-16)],\n"
-			"\t\t\t\t\to_left[(OWIDTH-1):(OWIDTH-16)] };\n"
-"\n");
-	}
+	if (dbg)
+		fprintf(fp, "\toutput\twire\t[33:0]\t\t\to_dbg;\n");
+
+	fprintf(fp, "\t\t// }}}\n\t);\n\n");
+
+	fprintf(fp, "\t// Local declarations\n\t// {{{\n");
 	fprintf(fp,
 	"\twire\tsigned\t[(IWIDTH-1):0]\ti_in_0r, i_in_0i, i_in_1r, i_in_1i;\n"
+	"\twire\t[(OWIDTH-1):0]\t\to_out_0r, o_out_0i,\n"
+				"\t\t\t\t\to_out_1r, o_out_1i;\n"
+	"\treg\trnd_sync, r_sync;\n"
+	"\treg\tsigned\t[(IWIDTH):0]\trnd_in_0r, rnd_in_0i;\n"
+	"\treg\tsigned\t[(IWIDTH):0]\trnd_in_1r, rnd_in_1i;\n\n"
+	"\t// }}}\n"
+"\n");
+
+	fprintf(fp,
 	"\tassign\ti_in_0r = i_left[(2*IWIDTH-1):(IWIDTH)];\n"
 	"\tassign\ti_in_0i = i_left[(IWIDTH-1):0];\n"
 	"\tassign\ti_in_1r = i_right[(2*IWIDTH-1):(IWIDTH)];\n"
-	"\tassign\ti_in_1i = i_right[(IWIDTH-1):0];\n"
-	"\twire\t[(OWIDTH-1):0]\t\to_out_0r, o_out_0i,\n"
-				"\t\t\t\t\to_out_1r, o_out_1i;\n"
-"\n"
-"\n"
-	"\t// Handle a potential rounding situation, when IWIDTH>=OWIDTH.\n"
-"\n"
-"\n");
+	"\tassign\ti_in_1i = i_right[(IWIDTH-1):0];\n");
+	if (dbg) fprintf(fp,
+		"\tassign\to_dbg = { ((o_sync)&&(i_ce)), i_ce, o_left[(2*OWIDTH-1):(2*OWIDTH-16)],\n"
+			"\t\t\t\t\to_left[(OWIDTH-1):(OWIDTH-16)] };\n"
+		"\n");
+
 	fprintf(fp,
 	"\n"
+	"\t// rnd_sync, r_sync\n"
+	"\t// {{{\n"
 	"\t// As with any register connected to the sync pulse, these must\n"
 	"\t// have initial values and be reset on the %s signal.\n"
 	"\t// Other data values need only restrict their updates to i_ce\n"
 	"\t// enabled clocks, but sync\'s must obey resets and initial\n"
 	"\t// conditions as well.\n"
-	"\treg\trnd_sync, r_sync;\n"
 "\n"
 	"\tinitial\trnd_sync      = 1\'b0; // Sync into rounding\n"
 	"\tinitial\tr_sync        = 1\'b0; // Sync coming out\n",
@@ -208,7 +222,10 @@ SLASHLINE
 			"\t\t\trnd_sync <= i_sync;\n"
 			"\t\t\tr_sync <= rnd_sync;\n"
 		"\t\tend\n"
+	"\t// }}}\n"
 "\n"
+	"\t// rnd_in_0r, rnd_in_0i, rnd_in_1r, rnd_in_1i\n"
+	"\t// {{{\n"
 	"\t// As with other variables, these are really only updated when in\n"
 	"\t// the processing pipeline, after the first i_sync.  However, to\n"
 	"\t// eliminate as much unnecessary logic as possible, we toggle\n"
@@ -218,19 +235,18 @@ SLASHLINE
 	"\t// Don't forget that we accumulate a bit by adding two values\n"
 	"\t// together. Therefore our intermediate value must have one more\n"
 	"\t// bit than the two originals.\n"
-	"\treg\tsigned\t[(IWIDTH):0]\trnd_in_0r, rnd_in_0i;\n"
-	"\treg\tsigned\t[(IWIDTH):0]\trnd_in_1r, rnd_in_1i;\n\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-		"\t\tbegin\n"
-			"\t\t\t//\n"
-			"\t\t\trnd_in_0r <= i_in_0r + i_in_1r;\n"
-			"\t\t\trnd_in_0i <= i_in_0i + i_in_1i;\n"
-			"\t\t\t//\n"
-			"\t\t\trnd_in_1r <= i_in_0r - i_in_1r;\n"
-			"\t\t\trnd_in_1i <= i_in_0i - i_in_1i;\n"
-			"\t\t\t//\n"
-		"\t\tend\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\t//\n"
+		"\t\trnd_in_0r <= i_in_0r + i_in_1r;\n"
+		"\t\trnd_in_0i <= i_in_0i + i_in_1i;\n"
+		"\t\t//\n"
+		"\t\trnd_in_1r <= i_in_0r - i_in_1r;\n"
+		"\t\trnd_in_1i <= i_in_0i - i_in_1i;\n"
+		"\t\t//\n"
+	"\tend\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fp,
 	"\t%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_0r(i_clk, i_ce,\n"
@@ -246,26 +262,32 @@ SLASHLINE
 	"\t\t\t\t\t\t\trnd_in_1i, o_out_1i);\n\n", rnd_string);
 
 	fprintf(fp, "\n"
+	"\t// o_left, o_right\n"
+	"\t// {{{\n"
 	"\t// Prior versions of this routine did not include the extra\n"
 	"\t// clock and register/flip-flops that this routine requires.\n"
 	"\t// These are placed in here to correct a bug in Verilator, that\n"
 	"\t// otherwise struggles.  (Hopefully this will fix the problem ...)\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-		"\t\tbegin\n"
-			"\t\t\to_left  <= { o_out_0r, o_out_0i };\n"
-			"\t\t\to_right <= { o_out_1r, o_out_1i };\n"
-		"\t\tend\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\to_left  <= { o_out_0r, o_out_0i };\n"
+		"\t\to_right <= { o_out_1r, o_out_1i };\n"
+	"\tend\n"
+	"\t// }}}\n"
 "\n"
+	"\t// o_sync\n"
+	"\t// {{{\n"
 	"\tinitial\to_sync = 1\'b0; // Final sync coming out of module\n");
 	if (async_reset)
-		fprintf(fp, "\talways @(posedge i_clk, negdge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
 	else
 		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
-		"\t\t\to_sync <= 1\'b0;\n"
-		"\t\telse if (i_ce)\n"
-		"\t\t\to_sync <= r_sync;\n"
+		"\t\to_sync <= 1\'b0;\n"
+		"\telse if (i_ce)\n"
+		"\t\to_sync <= r_sync;\n"
+	"\t// }}}\n"
 "\n"
 "endmodule\n");
 	fclose(fp);
@@ -279,16 +301,11 @@ void	build_stage(const char *fname,
 		int nbits, int xtra, int ckpce,
 		const bool async_reset, const bool dbg) {
 	FILE	*fstage = fopen(fname, "w");
-	int	cbits = nbits + xtra;
+	// int	cbits = nbits + xtra;
 
 	std::string	resetw("i_reset");
 	if (async_reset)
 		resetw = std::string("i_areset_n");
-
-	if (((unsigned)cbits * 2u) >= sizeof(long long)*8) {
-		fprintf(stderr, "ERROR: CMEM Coefficient precision requested overflows long long data type.\n");
-		exit(-1);
-	}
 
 	if (fstage == NULL) {
 		fprintf(stderr, "ERROR: Could not open %s for writing!\n", fname);
@@ -332,61 +349,67 @@ SLASHLINE
 		(dbg)?"_dbg":"", prjname, creator);
 	fprintf(fstage, "%s", cpyleft);
 	fprintf(fstage, "//\n//\n`default_nettype\tnone\n//\n");
-	fprintf(fstage, "module\tfftstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n",
-		(dbg)?"_dbg":"", resetw.c_str(),
-		(dbg)?", o_dbg":"");
+	fprintf(fstage, "module\tfftstage%s #(\n", (dbg)?"_dbg":"");
+	fprintf(fstage, "\t\t// {{{\n");
 	// These parameter values are useless at this point--they are to be
 	// replaced by the parameter values in the calling program.  Only
 	// problem is, the CWIDTH needs to match exactly!
-	fprintf(fstage, "\tparameter\tIWIDTH=%d,CWIDTH=%d,OWIDTH=%d;\n",
+	fprintf(fstage, "\t\tparameter\tIWIDTH=%d,CWIDTH=%d,OWIDTH=%d,\n",
 		nbits, 20, nbits+1); // 20, not cbits, since the tb depends upon it
 	fprintf(fstage,
-"\t// Parameters specific to the core that should be changed when this\n"
-"\t// core is built ... Note that the minimum LGSPAN (the base two log\n"
-"\t// of the span, or the base two log of the current FFT size) is 3.\n"
-"\t// Smaller spans (i.e. the span of 2) must use the dbl laststage module.\n"
-"\tparameter\tLGSPAN=%d, BFLYSHIFT=0; // LGWIDTH=%d\n"
-"\tparameter\t[0:0]	OPT_HWMPY = 1;\n",
+"\t\t// Parameters specific to the core that should be changed when\n"
+"\t\t// this core is built ... Note that the minimum LGSPAN (the base\n"
+"\t\t// two log of the span, or the base two log of the current FFT\n"
+"\t\t// size) is 3.  Smaller spans (i.e. the span of 2) must use the\n"
+"\t\t// dbl laststage module.\n"
+"\t\t// Verilator lint_off UNUSED\n"
+"\t\tparameter\tLGSPAN=%d, BFLYSHIFT=0, // LGWIDTH=%d\n"
+"\t\tparameter [0:0]\tOPT_HWMPY = 1,\n",
 		(nwide <= 1) ? lgval(stage)-1 : lgval(stage)-2, lgval(stage));
 	fprintf(fstage,
-"\t// Clocks per CE.  If your incoming data rate is less than 50%% of your\n"
-"\t// clock speed, you can set CKPCE to 2\'b10, make sure there's at least\n"
-"\t// one clock between cycles when i_ce is high, and then use two\n"
-"\t// multiplies instead of three.  Setting CKPCE to 2\'b11, and insisting\n"
-"\t// on at least two clocks with i_ce low between cycles with i_ce high,\n"
-"\t// then the hardware optimized butterfly code will used one multiply\n"
-"\t// instead of two.\n"
-"\tparameter\t	CKPCE = %d;\n", ckpce);
+"\t\t// Clocks per CE.  If your incoming data rate is less than 50%%\n"
+"\t\t// of your clock speed, you can set CKPCE to 2\'b10, make sure\n"
+"\t\t// there\'s at least one clock between cycles when i_ce is high,\n"
+"\t\t// and then use two multiplies instead of three.  Setting CKPCE\n"
+"\t\t// to 2\'b11, and insisting on at least two clocks with i_ce low\n"
+"\t\t// between cycles with i_ce high, then the hardware optimized\n"
+"\t\t// butterfly code will used one multiply instead of two.\n"
+"\t\tparameter\tCKPCE = %d,\n", ckpce);
 
 	fprintf(fstage,
-"\t// The COEFFILE parameter contains the name of the file containing the\n"
-"\t// FFT twiddle factors\n");
+"\t\t// The COEFFILE parameter contains the name of the file\n"
+"\t\t// containing the FFT twiddle factors\n");
 	if (nwide == 2) {
-		fprintf(fstage, "\tparameter\tCOEFFILE=\"cmem_%c%d.hex\";\n",
+		fprintf(fstage, "\t\tparameter\tCOEFFILE=\"cmem_%c%d.hex\",\n",
 			(offset)?'o':'e', stage*2);
 	} else
-		fprintf(fstage, "\tparameter\tCOEFFILE=\"cmem_%d.hex\";\n",
+		fprintf(fstage,
+			"\t\tparameter\tCOEFFILE=\"cmem_%d.hex\",\n",
 			stage);
+	fprintf(fstage, "\t\t// Verilator lint_on  UNUSED\n");
 
 	fprintf(fstage,"\n"
 "`ifdef	VERILATOR\n"
-	"\tparameter [0:0] ZERO_ON_IDLE = 1'b0;\n"
+	"\t\tparameter  [0:0]\tZERO_ON_IDLE = 1'b0\n"
 "`else\n"
-	"\tlocalparam [0:0] ZERO_ON_IDLE = 1'b0;\n"
-"`endif // VERILATOR\n\n");
+	"\t\tlocalparam [0:0]\tZERO_ON_IDLE = 1'b0\n"
+"`endif // VERILATOR\n"
+	"\t\t// }}}\n\t) (\n\t\t// {{{\n");
 
 	fprintf(fstage,
-"\tinput	wire				i_clk, %s, i_ce, i_sync;\n"
-"\tinput	wire	[(2*IWIDTH-1):0]	i_data;\n"
-"\toutput	reg	[(2*OWIDTH-1):0]	o_data;\n"
-"\toutput	reg				o_sync;\n"
-"\n", resetw.c_str());
-	if (dbg) { fprintf(fstage, "\toutput\twire\t[33:0]\t\t\to_dbg;\n"
-		"\tassign\to_dbg = { ((o_sync)&&(i_ce)), i_ce, o_data[(2*OWIDTH-1):(2*OWIDTH-16)],\n"
-			"\t\t\t\t\to_data[(OWIDTH-1):(OWIDTH-16)] };\n"
-"\n");
+	"\t\tinput\twire\t			i_clk, %s,\n"
+			"\t\t\t\t\t\t\ti_ce, i_sync,\n"
+	"\t\tinput\twire\t[(2*IWIDTH-1):0]	i_data,\n"
+	"\t\toutput\treg\t[(2*OWIDTH-1):0]	o_data,\n"
+	"\t\toutput\treg\t			o_sync%s\n"
+"\n", resetw.c_str(), (dbg) ? ",":"");
+	if (dbg) { fprintf(fstage, "\t\toutput\twire\t[33:0]\t\t\to_dbg\n");
 	}
+	fprintf(fstage, "\t\t// }}}\n\t);\n\n");
+
 	fprintf(fstage,
+	"\t// Local signal definitions\n"
+	"\t// {{{\n"
 	"\t// I am using the prefixes\n"
 	"\t// 	ib_*	to reference the inputs to the butterfly, and\n"
 	"\t// 	ob_*	to reference the outputs from the butterfly\n"
@@ -427,10 +450,19 @@ SLASHLINE
 	"\treg\t[LGSPAN:0]		oaddr;\n"
 	"\treg\t[(2*OWIDTH-1):0]	omem	[0:((1<<LGSPAN)-1)];\n"
 "\n"
-	"\treg\t\t\t\tidle;\n"
+	"\twire\t\t\t\tidle;\n"
 	"\treg	[(LGSPAN-1):0]\t\tnxt_oaddr;\n"
 	"\treg	[(2*OWIDTH-1):0]\tpre_ovalue;\n"
-"\n"
+	"\t// }}}\n"
+"\n");
+	if (dbg) fprintf(fstage, 
+	"\tassign\to_dbg = { ((o_sync)&&(i_ce)), i_ce, o_data[(2*OWIDTH-1):(2*OWIDTH-16)],\n"
+			"\t\t\t\t\to_data[(OWIDTH-1):(OWIDTH-16)] };\n"
+"\n");
+
+	fprintf(fstage, 
+	"\t// wait_for_sync, iaddr\n"
+	"\t// {{{\n"
 	"\tinitial wait_for_sync = 1\'b1;\n"
 	"\tinitial iaddr = 0;\n");
 	if (async_reset)
@@ -450,13 +482,19 @@ SLASHLINE
 		"\t\tiaddr <= iaddr + { {(LGSPAN){1\'b0}}, 1\'b1 };\n"
 		"\t\twait_for_sync <= 1\'b0;\n"
 	"\tend\n"
+	"\t// }}}\n"
+"\n"
+	"\t// Write to imem\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk) // Need to make certain here that we don\'t read\n"
 	"\tif ((i_ce)&&(!iaddr[LGSPAN])) // and write the same address on\n"
 		"\t\timem[iaddr[(LGSPAN-1):0]] <= i_data; // the same clk\n"
+	"\t// }}}\n"
 	"\n");
 
 	fprintf(fstage,
-	"\t//\n"
+	"\t// ib_sync\n"
+	"\t// {{{\n"
 	"\t// Now, we have all the inputs, so let\'s feed the butterfly\n"
 	"\t//\n"
 	"\t// ib_sync is the synchronization bit to the butterfly.  It will\n"
@@ -475,7 +513,9 @@ SLASHLINE
 			"\t\t// valid input in, and hence on the very\n"
 			"\t\t// first valid data out per FFT.\n"
 			"\t\tib_sync <= (iaddr==(1<<(LGSPAN)));\n"
-		"\tend\n\n"
+		"\tend\n\t// }}}\n\n"
+	"\t// ib_a, ib_b, ib_c\n"
+	"\t// {{{\n"
 	"\t// Read the values from our input memory, and use them to feed\n"
 	"\t// first of two butterfly inputs\n"
 	"\talways\t@(posedge i_clk)\n"
@@ -487,9 +527,11 @@ SLASHLINE
 		"\t\tib_b <= i_data;\n"
 		"\t\t// and the coefficient or twiddle factor\n"
 		"\t\tib_c <= cmem[iaddr[(LGSPAN-1):0]];\n"
-	"\tend\n\n");
+	"\tend\n\t// }}}\n\n");
 
 	fprintf(fstage,
+	"\t// idle\n"
+	"\t// {{{\n"
 	"\t// The idle register is designed to keep track of when an input\n"
 	"\t// to the butterfly is important and going to be used.  It's used\n"
 	"\t// in a flag following, so that when useful values are placed\n"
@@ -501,16 +543,40 @@ SLASHLINE
 	"\t// In this limited environment, the non-zero answers will stand\n"
 	"\t// in a trace making it easier to highlight a bug.\n"
 	"\tgenerate if (ZERO_ON_IDLE)\n"
-	"\tbegin\n"
-		"\t\tinitial	idle = 1;\n"
+	"\tbegin : GEN_ZERO_ON_IDLE\n");
+
+		fprintf(fstage,
+		"\t\treg	r_idle;\n\n"
+		"\t\tinitial	r_idle = 1;\n");
+		if (async_reset)
+			fprintf(fstage,
+		"\t\talways @(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+		else
+			fprintf(fstage,
 		"\t\talways @(posedge i_clk)\n"
-		"\t\tif (i_reset)\n"
-			"\t\t\tidle <= 1\'b1;\n"
+		"\t\tif (i_reset)\n");
+
+		fprintf(fstage,
+			"\t\t\tr_idle <= 1\'b1;\n"
 		"\t\telse if (i_ce)\n"
-			"\t\t\tidle <= (!iaddr[LGSPAN])&&(!wait_for_sync);\n\n"
-	"\tend else begin\n\n"
-	"\t\talways @(*) idle = 0;\n\n"
-	"\tend endgenerate\n\n");
+			"\t\t\tr_idle <= (!iaddr[LGSPAN])&&(!wait_for_sync);\n\n"
+		"\t\tassign\tidle = r_idle;\n\n");
+
+	fprintf(fstage,
+	"\tend else begin : NO_IDLE_GENERATION\n\n"
+	"\t\tassign\tidle = 0;\n\n"
+	"\tend endgenerate\n"
+	"\t// }}}\n\n");
+
+	fprintf(fstage,
+	"\t////////////////////////////////////////////////////////////////////////\n"
+	"\t//\n"
+	"\t// Instantiate the butterfly\n"
+	"\t// {{{\n"
+	"\t////////////////////////////////////////////////////////////////////////\n"
+	"\t//\n"
+	"\t//\n");
 
 	if (formal_property_flag)
 		fprintf(fstage,
@@ -525,34 +591,82 @@ SLASHLINE
 "\tgenerate if (OPT_HWMPY)\n"
 "\tbegin : HWBFLY\n"
 "\n"
-"\t\thwbfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
-			"\t\t\t\t.CKPCE(CKPCE), .SHIFT(BFLYSHIFT))\n"
-		"\t\t\tbfly(i_clk, %s, i_ce,\n"
-			"\t\t\t\t(idle && !i_ce) ? 0:ib_c,\n"
-			"\t\t\t\t(idle && !i_ce) ? 0:ib_a,\n"
-			"\t\t\t\t(idle && !i_ce) ? 0:ib_b,\n"
-			"\t\t\t\t(ib_sync && i_ce),\n"
-			"\t\t\t\tob_a, ob_b, ob_sync);\n"
+	"\t\thwbfly #(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.IWIDTH(IWIDTH),\n"
+		"\t\t\t.CWIDTH(CWIDTH),\n"
+		"\t\t\t.OWIDTH(OWIDTH),\n"
+		"\t\t\t.CKPCE(CKPCE),\n"
+		"\t\t\t.SHIFT(BFLYSHIFT)\n"
+		"\t\t\t// }}}\n"
+	"\t\t) bfly(\n"
+		"\t\t\t// {{{\n");
+		if (async_reset)
+			fprintf(fstage,
+		"\t\t\t.i_clk(i_clk), .i_areset_n(i_areset_n), .i_ce(i_ce),\n");
+		else
+			fprintf(fstage,
+		"\t\t\t.i_clk(i_clk), .i_reset(i_reset), .i_ce(i_ce),\n");
+
+		fprintf(fstage,
+		"\t\t\t.i_coef((idle && !i_ce) ? 0:ib_c),\n"
+		"\t\t\t.i_left((idle && !i_ce) ? 0:ib_a),\n"
+		"\t\t\t.i_right((idle && !i_ce) ? 0:ib_b),\n"
+		"\t\t\t.i_aux(ib_sync && i_ce),\n"
+		"\t\t\t.o_left(ob_a), .o_right(ob_b), .o_aux(ob_sync)\n"
+		"\t\t\t// }}}\n"
+	"\t\t);\n"
 "\n"
 "\tend else begin : FWBFLY\n"
 "\n"
-"\t\tbutterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),\n"
-		"\t\t\t\t.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))\n"
-	"\t\t\tbfly(i_clk, %s, i_ce,\n"
-			"\t\t\t\t(idle && !i_ce)?0:ib_c,\n"
-			"\t\t\t\t(idle && !i_ce)?0:ib_a,\n"
-			"\t\t\t\t(idle && !i_ce)?0:ib_b,\n"
-			"\t\t\t\t(ib_sync && i_ce),\n"
-			"\t\t\t\tob_a, ob_b, ob_sync);\n"
-"\n"
-"\tend endgenerate\n",
-			resetw.c_str(), resetw.c_str());
+	"\t\tbutterfly #(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.IWIDTH(IWIDTH),\n"
+		"\t\t\t.CWIDTH(CWIDTH),\n"
+		"\t\t\t.OWIDTH(OWIDTH),\n"
+		"\t\t\t.CKPCE(CKPCE),\n"
+		"\t\t\t.SHIFT(BFLYSHIFT)\n"
+		"\t\t\t// }}}\n"
+	"\t\t) bfly(\n"
+		"\t\t\t// {{{\n");
 
-	if (formal_property_flag)
+		if (async_reset)
+			fprintf(fstage,
+		"\t\t\t.i_clk(i_clk), .i_areset_n(i_areset_n), .i_ce(i_ce),\n");
+		else
+			fprintf(fstage,
+		"\t\t\t.i_clk(i_clk), .i_reset(i_reset), .i_ce(i_ce),\n");
+
+		fprintf(fstage,
+		"\t\t\t.i_coef( (idle && !i_ce)?0:ib_c),\n"
+		"\t\t\t.i_left( (idle && !i_ce)?0:ib_a),\n"
+		"\t\t\t.i_right((idle && !i_ce)?0:ib_b),\n"
+		"\t\t\t.i_aux(ib_sync && i_ce),\n"
+		"\t\t\t.o_left(ob_a), .o_right(ob_b), .o_aux(ob_sync)\n"
+		"\t\t\t// }}}\n"
+	"\t\t);\n"
+"\n"
+"\tend endgenerate\n");
+
+	if (formal_property_flag) {
+		fprintf(fstage, "`else\n"
+"\n"
+	"\t// Verilator lint_off UNDRIVEN\n"
+	"\t(* anyseq *)    wire    [(2*OWIDTH-1):0]        f_ob_a, f_ob_b;\n"
+	"\t(* anyseq *)    wire    f_ob_sync;\n"
+	"\t// Verilator lint_on  UNDRIVEN\n"
+"\n"
+	"\tassign  ob_sync = f_ob_sync;\n"
+	"\tassign  ob_a    = f_ob_a;\n"
+	"\tassign  ob_b    = f_ob_b;\n\n");
+
 		fprintf(fstage, "`endif\n\n");
+	}
+	fprintf(fstage, "\t// }}}\n\n");
 
 	fprintf(fstage,
-	"\t//\n"
+	"\t// oaddr, o_sync, b_started\n"
+	"\t// {{{\n"
 	"\t// Next step: recover the outputs from the butterfly\n"
 	"\t//\n"
 	"\t// The first output can go immediately to the output of this routine\n"
@@ -581,8 +695,11 @@ SLASHLINE
 		"\t\t\t// If b_started is true, then a butterfly output\n"
 		"\t\t\t// is available\n"
 		"\t\t\tb_started <= 1\'b1;\n"
-	"\tend\n\n");
+	"\tend\n\t// }}}\n\n");
+
 	fprintf(fstage,
+	"\t// nxt_oaddr\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 		"\t\tnxt_oaddr[0] <= oaddr[0];\n"
@@ -594,34 +711,65 @@ SLASHLINE
 		"\t\t\tnxt_oaddr[LGSPAN-1:1] <= oaddr[LGSPAN-1:1] + 1\'b1;\n"
 "\n"
 	"\tend endgenerate\n"
+	"\t// }}}\n"
 "\n"
+	"\t// omem\n"
+	"\t// {{{\n"
 	"\t// Only write to the memory on the first half of the outputs\n"
 	"\t// We'll use the memory value on the second half of the outputs\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif ((i_ce)&&(!oaddr[LGSPAN]))\n"
-		"\t\tomem[oaddr[(LGSPAN-1):0]] <= ob_b;\n\n");
+		"\t\tomem[oaddr[(LGSPAN-1):0]] <= ob_b;\n\t// }}}\n\n");
 
 	fprintf(fstage,
+	"\t// pre_ovalue\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 		"\t\tpre_ovalue <= omem[nxt_oaddr[(LGSPAN-1):0]];\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fstage,
+	"\t// o_data\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 	"\t\to_data <= (!oaddr[LGSPAN]) ? ob_a : pre_ovalue;\n"
+	"\t// }}}\n"
 "\n");
 
 	fprintf(fstage,
+"////////////////////////////////////////////////////////////////////////////////\n"
+"////////////////////////////////////////////////////////////////////////////////\n"
+"////////////////////////////////////////////////////////////////////////////////\n"
+"//\n"
+"// Formal properties\n"
+"// {{{\n"
+"////////////////////////////////////////////////////////////////////////////////\n"
+"////////////////////////////////////////////////////////////////////////////////\n"
+"////////////////////////////////////////////////////////////////////////////////\n"
 "`ifdef	FORMAL\n");
 
 
 	if (formal_property_flag) {
 
 	fprintf(fstage,
+	"\t// Local (formal) declarations\n"
+	"\t// {{{\n"
 	"\t// An arbitrary processing delay from butterfly input to\n"
 	"\t// butterfly output(s)\n"
+	"\t// Verilator lint_off UNDRIVEN\n"
 	"\t(* anyconst *) reg	[LGSPAN:0]	f_mpydelay;\n"
+	"\t(* anyconst *)	reg	[LGSPAN:0]	f_addr;\n"
+	"\t// Verilator lint_on  UNDRIVEN\n"
+	"\treg	[2*IWIDTH-1:0]			f_left, f_right;\n"
+	"\treg	[2*OWIDTH-1:0]	f_oleft, f_oright;\n"
+	"\treg	[LGSPAN:0]	f_oaddr;\n"
+	"\twire	[LGSPAN:0]	f_oaddr_m1 = f_oaddr - 1'b1;\n"
+	"\treg	f_output_active;\n"
+	"\t// }}}\n"
+"\n"
+"\n"
 	"\talways @(*)\n"
 	"\t\tassume(f_mpydelay > 1);\n"
 "\n"
@@ -647,17 +795,14 @@ SLASHLINE
 	"\tend\n\n");
 
 	fprintf(fstage,
-	"\t/////////////////////////////////////////\n"
+	"\t////////////////////////////////////////////////////////////////////////\n"
 	"\t//\n"
 	"\t// Formally verify the input half, from the inputs to this module\n"
 	"\t// to the inputs of the butterfly\n"
 	"\t//\n"
-	"\t/////////////////////////////////////////\n"
-	"\t//\n"
+	"\t////////////////////////////////////////////////////////////////////////\n"
+	"\t//\n\t//\n\n"
 	"\t// Let's  verify a specific set of inputs\n"
-	"\t(* anyconst *)	reg	[LGSPAN:0]	f_addr;\n"
-	"\treg	[2*IWIDTH-1:0]			f_left, f_right;\n"
-	"\twire	[LGSPAN:0]			f_next_addr;\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (!$past(i_ce) && !$past(i_ce,2) && !$past(i_ce,3) && !$past(i_ce,4))\n"
@@ -665,8 +810,6 @@ SLASHLINE
 "\n"
 	"\talways @(*)\n"
 		"\t\tassume(f_addr[LGSPAN]==1'b0);\n"
-"\n"
-	"\tassign\tf_next_addr = f_addr + 1'b1;\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif ((i_ce)&&(iaddr[LGSPAN:0] == f_addr))\n"
@@ -696,15 +839,13 @@ SLASHLINE
 	"\tend\n\n");
 
 	fprintf(fstage,
-	"\t/////////////////////////////////////////\n"
+	"\t////////////////////////////////////////////////////////////////////////\n"
 	"\t//\n"
 	"\t// Formally verify the output half, from the output of the butterfly\n"
 	"\t// to the outputs of this module\n"
 	"\t//\n"
-	"\t/////////////////////////////////////////\n"
-	"\treg	[2*OWIDTH-1:0]	f_oleft, f_oright;\n"
-	"\treg	[LGSPAN:0]	f_oaddr;\n"
-	"\twire	[LGSPAN:0]	f_oaddr_m1 = f_oaddr - 1'b1;\n\n");
+	"\t////////////////////////////////////////////////////////////////////////\n"
+	"\t//\n\t//\n\n");
 
 	fprintf(fstage,
 	"\talways @(*)\n"
@@ -714,7 +855,6 @@ SLASHLINE
 "\n");
 
 	fprintf(fstage,
-	"\treg	f_output_active;\n"
 	"\tinitial\tf_output_active = 1'b0;\n");
 	if (async_reset)
 		fprintf(fstage, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
@@ -735,8 +875,9 @@ SLASHLINE
 	fprintf(fstage,
 	"\talways @(*)\n"
 	"\tif (f_output_active)\n"
+	"\tbegin\n"
 		"\t\tassert(oaddr == f_oaddr);\n"
-	"\telse\n"
+	"\tend else\n"
 		"\t\tassert(oaddr == 0);\n"
 "\n");
 
@@ -772,29 +913,43 @@ SLASHLINE
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif ((i_ce)&&(f_oaddr_m1 == 0)&&(f_output_active))\n"
+	"\tbegin\n"
 		"\t\tassert(o_sync);\n"
-	"\telse if ((i_ce)||(!f_output_active))\n"
+	"\tend else if ((i_ce)||(!f_output_active))\n"
 		"\t\tassert(!o_sync);\n"
 	"\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif ((i_ce)&&(f_output_active)&&(f_oaddr_m1 == f_addr))\n"
 		"\t\tassert(o_data == f_oleft);\n"
+"\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif ((i_ce)&&(f_output_active)&&(f_oaddr[LGSPAN])\n"
 			"\t\t\t&&(f_oaddr[LGSPAN-1:0] == f_addr[LGSPAN-1:0]))\n"
 		"\t\tassert(pre_ovalue == f_oright);\n"
+"\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif ((i_ce)&&(f_output_active)&&(f_oaddr_m1[LGSPAN])\n"
 			"\t\t\t&&(f_oaddr_m1[LGSPAN-1:0] == f_addr[LGSPAN-1:0]))\n"
 		"\t\tassert(o_data == f_oright);\n"
 "\n");
+
+	fprintf(fstage,
+	"\t// Make Verilator happy\n"
+	"\t// {{{\n"
+	"\t// Verilator lint_off UNUSED\n"
+	"\twire	unused_formal;\n"
+	"\tassign unused_formal = &{ 1\'b0, idle, ib_sync };\n"
+	"\t// Verilator lint_on  UNUSED\n"
+	"\t// }}}\n\n");
+
 	} else { // If no formal properties
 		fprintf(fstage, "// Formal properties exist, but are not enabled"
 				" in this build\n");
 	} // End of the formal properties section
 
 	fprintf(fstage,
-"`endif\n");
+"`endif // FORMAL\n"
+"// }}}\n");
 
 	fprintf(fstage, "endmodule\n");
 }

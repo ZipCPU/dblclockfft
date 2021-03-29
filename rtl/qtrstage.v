@@ -9,32 +9,6 @@
 //	so that all of the multiplies are accomplished by additions and
 //	multiplexers only.
 //
-// Operation:
-// 	The operation of this stage is identical to the regular stages of
-// 	the FFT (see them for details), with one additional and critical
-// 	difference: this stage doesn't require any hardware multiplication.
-// 	The multiplies within it may all be accomplished using additions and
-// 	subtractions.
-//
-// 	Let's see how this is done.  Given x[n] and x[n+2], cause thats the
-// 	stage we are working on, with i_sync true for x[0] being input,
-// 	produce the output:
-//
-// 	y[n  ] = x[n] + x[n+2]
-// 	y[n+2] = (x[n] - x[n+2]) * e^{-j2pi n/2}	(forward transform)
-// 	       = (x[n] - x[n+2]) * -j^n
-//
-// 	y[n].r = x[n].r + x[n+2].r	(This is the easy part)
-// 	y[n].i = x[n].i + x[n+2].i
-//
-// 	y[2].r = x[0].r - x[2].r
-// 	y[2].i = x[0].i - x[2].i
-//
-// 	y[3].r =   (x[1].i - x[3].i)		(forward transform)
-// 	y[3].i = - (x[1].r - x[3].r)
-//
-// 	y[3].r = - (x[1].i - x[3].i)		(inverse transform)
-// 	y[3].i =   (x[1].r - x[3].r)		(INVERSE = 1)
 //
 // Creator:	Dan Gisselquist, Ph.D.
 //		Gisselquist Technology, LLC
@@ -72,16 +46,19 @@
 //
 module	qtrstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	parameter	IWIDTH=16, OWIDTH=IWIDTH+1;
-	parameter	LGWIDTH=8, INVERSE=0,SHIFT=0;
+	// Parameters specific to the core that should be changed when this
+	// core is built ... Note that the minimum LGSPAN is 2.  Smaller
+	// spans must use the fftdoubles stage.
+	parameter	LGWIDTH=8, ODD=0, INVERSE=0,SHIFT=0;
 	input	wire				i_clk, i_reset, i_ce, i_sync;
 	input	wire	[(2*IWIDTH-1):0]	i_data;
 	output	reg	[(2*OWIDTH-1):0]	o_data;
 	output	reg				o_sync;
-	
-	reg		wait_for_sync;
-	reg	[2:0]	pipeline;
 
-	reg	signed [(IWIDTH):0]	sum_r, sum_i, diff_r, diff_i;
+	reg		wait_for_sync;
+	reg	[3:0]	pipeline;
+
+	reg	[(IWIDTH):0]	sum_r, sum_i, diff_r, diff_i;
 
 	reg	[(2*OWIDTH-1):0]	ob_a;
 	wire	[(2*OWIDTH-1):0]	ob_b;
@@ -89,34 +66,31 @@ module	qtrstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	assign	ob_b = { ob_b_r, ob_b_i };
 
 	reg	[(LGWIDTH-1):0]		iaddr;
-	reg	[(2*IWIDTH-1):0]	imem	[0:1];
+	reg	[(2*IWIDTH-1):0]	imem;
 
 	wire	signed	[(IWIDTH-1):0]	imem_r, imem_i;
-	assign	imem_r = imem[1][(2*IWIDTH-1):(IWIDTH)];
-	assign	imem_i = imem[1][(IWIDTH-1):0];
+	assign	imem_r = imem[(2*IWIDTH-1):(IWIDTH)];
+	assign	imem_i = imem[(IWIDTH-1):0];
 
 	wire	signed	[(IWIDTH-1):0]	i_data_r, i_data_i;
 	assign	i_data_r = i_data[(2*IWIDTH-1):(IWIDTH)];
 	assign	i_data_i = i_data[(IWIDTH-1):0];
 
-	reg	[(2*OWIDTH-1):0]	omem [0:1];
+	reg	[(2*OWIDTH-1):0]	omem;
 
-	//
-	// Round our output values down to OWIDTH bits
-	//
-	wire	signed	[(OWIDTH-1):0]	rnd_sum_r, rnd_sum_i,
-			rnd_diff_r, rnd_diff_i, n_rnd_diff_r, n_rnd_diff_i;
-	convround #(IWIDTH+1,OWIDTH,SHIFT)	do_rnd_sum_r(i_clk, i_ce,
-				sum_r, rnd_sum_r);
+	wire	signed	[(OWIDTH-1):0]	rnd_sum_r, rnd_sum_i, rnd_diff_r, rnd_diff_i,
+					n_rnd_diff_r, n_rnd_diff_i;
+	convround #(IWIDTH+1,OWIDTH,SHIFT)
+	do_rnd_sum_r(i_clk, i_ce, sum_r, rnd_sum_r);
 
-	convround #(IWIDTH+1,OWIDTH,SHIFT)	do_rnd_sum_i(i_clk, i_ce,
-				sum_i, rnd_sum_i);
+	convround #(IWIDTH+1,OWIDTH,SHIFT)
+	do_rnd_sum_i(i_clk, i_ce, sum_i, rnd_sum_i);
 
-	convround #(IWIDTH+1,OWIDTH,SHIFT)	do_rnd_diff_r(i_clk, i_ce,
-				diff_r, rnd_diff_r);
+	convround #(IWIDTH+1,OWIDTH,SHIFT)
+	do_rnd_diff_r(i_clk, i_ce, diff_r, rnd_diff_r);
 
-	convround #(IWIDTH+1,OWIDTH,SHIFT)	do_rnd_diff_i(i_clk, i_ce,
-				diff_i, rnd_diff_i);
+	convround #(IWIDTH+1,OWIDTH,SHIFT)
+	do_rnd_diff_i(i_clk, i_ce, diff_i, rnd_diff_i);
 
 	assign n_rnd_diff_r = - rnd_diff_r;
 	assign n_rnd_diff_i = - rnd_diff_i;
@@ -129,31 +103,28 @@ module	qtrstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		iaddr <= 0;
 	end else if ((i_ce)&&((!wait_for_sync)||(i_sync)))
 	begin
-		iaddr <= iaddr + 1'b1;
+		iaddr <= iaddr + { {(LGWIDTH-1){1'b0}}, 1'b1 };
 		wait_for_sync <= 1'b0;
 	end
 
 	always @(posedge i_clk)
 	if (i_ce)
-	begin
-		imem[0] <= i_data;
-		imem[1] <= imem[0];
-	end
+		imem <= i_data;
 
 
 	// Note that we don't check on wait_for_sync or i_sync here.
 	// Why not?  Because iaddr will always be zero until after the
 	// first i_ce, so we are safe.
-	initial pipeline = 3'h0;
+	initial pipeline = 4'h0;
 	always	@(posedge i_clk)
 	if (i_reset)
-		pipeline <= 3'h0;
+		pipeline <= 4'h0;
 	else if (i_ce) // is our pipeline process full?  Which stages?
-		pipeline <= { pipeline[1:0], iaddr[1] };
+		pipeline <= { pipeline[2:0], iaddr[0] };
 
 	// This is the pipeline[-1] stage, pipeline[0] will be set next.
 	always	@(posedge i_clk)
-	if ((i_ce)&&(iaddr[1]))
+	if ((i_ce)&&(iaddr[0]))
 	begin
 		sum_r  <= imem_r + i_data_r;
 		sum_i  <= imem_i + i_data_i;
@@ -172,7 +143,7 @@ module	qtrstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	begin
 		ob_a <= { rnd_sum_r, rnd_sum_i };
 		// on Even, W = e^{-j2pi 1/4 0} = 1
-		if (!iaddr[0])
+		if (ODD == 0)
 		begin
 			ob_b_r <= rnd_diff_r;
 			ob_b_i <= rnd_diff_i;
@@ -190,172 +161,60 @@ module	qtrstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	always	@(posedge i_clk)
 	if (i_ce)
 	begin // In sequence, clock = 3
-		omem[0] <= ob_b;
-		omem[1] <= omem[0];
-		if (pipeline[2])
-			o_data <= ob_a;
-		else
-			o_data <= omem[1];
-	end
-
-	initial	o_sync = 1'b0;
-	always	@(posedge i_clk)
-	if (i_reset)
-		o_sync <= 1'b0;
-	else if (i_ce)
-		o_sync <= (iaddr[2:0] == 3'b101);
-
-`ifdef	FORMAL
-	reg	f_past_valid;
-	initial	f_past_valid = 1'b0;
-	always @(posedge i_clk)
-		f_past_valid = 1'b1;
-
-`ifdef	QTRSTAGE
-	always @(posedge i_clk)
-		assume((i_ce)||($past(i_ce))||($past(i_ce,2)));
-`endif
-
-	// The below logic only works if the rounding stage does nothing
-	initial	assert(IWIDTH+1 == OWIDTH);
-
-	reg	signed [IWIDTH-1:0]	f_piped_real	[0:7];
-	reg	signed [IWIDTH-1:0]	f_piped_imag	[0:7];
-
-	always @(posedge i_clk)
-	if (i_ce)
-	begin
-		f_piped_real[0] <= i_data[2*IWIDTH-1:IWIDTH];
-		f_piped_imag[0] <= i_data[  IWIDTH-1:0];
-
-		f_piped_real[1] <= f_piped_real[0];
-		f_piped_imag[1] <= f_piped_imag[0];
-
-		f_piped_real[2] <= f_piped_real[1];
-		f_piped_imag[2] <= f_piped_imag[1];
-
-		f_piped_real[3] <= f_piped_real[2];
-		f_piped_imag[3] <= f_piped_imag[2];
-
-		f_piped_real[4] <= f_piped_real[3];
-		f_piped_imag[4] <= f_piped_imag[3];
-
-		f_piped_real[5] <= f_piped_real[4];
-		f_piped_imag[5] <= f_piped_imag[4];
-
-		f_piped_real[6] <= f_piped_real[5];
-		f_piped_imag[6] <= f_piped_imag[5];
-
-		f_piped_real[7] <= f_piped_real[6];
-		f_piped_imag[7] <= f_piped_imag[6];
-	end
-
-	reg	f_rsyncd;
-	wire	f_syncd;
-
-	initial	f_rsyncd = 0;
-	always @(posedge i_clk)
-	if(i_reset)
-		f_rsyncd <= 1'b0;
-	else if (!f_rsyncd)
-		f_rsyncd <= (o_sync);
-	assign	f_syncd = (f_rsyncd)||(o_sync);
-
-	reg	[1:0]	f_state;
-
-
-	initial	f_state = 0;
-	always @(posedge i_clk)
-	if (i_reset)
-		f_state <= 0;
-	else if ((i_ce)&&((!wait_for_sync)||(i_sync)))
-		f_state <= f_state + 1;
-
-	always @(*)
-	if (f_state != 0)
-		assume(!i_sync);
-
-	always @(posedge i_clk)
-		assert(f_state[1:0] == iaddr[1:0]);
-
-	wire	signed [2*IWIDTH-1:0]	f_i_real, f_i_imag;
-	assign			f_i_real = i_data[2*IWIDTH-1:IWIDTH];
-	assign			f_i_imag = i_data[  IWIDTH-1:0];
-
-	wire	signed [OWIDTH-1:0]	f_o_real, f_o_imag;
-	assign			f_o_real = o_data[2*OWIDTH-1:OWIDTH];
-	assign			f_o_imag = o_data[  OWIDTH-1:0];
-
-	always @(posedge i_clk)
-	if (f_state == 2'b11)
-	begin
-		assume(f_piped_real[0] != 3'sb100);
-		assume(f_piped_real[2] != 3'sb100);
-		assert(sum_r  == f_piped_real[2] + f_piped_real[0]);
-		assert(sum_i  == f_piped_imag[2] + f_piped_imag[0]);
-
-		assert(diff_r == f_piped_real[2] - f_piped_real[0]);
-		assert(diff_i == f_piped_imag[2] - f_piped_imag[0]);
-	end
-
-	always @(posedge i_clk)
-	if ((f_state == 2'b00)&&((f_syncd)||(iaddr >= 4)))
-	begin
-		assert(rnd_sum_r  == f_piped_real[3]+f_piped_real[1]);
-		assert(rnd_sum_i  == f_piped_imag[3]+f_piped_imag[1]);
-		assert(rnd_diff_r == f_piped_real[3]-f_piped_real[1]);
-		assert(rnd_diff_i == f_piped_imag[3]-f_piped_imag[1]);
-	end
-
-	always @(posedge i_clk)
-	if ((f_state == 2'b10)&&(f_syncd))
-	begin
-		// assert(o_sync);
-		assert(f_o_real == f_piped_real[5] + f_piped_real[3]);
-		assert(f_o_imag == f_piped_imag[5] + f_piped_imag[3]);
-	end
-
-	always @(posedge i_clk)
-	if ((f_state == 2'b11)&&(f_syncd))
-	begin
-		assert(!o_sync);
-		assert(f_o_real == f_piped_real[5] + f_piped_real[3]);
-		assert(f_o_imag == f_piped_imag[5] + f_piped_imag[3]);
-	end
-
-	always @(posedge i_clk)
-	if ((f_state == 2'b00)&&(f_syncd))
-	begin
-		assert(!o_sync);
-		assert(f_o_real == f_piped_real[7] - f_piped_real[5]);
-		assert(f_o_imag == f_piped_imag[7] - f_piped_imag[5]);
-	end
-
-	always @(*)
-	if ((iaddr[2:0] == 0)&&(!wait_for_sync))
-		assume(i_sync);
-
-	always @(*)
-	if (wait_for_sync)
-		assert((iaddr == 0)&&(f_state == 2'b00)&&(!o_sync)&&(!f_rsyncd));
-
-	always @(posedge i_clk)
-	if ((f_past_valid)&&($past(i_ce))&&($past(i_sync))&&(!$past(i_reset)))
-		assert(!wait_for_sync);
-
-	always @(posedge i_clk)
-	if ((f_state == 2'b01)&&(f_syncd))
-	begin
-		assert(!o_sync);
-		if (INVERSE)
+		if (pipeline[3])
 		begin
-			assert(f_o_real == -f_piped_imag[7]+f_piped_imag[5]);
-			assert(f_o_imag ==  f_piped_real[7]-f_piped_real[5]);
-		end else begin
-			assert(f_o_real ==  f_piped_imag[7]-f_piped_imag[5]);
-			assert(f_o_imag == -f_piped_real[7]+f_piped_real[5]);
-		end
+			omem <= ob_b;
+			o_data <= ob_a;
+		end else
+			o_data <= omem;
 	end
 
-`endif
+	// This algorithm takes five clocks to complete, therefore we can
+	// set o_sync any time the address counter iaddr == 5.
+	//
+	// Don't forget in the sync check that we are running at two
+	// clocks per sample.  Thus we need to produce a sync every
+	// 2^(LGWIDTH-1) clocks.
+	//
+	initial	o_sync = 1'b0;
+	generate if (LGWIDTH == 3)
+	begin
+
+		reg	o_sync_passed;
+
+		initial	o_sync_passed = 1'b0;
+		always	@(posedge i_clk)
+		if (i_reset)
+			o_sync_passed <= 1'b0;
+		else if (i_ce && o_sync)
+			o_sync_passed <= 1'b1;
+
+		always	@(posedge i_clk)
+		if (i_reset)
+			o_sync <= 1'b0;
+		else if (i_ce && (o_sync_passed || iaddr[2]))
+			o_sync <= (iaddr[1:0] == 2'b01);
+
+	end else if (LGWIDTH == 4)
+	begin
+
+		always	@(posedge i_clk)
+		if (i_reset)
+			o_sync <= 1'b0;
+		else if (i_ce)
+			o_sync <= (iaddr[2:0] == 3'b101);
+
+	end else begin
+
+		always	@(posedge i_clk)
+		if (i_reset)
+			o_sync <= 1'b0;
+		else if (i_ce)
+			// As currently formulated, this line requires a
+			// transform of 32 points or greater.  Notice
+			// that the top bit is ignored, on purpose.
+			o_sync <= (iaddr[(LGWIDTH-2):3] == 0) && (iaddr[2:0] == 3'b101);
+
+	end endgenerate
+
 endmodule

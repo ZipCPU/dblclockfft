@@ -399,7 +399,7 @@ SLASHLINE
 "\t\tend\n"
 "\n"
 "\tend else // If there's more than one bit we are dropping\n"
-"\tbegin : ROUND_RESULT \n"
+"\tbegin : ROUND_RESULT\n"
 "\t\twire\t[(OWID-1):0]	truncated_value, rounded_up;\n"
 "\t\twire\t\t\tlast_valid_bit, first_lost_bit;\n\n"
 "\t\tassign\ttruncated_value=i_val[(IWID-1-SHIFT):(IWID-SHIFT-OWID)];\n"

@@ -57,7 +57,9 @@ module	abs_mpy #(
 		// }}}
 	);
 
+	// Verilator lint_off UNDRIVEN
 	(* anyseq *)	wire	[(AW+BW-1):0]	any_result;
+	// Verilator lint_on  UNDRIVEN
 
 	reg	[AW-1:0]	u_a;
 	reg	[BW-1:0]	u_b;
@@ -79,8 +81,9 @@ module	abs_mpy #(
 	begin
 		// Constrain our result among many possibilities
 		if ((i_a == 0)||(i_b == 0))
+		begin
 			assume(any_result == 0);
-		else if (OPT_SIGNED)
+		end else if (OPT_SIGNED)
 			assume(any_result[AW+BW-1]
 				== (i_a[AW-1] ^ i_b[BW-1]));
 

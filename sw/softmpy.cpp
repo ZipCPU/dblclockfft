@@ -205,28 +205,40 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	bimpy(i_clk, i_reset, i_ce, i_a, i_b, o_r);\n"
-"\tparameter\tBW=18; // Number of bits in i_b\n"
-"\tlocalparam\tLUTB=2; // Number of bits in i_a for our LUT multiply\n"
-"\tinput\twire\t\t\ti_clk, i_reset, i_ce;\n"
-"\tinput\twire\t[(LUTB-1):0]\ti_a;\n"
-"\tinput\twire\t[(BW-1):0]\ti_b;\n"
-"\toutput\treg\t[(BW+LUTB-1):0]	o_r;\n"
+"module	bimpy #(\n" // (i_clk, i_reset, i_ce, i_a, i_b, o_r);\n"
+		"\t\t// {{{\n"
+		"\t\tparameter\tBW=18, // Number of bits in i_b\n"
+		"\t\tlocalparam\tLUTB=2 // Number of bits in i_a for our LUT multiply\n"
+		"\t\t// }}}\n"
+	"\t) (\n"
+		"\t\t// {{{\n"
+		"\t\tinput\twire\t\t\ti_clk, i_reset, i_ce,\n"
+		"\t\tinput\twire\t[(LUTB-1):0]\ti_a,\n"
+		"\t\tinput\twire\t[(BW-1):0]\ti_b,\n"
+		"\t\toutput\treg\t[(BW+LUTB-1):0]	o_r\n"
+		"\t\t// }}}\n"
+	"\t);\n"
 "\n"
+"\t// Local declarations\n"
+"\t// {{{\n"
 "\twire	[(BW+LUTB-2):0]	w_r;\n"
 "\twire	[(BW+LUTB-3):1]	c;\n"
+"\t// }}}\n"
 "\n"
 "\tassign\tw_r =  { ((i_a[1])?i_b:{(BW){1\'b0}}), 1\'b0 }\n"
 "\t\t\t\t^ { 1\'b0, ((i_a[0])?i_b:{(BW){1\'b0}}) };\n"
 "\tassign\tc = { ((i_a[1])?i_b[(BW-2):0]:{(BW-1){1\'b0}}) }\n"
 "\t\t\t& ((i_a[0])?i_b[(BW-1):1]:{(BW-1){1\'b0}});\n"
 "\n"
+"\t// o_r\n"
+"\t// {{{\n"
 "\tinitial o_r = 0;\n"
 "\talways @(posedge i_clk)\n"
 "\tif (i_reset)\n"
 "\t\to_r <= 0;\n"
 "\telse if (i_ce)\n"
 "\t\to_r <= w_r + { c, 2'b0 };\n"
+"\t// }}}\n"
 "\n");
 
 	// Formal properties
@@ -235,6 +247,15 @@ SLASHLINE
 	// Hence, we'll use an ifdef LONGBIMPY to capture if it is being
 	// verified as part of LONGBIMPY, or placed within another module.
 	fprintf(fp,
+SLASHLINE
+SLASHLINE
+SLASHLINE
+"//\n"
+"// Formal property section\n"
+"// {{{\n"
+SLASHLINE
+SLASHLINE
+SLASHLINE
 "`ifdef	FORMAL\n");
 
 	if (formal_property_flag) {
@@ -253,17 +274,20 @@ SLASHLINE
 	fprintf(fp,
 	"\talways @(posedge i_clk)\n"
 	"\tif ((!f_past_valid)||($past(i_reset)))\n"
+	"\tbegin\n"
 		"\t\t`ASSERT(o_r == 0);\n"
-	"\telse if ($past(i_ce))\n"
+	"\tend else if ($past(i_ce))\n"
 	"\tbegin\n"
 		"\t\tif ($past(i_a)==0)\n"
+		"\t\tbegin\n"
 			"\t\t\t`ASSERT(o_r == 0);\n"
-		"\t\telse if ($past(i_a) == 1)\n"
+		"\t\tend else if ($past(i_a) == 1)\n"
 			"\t\t\t`ASSERT(o_r == $past(i_b));\n"
 		"\n"
 		"\t\tif ($past(i_b)==0)\n"
+		"\t\tbegin\n"
 			"\t\t\t`ASSERT(o_r == 0);\n"
-		"\t\telse if ($past(i_b) == 1)\n"
+		"\t\tend else if ($past(i_b) == 1)\n"
 			"\t\t\t`ASSERT(o_r[(LUTB-1):0] == $past(i_a));\n"
 	"\tend\n");
 
@@ -275,6 +299,7 @@ SLASHLINE
 "`endif\n");
 	// And then the end of the module
 	fprintf(fp,
+"// }}}\n"
 "endmodule\n");
 
 	fclose(fp);
@@ -314,46 +339,45 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r\n");
+"module	longbimpy #(\n");
 
-	if (formal_property_flag) fprintf(fp,
-"`ifdef	FORMAL\n"
-	"\t, f_past_a_unsorted, f_past_b_unsorted\n"
-"`endif\n\t\t");
-
-	fprintf(fp, ");\n"
-	"\tparameter	IAW=%d,	// The width of i_a, min width is 5\n"
-			"\t\t\tIBW=", TST_LONGBIMPY_AW);
+	fprintf(fp, "\t\t// {{{\n"
+	"\t\tparameter	IAW=%d,	// The width of i_a, min width is 5\n"
+			"\t\t\t\tIBW=", TST_LONGBIMPY_AW);
 #ifdef	TST_LONGBIMPY_BW
 	fprintf(fp, "%d", TST_LONGBIMPY_BW);
 #else
 	fprintf(fp, "IAW");
 #endif
 
-	fprintf(fp, ";	// The width of i_b, can be anything\n"
+	fprintf(fp, ",	// The width of i_b, can be anything\n"
 			"\t\t\t// The following three parameters should not be changed\n"
 			"\t\t\t// by any implementation, but are based upon hardware\n"
 			"\t\t\t// and the above values:\n"
 			"\t\t\t// OW=IAW+IBW;	// The output width\n");
 	fprintf(fp,
-	"\tlocalparam	AW = (IAW<IBW) ? IAW : IBW,\n"
-			"\t\t\tBW = (IAW<IBW) ? IBW : IAW,\n"
-			"\t\t\tIW=(AW+1)&(-2),	// Internal width of A\n"
-			"\t\t\tLUTB=2,	// How many bits we can multiply by at once\n"
-			"\t\t\tTLEN=(AW+(LUTB-1))/LUTB; // Nmbr of rows in our tableau\n"
-	"\tinput\twire\t\t\ti_clk, i_ce;\n"
-	"\tinput\twire\t[(IAW-1):0]\ti_a_unsorted;\n"
-	"\tinput\twire\t[(IBW-1):0]\ti_b_unsorted;\n"
-	"\toutput\treg\t[(AW+BW-1):0]\to_r;\n"
+	"\t\tlocalparam	AW = (IAW<IBW) ? IAW : IBW,\n"
+			"\t\t\t\tBW = (IAW<IBW) ? IBW : IAW,\n"
+			"\t\t\t\tIW=(AW+1)&(-2),	// Internal width of A\n"
+			"\t\t\t\tLUTB=2,	// How many bits to mpy at once\n"
+			"\t\t\t\tTLEN=(AW+(LUTB-1))/LUTB // Rows in our tableau\n"
+	"\t\t// }}}\n"
+	"\t) (\n"
+	"\t\t// {{{\n"
+	"\t\tinput\twire\t\t\ti_clk, i_ce,\n"
+	"\t\tinput\twire\t[(IAW-1):0]\ti_a_unsorted,\n"
+	"\t\tinput\twire\t[(IBW-1):0]\ti_b_unsorted,\n"
+	"\t\toutput\treg\t[(AW+BW-1):0]\to_r\n"
 "\n");
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
-	"\toutput\twire\t[(IAW-1):0]\tf_past_a_unsorted;\n"
-	"\toutput\twire\t[(IBW-1):0]\tf_past_b_unsorted;\n"
+	"\t\t, output\twire\t[(IAW-1):0]\tf_past_a_unsorted,\n"
+	"\t\toutput\twire\t[(IBW-1):0]\tf_past_b_unsorted\n"
 "`endif\n");
 
-	fprintf(fp, "\n"
-	"\t//\n"
+	fprintf(fp, "\t\t// }}}\n\t);\n"
+	"\t// Local declarations\n"
+	"\t// {{{\n"
 	"\t// Swap parameter order, so that AW <= BW -- for performance\n"
 	"\t// reasons\n"
 	"\twire	[AW-1:0]	i_a;\n"
@@ -377,6 +401,12 @@ SLASHLINE
 	"\treg\t[(IW+BW-1):0]\t\tacc[0:(TLEN-2)];\n"
 	"\tgenvar k;\n"
 "\n"
+	"\twire	[(BW+LUTB-1):0]	pr_a, pr_b;\n"
+	"\twire	[(IW+BW-1):0]	w_r;\n"
+	"\t// }}}\n");
+
+	fprintf(fp,
+"\n"
 	"\t// First step:\n"
 	"\t// Switch to unsigned arithmetic for our multiply, keeping track\n"
 	"\t// of the along the way.  We'll then add the sign again later at\n"
@@ -386,18 +416,26 @@ SLASHLINE
 	"\t// taking the absolute value here would require an additional bit.\n"
 	"\t// However, because our results are now unsigned, we can stay\n"
 	"\t// within the number of bits given (for now).\n"
+	"\n"
+	"\t// u_a\n"
+	"\t// {{{\n"
 	"\tinitial u_a = 0;\n"
 	"\tgenerate if (IW > AW)\n"
 	"\tbegin : ABS_AND_ADD_BIT_TO_A\n"
 		"\t\talways @(posedge i_clk)\n"
-			"\t\t\tif (i_ce)\n"
-			"\t\t\t\tu_a <= { 1\'b0, (i_a[AW-1])?(-i_a):(i_a) };\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\tu_a <= { 1\'b0, (i_a[AW-1])?(-i_a):(i_a) };\n"
 	"\tend else begin : ABS_A\n"
 		"\t\talways @(posedge i_clk)\n"
-			"\t\t\tif (i_ce)\n"
-			"\t\t\t\tu_a <= (i_a[AW-1])?(-i_a):(i_a);\n"
+		"\t\tif (i_ce)\n"
+			"\t\t\tu_a <= (i_a[AW-1])?(-i_a):(i_a);\n"
 	"\tend endgenerate\n"
-"\n"
+	"\t// }}}\n"
+"\n");
+
+	fprintf(fp,
+	"\t// sgn, u_b\n"
+	"\t// {{{\n"
 	"\tinitial sgn = 0;\n"
 	"\tinitial u_b = 0;\n"
 	"\talways @(posedge i_clk)\n"
@@ -406,8 +444,7 @@ SLASHLINE
 		"\t\tu_b <= (i_b[BW-1])?(-i_b):(i_b);\n"
 		"\t\tsgn <= i_a[AW-1] ^ i_b[BW-1];\n"
 	"\tend\n"
-"\n"
-	"\twire	[(BW+LUTB-1):0]	pr_a, pr_b;\n"
+	"\t// }}}\n"
 "\n"
 	"\t//\n"
 	"\t// Second step: First two 2xN products.\n"
@@ -420,21 +457,30 @@ SLASHLINE
 	"\tbimpy\t#(BW) lmpy_0(i_clk,1\'b0,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);\n"
 	"\tbimpy\t#(BW) lmpy_1(i_clk,1\'b0,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);\n"
 	"\n"
+	"\t// r_s, r_a[0], r_b[0]\n"
+	"\t// {{{\n"
 	"\tinitial r_s    = 0;\n"
 	"\tinitial r_a[0] = 0;\n"
 	"\tinitial r_b[0] = 0;\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce) r_a[0] <= u_a[(IW-1):(2*LUTB)];\n"
-	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce) r_b[0] <= u_b;\n"
-	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce) r_s <= { r_s[(TLEN-2):0], sgn };\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\tr_a[0] <= u_a[(IW-1):(2*LUTB)];\n"
+		"\t\tr_b[0] <= u_b;\n"
+		"\t\tr_s <= { r_s[(TLEN-2):0], sgn };\n"
+	"\tend\n\t// }}}\n"
 	"\n"
+	"\t// acc[0]\n"
+	"\t// {{{\n"
 	"\tinitial acc[0] = 0;\n"
 	"\talways @(posedge i_clk) // One clk after p[0],p[1] become valid\n"
-	"\tif (i_ce) acc[0] <= { {(IW-LUTB){1\'b0}}, pr_a}\n"
+	"\tif (i_ce)\n"
+	"\t\tacc[0] <= { {(IW-LUTB){1\'b0}}, pr_a}\n"
 		"\t\t  +{ {(IW-(2*LUTB)){1\'b0}}, pr_b, {(LUTB){1\'b0}} };\n"
+	"\t// }}}\n"
 "\n"
+	"\t// r_a[TLEN-3:1], r_b[TLEN-3:1]\n"
+	"\t// {{{\n"
 	"\tgenerate // Keep track of intermediate values, before multiplying them\n"
 	"\tif (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)\n"
 	"\tbegin : GENCOPIES\n"
@@ -449,14 +495,18 @@ SLASHLINE
 			"\t\t\tr_b[k+1] <= r_b[k];\n"
 			"\t\tend\n"
 	"\tend endgenerate\n"
+	"\t// }}}\n"
 "\n"
+	"\t// acc[TLEN-2:1]\n"
+	"\t// {{{\n"
 	"\tgenerate // The actual multiply and accumulate stage\n"
 	"\tif (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)\n"
 	"\tbegin : GENSTAGES\n"
 		"\t\twire\t[(BW+LUTB-1):0] genp;\n"
 		"\n"
 		"\t\t// First, the multiply: 2-bits times BW bits\n"
-		"\t\tbimpy #(BW) genmpy(i_clk,1\'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);\n"
+		"\t\tbimpy #(BW)\n"
+		"\t\tgenmpy(i_clk,1\'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);\n"
 "\n"
 		"\t\t// Then the accumulate step -- on the next clock\n"
 		"\t\tinitial acc[k+1] = 0;\n"
@@ -465,31 +515,44 @@ SLASHLINE
 			"\t\t\tacc[k+1] <= acc[k] + {{(IW-LUTB*(k+3)){1\'b0}},\n"
 				"\t\t\t\tgenp, {(LUTB*(k+2)){1\'b0}} };\n"
 	"\tend endgenerate\n"
+	"\t// }}}\n"
 "\n"
-	"\twire	[(IW+BW-1):0]	w_r;\n"
 	"\tassign\tw_r = (r_s[TLEN-1]) ? (-acc[TLEN-2]) : acc[TLEN-2];\n"
 	"\n"
+	"\t// o_r\n"
+	"\t// {{{\n"
 	"\tinitial o_r = 0;\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 		"\t\to_r <= w_r[(AW+BW-1):0];\n"
+	"\t// }}}\n"
 "\n");
 
-	// Make Verilator happy
 	fprintf(fp,
+	"\t// Make Verilator happy\n"
+	"\t// {{{\n"
 	"\tgenerate if (IW > AW)\n"
 	"\tbegin : VUNUSED\n"
 	"\t\t// verilator lint_off UNUSED\n"
-	"\t\twire\t[(IW-AW)-1:0]\tunused;\n"
-	"\t\tassign\tunused = w_r[(IW+BW-1):(AW+BW)];\n"
+	"\t\twire\tunused;\n"
+	"\t\tassign\tunused = &{ 1\'b0, w_r[(IW+BW-1):(AW+BW)] };\n"
 	"\t\t// verilator lint_on UNUSED\n"
 	"\tend endgenerate\n"
-"\n");
+	"\t// }}}\n");
 
 	// The formal property section
 	// Starting with properties specific to this component's proof, and not
 	// any parent modules
 	fprintf(fp,
+SLASHLINE
+SLASHLINE
+SLASHLINE
+"//\n"
+"// Formal property section\n"
+"// {{{\n"
+SLASHLINE
+SLASHLINE
+SLASHLINE
 "`ifdef	FORMAL\n");
 
 	if (formal_property_flag) {
@@ -573,13 +636,15 @@ SLASHLINE
 	"\tif ((f_past_valid)&&($past(i_ce)))\n"
 	"\tbegin\n"
 		"\t\tif ($past(i_a)==0)\n"
+		"\t\tbegin\n"
 			"\t\t\t`ASSERT(u_a == 0);\n"
-		"\t\telse if ($past(i_a[AW-1]) == 1'b0)\n"
+		"\t\tend else if ($past(i_a[AW-1]) == 1'b0)\n"
 			"\t\t\t`ASSERT(u_a == $past(i_a));\n"
 "\n"
 		"\t\tif ($past(i_b)==0)\n"
+		"\t\tbegin\n"
 			"\t\t\t`ASSERT(u_b == 0);\n"
-		"\t\telse if ($past(i_b[BW-1]) == 1'b0)\n"
+		"\t\tend else if ($past(i_b[BW-1]) == 1'b0)\n"
 			"\t\t\t`ASSERT(u_b == $past(i_b));\n"
 	"\tend\n"
 "\n");
@@ -592,8 +657,9 @@ SLASHLINE
 		"\t\tif (i_ce)\n"
 		"\t\tbegin\n"
 			"\t\t\tif (f_past_a[k]==0)\n"
+			"\t\t\tbegin\n"
 				"\t\t\t\t`ASSERT(r_a[k] == 0);\n"
-			"\t\t\telse if (f_past_a[k]==1)\n"
+			"\t\t\tend else if (f_past_a[k]==1)\n"
 				"\t\t\t\t`ASSERT(r_a[k] == 0);\n"
 			"\t\t\t`ASSERT(r_b[k] == f_past_b[k]);\n"
 		"\t\tend\n"
@@ -637,8 +703,9 @@ SLASHLINE
 	"\tif ((f_past_valid)&&($past(i_ce)))\n"
 	"\tbegin\n"
 		"\t\tif ((f_past_a[TLEN]==0)||(f_past_b[TLEN]==0))\n"
+		"\t\tbegin\n"
 			"\t\t\t`ASSERT(o_r == 0);\n"
-		"\t\telse if (f_past_a[TLEN]==1)\n"
+		"\t\tend else if (f_past_a[TLEN]==1)\n"
 		"\t\tbegin\n"
 			"\t\t\tif ((f_sgn_a[TLEN+1]^f_sgn_b[TLEN+1])==0)\n"
 			"\t\t\tbegin\n"
@@ -746,11 +813,12 @@ SLASHLINE
 
 
 	} else {
-		fprintf(fp, "// Formal properties have not been enabled\n");
+		fprintf(fp, "// Formal property generation was not been enabled\n");
 	}
 
 	fprintf(fp,
 "`endif\t// FORMAL\n"
+"// }}}\n"
 "endmodule\n");
 
 	fclose(fp);

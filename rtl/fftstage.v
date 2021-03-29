@@ -62,37 +62,49 @@
 //
 `default_nettype	none
 //
-module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
-	parameter	IWIDTH=15,CWIDTH=20,OWIDTH=16;
-	// Parameters specific to the core that should be changed when this
-	// core is built ... Note that the minimum LGSPAN (the base two log
-	// of the span, or the base two log of the current FFT size) is 3.
-	// Smaller spans (i.e. the span of 2) must use the dbl laststage module.
-	parameter	LGSPAN=10, BFLYSHIFT=0; // LGWIDTH=11
-	parameter	[0:0]	OPT_HWMPY = 1;
-	// Clocks per CE.  If your incoming data rate is less than 50% of your
-	// clock speed, you can set CKPCE to 2'b10, make sure there's at least
-	// one clock between cycles when i_ce is high, and then use two
-	// multiplies instead of three.  Setting CKPCE to 2'b11, and insisting
-	// on at least two clocks with i_ce low between cycles with i_ce high,
-	// then the hardware optimized butterfly code will used one multiply
-	// instead of two.
-	parameter		CKPCE = 1;
-	// The COEFFILE parameter contains the name of the file containing the
-	// FFT twiddle factors
-	parameter	COEFFILE="cmem_2048.hex";
+module	fftstage #(
+		// {{{
+		parameter	IWIDTH=15,CWIDTH=20,OWIDTH=16,
+		// Parameters specific to the core that should be changed when
+		// this core is built ... Note that the minimum LGSPAN (the base
+		// two log of the span, or the base two log of the current FFT
+		// size) is 3.  Smaller spans (i.e. the span of 2) must use the
+		// dbl laststage module.
+		// Verilator lint_off UNUSED
+		parameter	LGSPAN=9, BFLYSHIFT=0, // LGWIDTH=11
+		parameter [0:0]	OPT_HWMPY = 1,
+		// Clocks per CE.  If your incoming data rate is less than 50%
+		// of your clock speed, you can set CKPCE to 2'b10, make sure
+		// there's at least one clock between cycles when i_ce is high,
+		// and then use two multiplies instead of three.  Setting CKPCE
+		// to 2'b11, and insisting on at least two clocks with i_ce low
+		// between cycles with i_ce high, then the hardware optimized
+		// butterfly code will used one multiply instead of two.
+		parameter	CKPCE = 1,
+		// The COEFFILE parameter contains the name of the file
+		// containing the FFT twiddle factors
+		parameter	COEFFILE="cmem_o4096.hex",
+		// Verilator lint_on  UNUSED
 
 `ifdef	VERILATOR
-	parameter [0:0] ZERO_ON_IDLE = 1'b0;
+		parameter  [0:0]	ZERO_ON_IDLE = 1'b0
 `else
-	localparam [0:0] ZERO_ON_IDLE = 1'b0;
+		localparam [0:0]	ZERO_ON_IDLE = 1'b0
 `endif // VERILATOR
+		// }}}
+	) (
+		// {{{
+		input	wire				i_clk, i_reset,
+							i_ce, i_sync,
+		input	wire	[(2*IWIDTH-1):0]	i_data,
+		output	reg	[(2*OWIDTH-1):0]	o_data,
+		output	reg				o_sync
 
-	input	wire				i_clk, i_reset, i_ce, i_sync;
-	input	wire	[(2*IWIDTH-1):0]	i_data;
-	output	reg	[(2*OWIDTH-1):0]	o_data;
-	output	reg				o_sync;
+		// }}}
+	);
 
+	// Local signal definitions
+	// {{{
 	// I am using the prefixes
 	// 	ib_*	to reference the inputs to the butterfly, and
 	// 	ob_*	to reference the outputs from the butterfly
@@ -126,10 +138,13 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	reg	[LGSPAN:0]		oaddr;
 	reg	[(2*OWIDTH-1):0]	omem	[0:((1<<LGSPAN)-1)];
 
-	reg				idle;
+	wire				idle;
 	reg	[(LGSPAN-1):0]		nxt_oaddr;
 	reg	[(2*OWIDTH-1):0]	pre_ovalue;
+	// }}}
 
+	// wait_for_sync, iaddr
+	// {{{
 	initial wait_for_sync = 1'b1;
 	initial iaddr = 0;
 	always @(posedge i_clk)
@@ -145,11 +160,17 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		iaddr <= iaddr + { {(LGSPAN){1'b0}}, 1'b1 };
 		wait_for_sync <= 1'b0;
 	end
+	// }}}
+
+	// Write to imem
+	// {{{
 	always @(posedge i_clk) // Need to make certain here that we don't read
 	if ((i_ce)&&(!iaddr[LGSPAN])) // and write the same address on
 		imem[iaddr[(LGSPAN-1):0]] <= i_data; // the same clk
+	// }}}
 
-	//
+	// ib_sync
+	// {{{
 	// Now, we have all the inputs, so let's feed the butterfly
 	//
 	// ib_sync is the synchronization bit to the butterfly.  It will
@@ -166,7 +187,10 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		// first valid data out per FFT.
 		ib_sync <= (iaddr==(1<<(LGSPAN)));
 	end
+	// }}}
 
+	// ib_a, ib_b, ib_c
+	// {{{
 	// Read the values from our input memory, and use them to feed
 	// first of two butterfly inputs
 	always	@(posedge i_clk)
@@ -179,7 +203,10 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		// and the coefficient or twiddle factor
 		ib_c <= cmem[iaddr[(LGSPAN-1):0]];
 	end
+	// }}}
 
+	// idle
+	// {{{
 	// The idle register is designed to keep track of when an input
 	// to the butterfly is important and going to be used.  It's used
 	// in a flag following, so that when useful values are placed
@@ -191,20 +218,32 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	// In this limited environment, the non-zero answers will stand
 	// in a trace making it easier to highlight a bug.
 	generate if (ZERO_ON_IDLE)
-	begin
-		initial	idle = 1;
+	begin : GEN_ZERO_ON_IDLE
+		reg	r_idle;
+
+		initial	r_idle = 1;
 		always @(posedge i_clk)
 		if (i_reset)
-			idle <= 1'b1;
+			r_idle <= 1'b1;
 		else if (i_ce)
-			idle <= (!iaddr[LGSPAN])&&(!wait_for_sync);
+			r_idle <= (!iaddr[LGSPAN])&&(!wait_for_sync);
 
-	end else begin
+		assign	idle = r_idle;
 
-		always @(*) idle = 0;
+	end else begin : NO_IDLE_GENERATION
+
+		assign	idle = 0;
 
 	end endgenerate
+	// }}}
 
+	////////////////////////////////////////////////////////////////////////
+	//
+	// Instantiate the butterfly
+	// {{{
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 // For the formal proof, we'll assume the outputs of hwbfly and/or
 // butterfly, rather than actually calculating them.  This will simplify
 // the proof and (if done properly) will be equivalent.  Be careful of
@@ -214,30 +253,64 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 	generate if (OPT_HWMPY)
 	begin : HWBFLY
 
-		hwbfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),
-				.CKPCE(CKPCE), .SHIFT(BFLYSHIFT))
-			bfly(i_clk, i_reset, i_ce,
-				(idle && !i_ce) ? 0:ib_c,
-				(idle && !i_ce) ? 0:ib_a,
-				(idle && !i_ce) ? 0:ib_b,
-				(ib_sync && i_ce),
-				ob_a, ob_b, ob_sync);
+		hwbfly #(
+			// {{{
+			.IWIDTH(IWIDTH),
+			.CWIDTH(CWIDTH),
+			.OWIDTH(OWIDTH),
+			.CKPCE(CKPCE),
+			.SHIFT(BFLYSHIFT)
+			// }}}
+		) bfly(
+			// {{{
+			.i_clk(i_clk), .i_reset(i_reset), .i_ce(i_ce),
+			.i_coef((idle && !i_ce) ? 0:ib_c),
+			.i_left((idle && !i_ce) ? 0:ib_a),
+			.i_right((idle && !i_ce) ? 0:ib_b),
+			.i_aux(ib_sync && i_ce),
+			.o_left(ob_a), .o_right(ob_b), .o_aux(ob_sync)
+			// }}}
+		);
 
 	end else begin : FWBFLY
 
-		butterfly #(.IWIDTH(IWIDTH),.CWIDTH(CWIDTH),.OWIDTH(OWIDTH),
-				.CKPCE(CKPCE),.SHIFT(BFLYSHIFT))
-			bfly(i_clk, i_reset, i_ce,
-				(idle && !i_ce)?0:ib_c,
-				(idle && !i_ce)?0:ib_a,
-				(idle && !i_ce)?0:ib_b,
-				(ib_sync && i_ce),
-				ob_a, ob_b, ob_sync);
+		butterfly #(
+			// {{{
+			.IWIDTH(IWIDTH),
+			.CWIDTH(CWIDTH),
+			.OWIDTH(OWIDTH),
+			.CKPCE(CKPCE),
+			.SHIFT(BFLYSHIFT)
+			// }}}
+		) bfly(
+			// {{{
+			.i_clk(i_clk), .i_reset(i_reset), .i_ce(i_ce),
+			.i_coef( (idle && !i_ce)?0:ib_c),
+			.i_left( (idle && !i_ce)?0:ib_a),
+			.i_right((idle && !i_ce)?0:ib_b),
+			.i_aux(ib_sync && i_ce),
+			.o_left(ob_a), .o_right(ob_b), .o_aux(ob_sync)
+			// }}}
+		);
 
 	end endgenerate
+`else
+
+	// Verilator lint_off UNDRIVEN
+	(* anyseq *)    wire    [(2*OWIDTH-1):0]        f_ob_a, f_ob_b;
+	(* anyseq *)    wire    f_ob_sync;
+	// Verilator lint_on  UNDRIVEN
+
+	assign  ob_sync = f_ob_sync;
+	assign  ob_a    = f_ob_a;
+	assign  ob_b    = f_ob_b;
+
 `endif
 
-	//
+	// }}}
+
+	// oaddr, o_sync, b_started
+	// {{{
 	// Next step: recover the outputs from the butterfly
 	//
 	// The first output can go immediately to the output of this routine
@@ -264,7 +337,10 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 			// is available
 			b_started <= 1'b1;
 	end
+	// }}}
 
+	// nxt_oaddr
+	// {{{
 	always @(posedge i_clk)
 	if (i_ce)
 		nxt_oaddr[0] <= oaddr[0];
@@ -276,25 +352,57 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 			nxt_oaddr[LGSPAN-1:1] <= oaddr[LGSPAN-1:1] + 1'b1;
 
 	end endgenerate
+	// }}}
 
+	// omem
+	// {{{
 	// Only write to the memory on the first half of the outputs
 	// We'll use the memory value on the second half of the outputs
 	always @(posedge i_clk)
 	if ((i_ce)&&(!oaddr[LGSPAN]))
 		omem[oaddr[(LGSPAN-1):0]] <= ob_b;
+	// }}}
 
+	// pre_ovalue
+	// {{{
 	always @(posedge i_clk)
 	if (i_ce)
 		pre_ovalue <= omem[nxt_oaddr[(LGSPAN-1):0]];
+	// }}}
 
+	// o_data
+	// {{{
 	always @(posedge i_clk)
 	if (i_ce)
 		o_data <= (!oaddr[LGSPAN]) ? ob_a : pre_ovalue;
+	// }}}
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal properties
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
+	// Local (formal) declarations
+	// {{{
 	// An arbitrary processing delay from butterfly input to
 	// butterfly output(s)
+	// Verilator lint_off UNDRIVEN
 	(* anyconst *) reg	[LGSPAN:0]	f_mpydelay;
+	(* anyconst *)	reg	[LGSPAN:0]	f_addr;
+	// Verilator lint_on  UNDRIVEN
+	reg	[2*IWIDTH-1:0]			f_left, f_right;
+	reg	[2*OWIDTH-1:0]	f_oleft, f_oright;
+	reg	[LGSPAN:0]	f_oaddr;
+	wire	[LGSPAN:0]	f_oaddr_m1 = f_oaddr - 1'b1;
+	reg	f_output_active;
+	// }}}
+
+
 	always @(*)
 		assume(f_mpydelay > 1);
 
@@ -314,17 +422,16 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		assert(!o_sync);
 	end
 
-	/////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Formally verify the input half, from the inputs to this module
 	// to the inputs of the butterfly
 	//
-	/////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
+	//
+
 	// Let's  verify a specific set of inputs
-	(* anyconst *)	reg	[LGSPAN:0]	f_addr;
-	reg	[2*IWIDTH-1:0]			f_left, f_right;
-	wire	[LGSPAN:0]			f_next_addr;
 
 	always @(posedge i_clk)
 	if (!$past(i_ce) && !$past(i_ce,2) && !$past(i_ce,3) && !$past(i_ce,4))
@@ -332,8 +439,6 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 
 	always @(*)
 		assume(f_addr[LGSPAN]==1'b0);
-
-	assign	f_next_addr = f_addr + 1'b1;
 
 	always @(posedge i_clk)
 	if ((i_ce)&&(iaddr[LGSPAN:0] == f_addr))
@@ -362,22 +467,20 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 		assert(ib_c == cmem[f_addr[LGSPAN-1:0]]);
 	end
 
-	/////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////
 	//
 	// Formally verify the output half, from the output of the butterfly
 	// to the outputs of this module
 	//
-	/////////////////////////////////////////
-	reg	[2*OWIDTH-1:0]	f_oleft, f_oright;
-	reg	[LGSPAN:0]	f_oaddr;
-	wire	[LGSPAN:0]	f_oaddr_m1 = f_oaddr - 1'b1;
+	////////////////////////////////////////////////////////////////////////
+	//
+	//
 
 	always @(*)
 		f_oaddr = iaddr - f_mpydelay + {1'b1,{(LGSPAN-1){1'b0}} };
 
 	assign	f_oaddr_m1 = f_oaddr - 1'b1;
 
-	reg	f_output_active;
 	initial	f_output_active = 1'b0;
 	always @(posedge i_clk)
 	if (i_reset)
@@ -394,8 +497,9 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 
 	always @(*)
 	if (f_output_active)
+	begin
 		assert(oaddr == f_oaddr);
-	else
+	end else
 		assert(oaddr == 0);
 
 	always @(*)
@@ -427,21 +531,33 @@ module	fftstage(i_clk, i_reset, i_ce, i_sync, i_data, o_data, o_sync);
 
 	always @(posedge i_clk)
 	if ((i_ce)&&(f_oaddr_m1 == 0)&&(f_output_active))
+	begin
 		assert(o_sync);
-	else if ((i_ce)||(!f_output_active))
+	end else if ((i_ce)||(!f_output_active))
 		assert(!o_sync);
 
 	always @(posedge i_clk)
 	if ((i_ce)&&(f_output_active)&&(f_oaddr_m1 == f_addr))
 		assert(o_data == f_oleft);
+
 	always @(posedge i_clk)
 	if ((i_ce)&&(f_output_active)&&(f_oaddr[LGSPAN])
 			&&(f_oaddr[LGSPAN-1:0] == f_addr[LGSPAN-1:0]))
 		assert(pre_ovalue == f_oright);
+
 	always @(posedge i_clk)
 	if ((i_ce)&&(f_output_active)&&(f_oaddr_m1[LGSPAN])
 			&&(f_oaddr_m1[LGSPAN-1:0] == f_addr[LGSPAN-1:0]))
 		assert(o_data == f_oright);
 
-`endif
+	// Make Verilator happy
+	// {{{
+	// Verilator lint_off UNUSED
+	wire	unused_formal;
+	assign unused_formal = &{ 1'b0, idle, ib_sync };
+	// Verilator lint_on  UNUSED
+	// }}}
+
+`endif // FORMAL
+// }}}
 endmodule

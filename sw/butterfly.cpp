@@ -200,80 +200,119 @@ SLASHLINE
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 
 	fprintf(fp,
-"module\tbutterfly(i_clk, %s, i_ce, i_coef, i_left, i_right, i_aux,\n"
-		"\t\to_left, o_right, o_aux);\n"
-	"\t// Public changeable parameters ...\n", resetw.c_str());
+"module\tbutterfly #(\n"
+	"\t\t// {{{\n"
+	"\t\t// Public changeable parameters ...\n");
 
 	fprintf(fp,
-	"\tparameter IWIDTH=%d,", TST_BUTTERFLY_IWIDTH);
+	"\t\t// IWIDTH\n"
+	"\t\t// {{{\n"
+	"\t\t// This is the input data width\n"
+	"\t\tparameter IWIDTH=%d,\n\t\t// }}}\n", TST_BUTTERFLY_IWIDTH);
+	fprintf(fp,
+	"\t\t// CWIDTH\n"
+	"\t\t// {{{\n"
+	"\t\t// This is the width of the twiddle factor, the \'coefficient\'\n"
+	"\t\t// if you will.\n");
 #ifdef	TST_BUTTERFLY_CWIDTH
-	fprintf(fp, "CWIDTH=%d,", TST_BUTTERFLY_CWIDTH);
+	fprintf(fp, "\t\tCWIDTH=%d,\t\t// }}}\n", TST_BUTTERFLY_CWIDTH);
 #else
-	fprintf(fp, "CWIDTH=IWIDTH+%d,", xtracbits);
+	fprintf(fp, "\t\tCWIDTH=IWIDTH+%d,\n\t\t// }}}\n", xtracbits);
 #endif
+	fprintf(fp,
+	"\t\t// OWIDTH\n"
+	"\t\t// {{{\n"
+	"\t\t// This is the width of the final output\n");
 #ifdef	TST_BUTTERFLY_OWIDTH
-	fprintf(fp, "OWIDTH=%d;\n", TST_BUTTERFLY_OWIDTH);
+	fprintf(fp, "\t\tOWIDTH=%d,\n", TST_BUTTERFLY_OWIDTH);
 	// OWIDTH = TST_BUTTERFLY_OWIDTH;
 #else
-	fprintf(fp, "OWIDTH=IWIDTH+1;\n");
+	fprintf(fp, "\t\tOWIDTH=IWIDTH+1,\n");
 #endif
-	fprintf(fp, "\tparameter\tSHIFT=0;\n");
+	fprintf(fp, "\t\t// }}}\n"
+		"\t\t// SHIFT\n"
+		"\t\t// {{{\n"
+		"\t\t// The shift controls whether or not the result will be\n"
+		"\t\t// left shifted by SHIFT bits, throwing the overflow\n"
+		"\t\t// away.\n"
+		"\t\tparameter\tSHIFT=0,\n\t\t// }}}\n");
 
 	fprintf(fp,
-	"\t// The number of clocks per each i_ce.  The actual number can be\n"
-	"\t// more, but the algorithm depends upon at least this many for\n"
-	"\t// extra internal processing.\n"
-	"\tparameter	CKPCE=%d;\n", ckpce);
+		"\t\t// CKPCE\n"
+		"\t\t// {{{\n"
+		"\t\t// CKPCE is the number of clocks per each i_ce.  The actual\n"
+		"\t\t// number can be more, but the algorithm depends upon at least\n"
+		"\t\t// this many for extra internal processing.\n"
+		"\t\tparameter	CKPCE=%d,\n\t\t// }}}\n", ckpce);
 
 	fprintf(fp,
-	"\t//\n"
-	"\t// Local/derived parameters that are calculated from the above\n"
-	"\t// params.  Apart from algorithmic changes below, these should not\n"
-	"\t// be adjusted\n"
-	"\t//\n"
-	"\t// The first step is to calculate how many clocks it takes our\n"
-	"\t// multiply to come back with an answer within.  The time in the\n"
-	"\t// multiply depends upon the input value with the fewest number of\n"
-	"\t// bits--to keep the pipeline depth short.  So, let's find the\n"
-	"\t// fewest number of bits here.\n"
-	"\tlocalparam MXMPYBITS = \n"
-		"\t\t((IWIDTH+2)>(CWIDTH+1)) ? (CWIDTH+1) : (IWIDTH + 2);\n"
-	"\t//\n"
-	"\t// Given this \"fewest\" number of bits, we can calculate the\n"
-	"\t// number of clocks the multiply itself will take.\n"
-	"\tlocalparam	MPYDELAY=((MXMPYBITS+1)/2)+2;\n"
-	"\t//\n"
-	"\t// In an environment when CKPCE > 1, the multiply delay isn\'t\n"
-	"\t// necessarily the delay felt by this algorithm--measured in\n"
-	"\t// i_ce\'s.  In particular, if the multiply can operate with more\n"
-	"\t// operations per clock, it can appear to finish \"faster\".\n"
-	"\t// Since most of the logic in this core operates on the slower\n"
-	"\t// clock, we'll need to map that speed into the number of slower\n"
-	"\t// clock ticks that it takes.\n"
-	"\tlocalparam	LCLDELAY = (CKPCE == 1) ? MPYDELAY\n"
-		"\t\t: (CKPCE == 2) ? (MPYDELAY/2+2)\n"
-		"\t\t: (MPYDELAY/3 + 2);\n"
-	"\tlocalparam	LGDELAY = (MPYDELAY>64) ? 7\n"
-			"\t\t\t: (MPYDELAY > 32) ? 6\n"
-			"\t\t\t: (MPYDELAY > 16) ? 5\n"
-			"\t\t\t: (MPYDELAY >  8) ? 4\n"
-			"\t\t\t: (MPYDELAY >  4) ? 3\n"
-			"\t\t\t: 2;\n"
-	"\tlocalparam	AUXLEN=(LCLDELAY+3);\n"
-	"\tlocalparam	MPYREMAINDER = MPYDELAY - CKPCE*(MPYDELAY/CKPCE);\n"
-"\n\n");
-
+		"\t\t//\n"
+		"\t\t// Local/derived parameters\n"
+		"\t\t// {{{\n"
+		"\t\t// These are calculated from the above params.  Apart from\n"
+		"\t\t// algorithmic changes below, these should not be adjusted\n"
+		"\t\t//\n"
+		"\t\t// MXMPYBITS\n"
+		"\t\t// {{{\n"
+		"\t\t// The first step is to calculate how many clocks it takes\n"
+		"\t\t// our multiply to come back with an answer within.  The\n"
+		"\t\t// time in the multiply depends upon the input value with\n"
+		"\t\t// the fewest number of bits--to keep the pipeline depth\n"
+		"\t\t// short.  So, let's find the fewest number of bits here.\n"
+		"\t\tlocalparam MXMPYBITS =\n"
+		"\t\t((IWIDTH+2)>(CWIDTH+1)) ? (CWIDTH+1) : (IWIDTH + 2),\n"
+		"\t\t// }}}\n"
+		"\t\t// MPYDELAY\n"
+		"\t\t// {{{\n"
+		"\t\t// Given this \"fewest\" number of bits, we can calculate\n"
+		"\t\t// the number of clocks the multiply itself will take.\n"
+		"\t\tlocalparam	MPYDELAY=((MXMPYBITS+1)/2)+2,\n"
+		"\t\t// }}}\n"
+		"\t\t// LCLDELAY\n"
+		"\t\t// {{{\n"
+	"\t\t//\n"
+	"\t\t// In an environment when CKPCE > 1, the multiply delay isn\'t\n"
+	"\t\t// necessarily the delay felt by this algorithm--measured in\n"
+	"\t\t// i_ce\'s.  In particular, if the multiply can operate with more\n"
+		"\t\t// operations per clock, it can appear to finish \"faster\".\n"
+		"\t\t// Since most of the logic in this core operates on the\n"
+		"\t\t// slower clock, we'll need to map that speed into the\n"
+		"\t\t// number of slower clock ticks that it takes.\n"
+		"\t\tlocalparam	LCLDELAY = (CKPCE == 1) ? MPYDELAY\n"
+		"\t\t\t: (CKPCE == 2) ? (MPYDELAY/2+2)\n"
+		"\t\t\t: (MPYDELAY/3 + 2),\n"
+		"\t\t// }}}\n"
+		"\t\t// LGDELAY\n"
+		"\t\t// {{{\n"
+		"\t\tlocalparam	LGDELAY = (MPYDELAY>64) ? 7\n"
+				"\t\t\t: (MPYDELAY > 32) ? 6\n"
+				"\t\t\t: (MPYDELAY > 16) ? 5\n"
+				"\t\t\t: (MPYDELAY >  8) ? 4\n"
+				"\t\t\t: (MPYDELAY >  4) ? 3\n"
+				"\t\t\t: 2,\n"
+		"\t\t// }}}\n"
+	"\t\tlocalparam	AUXLEN=(LCLDELAY+3),\n"
+	"\t\tlocalparam	MPYREMAINDER = MPYDELAY - CKPCE*(MPYDELAY/CKPCE)\n"
+	"\t\t// }}}\n"
+	"\t\t// }}}\n"
+	"\t) (\n");
 
 	fprintf(fp,
-	"\tinput\twire\ti_clk, %s, i_ce;\n"
-	"\tinput\twire\t[(2*CWIDTH-1):0] i_coef;\n"
-	"\tinput\twire\t[(2*IWIDTH-1):0] i_left, i_right;\n"
-	"\tinput\twire\ti_aux;\n"
-	"\toutput\twire	[(2*OWIDTH-1):0] o_left, o_right;\n"
-	"\toutput\treg\to_aux;\n\n", resetw.c_str());
+	"\t\t// {{{\n"
+	"\t\tinput\twire\ti_clk, %s, i_ce,\n"
+	"\t\tinput\twire\t[(2*CWIDTH-1):0] i_coef,\n"
+	"\t\tinput\twire\t[(2*IWIDTH-1):0] i_left, i_right,\n"
+	"\t\tinput\twire\ti_aux,\n"
+	"\t\toutput\twire	[(2*OWIDTH-1):0] o_left, o_right,\n"
+	"\t\toutput\treg\to_aux\n"
+	"\t\t// }}}\n"
+	"\t);\n\n", resetw.c_str());
 
+	fprintf(fp,
+	"\t// Local delcarations\n\t// {{{\n");
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
+	"\t// {{{\n"
 	"\tlocalparam	F_LGDEPTH = (AUXLEN > 64) ? 7\n"
 			"\t\t\t: (AUXLEN > 32) ? 6\n"
 			"\t\t\t: (AUXLEN > 16) ? 5\n"
@@ -303,25 +342,47 @@ SLASHLINE
 "\n"
 	"\twire	[(CWIDTH):0]	fp_one_ic, fp_two_ic, fp_three_ic, f_p3c_in;\n"
 	"\twire	[(IWIDTH+1):0]	fp_one_id, fp_two_id, fp_three_id, f_p3d_in;\n"
+	"\t// }}}\n"
 "`endif\n\n");
 
 	fprintf(fp,
 	"\treg\t[(2*IWIDTH-1):0]\tr_left, r_right;\n"
 	"\treg\t[(2*CWIDTH-1):0]\tr_coef, r_coef_2;\n"
 	"\twire\tsigned\t[(IWIDTH-1):0]\tr_left_r, r_left_i, r_right_r, r_right_i;\n"
-	"\tassign\tr_left_r  = r_left[ (2*IWIDTH-1):(IWIDTH)];\n"
-	"\tassign\tr_left_i  = r_left[ (IWIDTH-1):0];\n"
-	"\tassign\tr_right_r = r_right[(2*IWIDTH-1):(IWIDTH)];\n"
-	"\tassign\tr_right_i = r_right[(IWIDTH-1):0];\n"
-"\n"
 	"\treg\tsigned\t[(IWIDTH):0]\tr_sum_r, r_sum_i, r_dif_r, r_dif_i;\n"
 "\n"
 	"\treg	[(LGDELAY-1):0]	fifo_addr;\n"
 	"\twire	[(LGDELAY-1):0]	fifo_read_addr;\n"
-	"\tassign\tfifo_read_addr = fifo_addr - LCLDELAY[(LGDELAY-1):0];\n"
 	"\treg	[(2*IWIDTH+1):0]	fifo_left [ 0:((1<<LGDELAY)-1)];\n"
+	"\twire\tsigned\t[(CWIDTH-1):0]	ir_coef_r, ir_coef_i;\n"
+	"\twire\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\tp_one, p_two, p_three;\n"
+	"\twire\tsigned\t[(IWIDTH+CWIDTH):0]	fifo_i, fifo_r;\n"
+"\n"
+	"\treg\t\t[(2*IWIDTH+1):0]	fifo_read;\n"
+"\n"
+	"\treg\tsigned\t[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n"
+"\n"
+	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;\n\n"
+	"\twire\tsigned\t[(CWIDTH+IWIDTH+3-1):0]\tleft_sr, left_si;\n"
+	"\treg\t[(AUXLEN-1):0]\taux_pipeline;\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fp,
+	"\t// Break complex registers into their real and imaginary components\n"
+	"\t// {{{\n"
+	"\tassign\tr_left_r  = r_left[ (2*IWIDTH-1):(IWIDTH)];\n"
+	"\tassign\tr_left_i  = r_left[ (IWIDTH-1):0];\n"
+	"\tassign\tr_right_r = r_right[(2*IWIDTH-1):(IWIDTH)];\n"
+	"\tassign\tr_right_i = r_right[(IWIDTH-1):0];\n"
+	"\n"
+	"\tassign\tir_coef_r = r_coef_2[(2*CWIDTH-1):CWIDTH];\n"
+	"\tassign\tir_coef_i = r_coef_2[(CWIDTH-1):0];\n"
+	"\t// }}}\n"
+"\n"
+	"\tassign\tfifo_read_addr = fifo_addr - LCLDELAY[(LGDELAY-1):0];\n\n");
+	fprintf(fp,
+	"\t// r_left, r_right, r_coef, r_sum_[r|i], r_dif_[r|i], r_coef_2\n"
+	"\t// {{{\n"
 	"\t// Set up the input to the multiply\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
@@ -338,8 +399,11 @@ SLASHLINE
 		"\t\t// Other inputs are simply delayed on second clock\n"
 		"\t\tr_coef_2<= r_coef;\n"
 	"\tend\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fp,
+	"\t// fifo_addr\n"
+	"\t// {{{\n"
 	"\t// Don\'t forget to record the even side, since it doesn\'t need\n"
 	"\t// to be multiplied, but yet we still need the results in sync\n"
 	"\t// with the answer when it is ready.\n"
@@ -355,18 +419,18 @@ SLASHLINE
 			"\t\t// to it, but it needs to stay synchronized with the\n"
 			"\t\t// right side.\n"
 			"\t\tfifo_addr <= fifo_addr + 1;\n"
+	"\t// }}}\n"
 "\n"
+	"\t// Write into the left-side input FIFO\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 		"\t\tfifo_left[fifo_addr] <= { r_sum_r, r_sum_i };\n"
-"\n"
-	"\twire\tsigned\t[(CWIDTH-1):0]	ir_coef_r, ir_coef_i;\n"
-	"\tassign\tir_coef_r = r_coef_2[(2*CWIDTH-1):CWIDTH];\n"
-	"\tassign\tir_coef_i = r_coef_2[(CWIDTH-1):0];\n"
-	"\twire\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\tp_one, p_two, p_three;\n"
-"\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fp,
+	"\t// Notes\n"
+	"\t// {{{\n"
 	"\t// Multiply output is always a width of the sum of the widths of\n"
 	"\t// the two inputs.  ALWAYS.  This is independent of the number of\n"
 	"\t// bits in p_one, p_two, or p_three.  These values needed to\n"
@@ -375,7 +439,6 @@ SLASHLINE
 	"\t// number of bits in our final output.  We\'ll take care of\n"
 	"\t// dropping back down to the proper width, OWIDTH, in our routine\n"
 	"\t// below.\n"
-"\n"
 "\n");
 	fprintf(fp,
 	"\t// We accomplish here \"Karatsuba\" multiplication.  That is,\n"
@@ -394,24 +457,30 @@ SLASHLINE
 	"\t//\tad + bc = P3 - P2 - P1\n"
 	"\t//\t        = (ac + bc + ad + bd) - bd - ac\n"
 	"\t//\t        = bc + ad (this checks)\n"
-"\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fp,
-	"\t// This should really be based upon an IF, such as in\n"
-	"\t// if (IWIDTH < CWIDTH) then ...\n"
-	"\t// However, this is the only (other) way I know to do it.\n"
+	"\t// Instantiate the multiplies\n"
+	"\t// {{{\n"
 	"\tgenerate if (CKPCE <= 1)\n"
 	"\tbegin\n"
-"\n"
+		"\t\t// {{{\n"
+		"\t\t// Local declarations\n"
+		"\t\t// {{{\n"
 		"\t\twire\t[(CWIDTH):0]\tp3c_in;\n"
 		"\t\twire\t[(IWIDTH+1):0]\tp3d_in;\n"
+		"\t\t// }}}\n"
+		"\n"
 		"\t\tassign\tp3c_in = ir_coef_i + ir_coef_r;\n"
 		"\t\tassign\tp3d_in = r_dif_r + r_dif_i;\n"
 		"\n"
+		"\t\t// p_one = ir_coef_r * r_dif_r\n"
+		"\t\t// {{{\n"
 		"\t\t// We need to pad these first two multiplies by an extra\n"
 		"\t\t// bit just to keep them aligned with the third,\n"
 		"\t\t// simpler, multiply.\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) p1(i_clk, i_ce,\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
+		"\t\tp1(i_clk, i_ce,\n"
 				"\t\t\t\t{ir_coef_r[CWIDTH-1],ir_coef_r},\n"
 				"\t\t\t\t{r_dif_r[IWIDTH],r_dif_r}, p_one");
 		if (formal_property_flag) fprintf(fp,
@@ -420,7 +489,12 @@ SLASHLINE
 "`endif\n"
 			"\t\t\t");
 		fprintf(fp, ");\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) p2(i_clk, i_ce,\n"
+		"\t\t// }}}\n"
+		"\n"
+		"\t\t// p_two = ir_coef_i * r_dif_i\n"
+		"\t\t// {{{\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
+		"\t\tp2(i_clk, i_ce,\n"
 				"\t\t\t\t{ir_coef_i[CWIDTH-1],ir_coef_i},\n"
 				"\t\t\t\t{r_dif_i[IWIDTH],r_dif_i}, p_two");
 		if (formal_property_flag) fprintf(fp,
@@ -429,7 +503,12 @@ SLASHLINE
 "`endif\n"
 			"\t\t\t");
 		fprintf(fp, ");\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) p3(i_clk, i_ce,\n"
+		"\t\t// }}}\n"
+		"\n"
+		"\t\t// p_three = (ir_coef_i + ir_coef_r) * (r_dif_r + r_dif_i)\n"
+		"\t\t// {{{\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
+		"\t\tp3(i_clk, i_ce,\n"
 			"\t\t\t\tp3c_in, p3d_in, p_three");
 		if (formal_property_flag) fprintf(fp,
 "\n`ifdef\tFORMAL\n"
@@ -437,7 +516,9 @@ SLASHLINE
 "`endif\n"
 			"\t\t\t");
 		fprintf(fp, ");\n"
-"\n");
+		"\t\t// }}}\n"
+		"\n"
+		"\t\t// }}}\n");
 
 	///////////////////////////////////////////
 	///
@@ -446,6 +527,9 @@ SLASHLINE
 	fprintf(fp,
 	"\tend else if (CKPCE == 2)\n"
 	"\tbegin : CKPCE_TWO\n"
+		"\t\t// {{{\n"
+		"\t\t// Local declarations\n"
+		"\t\t// {{{\n"
 		"\t\t// Coefficient multiply inputs\n"
 		"\t\treg		[2*(CWIDTH)-1:0]	mpy_pipe_c;\n"
 		"\t\t// Data multiply inputs\n"
@@ -455,18 +539,19 @@ SLASHLINE
 		"\t\t//\n"
 		"\t\treg	signed	[(CWIDTH+1)-1:0]	mpy_cof_sum;\n"
 		"\t\treg	signed	[(IWIDTH+2)-1:0]	mpy_dif_sum;\n"
-"\n"
-		"\t\tassign	mpy_pipe_vc =  mpy_pipe_c[2*(CWIDTH)-1:CWIDTH];\n"
-		"\t\tassign	mpy_pipe_vd =  mpy_pipe_d[2*(IWIDTH+1)-1:IWIDTH+1];\n"
-"\n"
+		"\n"
 		"\t\treg			mpy_pipe_v;\n"
 		"\t\treg			ce_phase;\n"
 "\n"
 		"\t\treg	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
 		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
+		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\n"
+			"\t\t\t\t\trp_one, rp_two, rp_three,\n"
+			"\t\t\t\t\trp2_one, rp2_two, rp2_three;\n"
 "\n");
 		if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
+		"\t\t// {{{\n"
 		"\t\twire	[CWIDTH:0]	f_past_ic;\n"
 		"\t\twire	[IWIDTH+1:0]	f_past_id;\n"
 		"\t\twire	[CWIDTH:0]	f_past_mux_ic;\n"
@@ -476,22 +561,44 @@ SLASHLINE
 					"\t\t\t\t\tf_rp2one_ic, f_rp2two_ic, f_rp2three_ic;\n"
 		"\t\treg	[IWIDTH+1:0]	f_rpone_id, f_rptwo_id, f_rpthree_id,\n"
 					"\t\t\t\t\tf_rp2one_id, f_rp2two_id, f_rp2three_id;\n"
-"`endif\n\n");
+		"\t\t// }}}\n"
+"`endif\n");
+
+		fprintf(fp,
+		"\t\t// }}}\n\n"
+		"\t\tassign	mpy_pipe_vc =  mpy_pipe_c[2*(CWIDTH)-1:CWIDTH];\n"
+		"\t\tassign	mpy_pipe_vd =  mpy_pipe_d[2*(IWIDTH+1)-1:IWIDTH+1];\n");
 
 		fprintf(fp,
 "\n"
-		"\t\tinitial	ce_phase = 1'b0;\n"
-		"\t\talways @(posedge i_clk)\n"
-		"\t\tif (i_reset)\n"
+		"\t\t// ce_phase\n"
+		"\t\t// {{{\n"
+		"\t\tinitial	ce_phase = 1'b0;\n");
+		if (async_reset)
+			fprintf(fp,
+				"\t\talways @(posedge i_clk, negedge i_areset_n)\n"
+				"\t\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
+				"\t\talways @(posedge i_clk)\n"
+				"\t\tif (i_reset)\n");
+
+		fprintf(fp,
 			"\t\t\tce_phase <= 1'b0;\n"
 		"\t\telse if (i_ce)\n"
 			"\t\t\tce_phase <= 1'b1;\n"
 		"\t\telse\n"
 			"\t\t\tce_phase <= 1'b0;\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\t// mpy_pipe_v\n"
+		"\t\t// {{{\n"
 		"\t\talways @(*)\n"
 			"\t\t\tmpy_pipe_v = (i_ce)||(ce_phase);\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\t// mpy_pipe_c, mpy_pipe_d\n"
+		"\t\t// {{{\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (ce_phase)\n"
 		"\t\tbegin\n"
@@ -510,19 +617,29 @@ SLASHLINE
 			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <= {\n"
 				"\t\t\t\tmpy_pipe_d[(IWIDTH+1)-1:0], {(IWIDTH+1){1'b0}} };\n"
 		"\t\tend\n"
+		"\t\t// }}}\n"
 "\n");
 	fprintf(fp,
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) mpy0(i_clk, mpy_pipe_v,\n"
+		"\t\t// longmpy = mpy_cof_sum * mpy_dif_sum\n"
+		"\t\t// {{{\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
+		"\t\tmpy0(i_clk, mpy_pipe_v,\n"
 			"\t\t\t\tmpy_cof_sum, mpy_dif_sum, longmpy\n");
 		if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
 			"\t\t\t\t, f_past_ic, f_past_id\n"
 "`endif\n");
 	fprintf(fp,"\t\t\t);\n"
+		"\t\t// }}}\n"
 "\n");
 
 	fprintf(fp,
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) mpy1(i_clk, mpy_pipe_v,\n"
+		"\t\t// mpy_pipe_out = mpy_pipe_vc * mpy_pipe_vd\n"
+		"\t\t// {{{\n"
+		"\t\t// This is the shared multiply, but still multiplying\n"
+		"\t\t// a coefficient (i.e. twiddle factor) times data\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
+		"\t\tmpy1(i_clk, mpy_pipe_v,\n"
 			"\t\t\t\t{ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc },\n"
 			"\t\t\t\t{ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd },\n"
 			"\t\t\t\tmpy_pipe_out\n");
@@ -531,13 +648,12 @@ SLASHLINE
 			"\t\t\t\t, f_past_mux_ic, f_past_mux_id\n"
 "`endif\n");
 	fprintf(fp,"\t\t\t);\n"
+	"\t\t// }}}\n"
 "\n");
 
 	fprintf(fp,
-		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\n"
-			"\t\t\t\t\trp_one, rp_two, rp_three,\n"
-			"\t\t\t\t\trp2_one, rp2_two, rp2_three;\n"
-"\n"
+		"\t\t// rp_one (from mpy_pipe_out, first round)\n"
+		"\t\t// {{{\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (((i_ce)&&(!MPYDELAY[0]))\n"
 		"\t\t\t||((ce_phase)&&(MPYDELAY[0])))\n"
@@ -549,8 +665,10 @@ SLASHLINE
 			"\t\t\tf_rpone_id <= f_past_mux_id;\n"
 "`endif\n");
 		fprintf(fp,
-		"\t\tend\n\n");
+		"\t\tend\n\t\t// }}}\n\n");
 		fprintf(fp,
+		"\t\t// rp_two (from mpy_pipe_out, second round)\n"
+		"\t\t// {{{\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (((i_ce)&&(MPYDELAY[0]))\n"
 		"\t\t\t||((ce_phase)&&(!MPYDELAY[0])))\n"
@@ -562,8 +680,10 @@ SLASHLINE
 			"\t\t\tf_rptwo_id <= f_past_mux_id;\n"
 "`endif\n");
 		fprintf(fp,
-		"\t\tend\n\n");
+		"\t\tend\n\t\t// }}}\n\n");
 		fprintf(fp,
+		"\t\t// rp_three (from longmpy)\n"
+		"\t\t// {{{\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 		"\t\tbegin\n"
@@ -575,13 +695,16 @@ SLASHLINE
 "`endif\n");
 		fprintf(fp,
 		"\t\tend\n"
-"\n\n");
+		"\t\t// }}}\n"
+"\n");
 
 
 		fprintf(fp,
+		"\t\t// rp2_[one|two|three] -- register the outputs on i_ce\n"
+		"\t\t// {{{\n"
 		"\t\t// Our outputs *MUST* be set on a clock where i_ce is\n"
 		"\t\t// true for the following logic to work.  Make that\n"
-		"\t\t// happen here.\n"
+		"\t\t// happens here.\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 		"\t\tbegin\n"
@@ -603,18 +726,26 @@ SLASHLINE
 "`endif\n");
 		fprintf(fp,
 		"\t\tend\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\t// Final multiply output assignments\n"
+		"\t\t// {{{\n"
 		"\t\tassign	p_one	= rp2_one;\n"
 		"\t\tassign	p_two	= (!MPYDELAY[0])? rp2_two  : rp_two;\n"
 		"\t\tassign	p_three	= ( MPYDELAY[0])? rp_three : rp2_three;\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\t// Make verilator happy\n"
+		"\t\t// {{{\n"
 		"\t\t// verilator lint_off UNUSED\n"
 		"\t\twire\t[2*(IWIDTH+CWIDTH+3)-1:0]\tunused;\n"
 		"\t\tassign\tunused = { rp2_two, rp2_three };\n"
 		"\t\t// verilator lint_on  UNUSED\n"
+		"\t\t// }}}\n"
 "\n");
 		if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
+		"\t\t// {{{\n"
 		"\t\tassign fp_one_ic = f_rp2one_ic;\n"
 		"\t\tassign fp_one_id = f_rp2one_id;\n"
 "\n"
@@ -623,7 +754,8 @@ SLASHLINE
 "\n"
 		"\t\tassign fp_three_ic= (MPYDELAY[0])? f_rpthree_ic : f_rp2three_ic;\n"
 		"\t\tassign fp_three_id= (MPYDELAY[0])? f_rpthree_id : f_rp2three_id;\n"
-"`endif\n\n");
+		"\t\t// }}}\n"
+"`endif\n\t\t// }}}\n");
 
 
 	/////////////////////////
@@ -634,15 +766,15 @@ SLASHLINE
 "\tend else if (CKPCE <= 3)\n\tbegin : CKPCE_THREE\n");
 
 	fprintf(fp,
+	"\t\t// {{{\n"
+	"\t\t// Local declarations\n"
+	"\t\t// {{{\n"
 	"\t\t// Coefficient multiply inputs\n"
 	"\t\treg\t\t[3*(CWIDTH+1)-1:0]\tmpy_pipe_c;\n"
 	"\t\t// Data multiply inputs\n"
 	"\t\treg\t\t[3*(IWIDTH+2)-1:0]\tmpy_pipe_d;\n"
 	"\t\twire\tsigned	[(CWIDTH):0]	mpy_pipe_vc;\n"
 	"\t\twire\tsigned	[(IWIDTH+1):0]	mpy_pipe_vd;\n"
-	"\n"
-	"\t\tassign\tmpy_pipe_vc =  mpy_pipe_c[3*(CWIDTH+1)-1:2*(CWIDTH+1)];\n"
-	"\t\tassign\tmpy_pipe_vd =  mpy_pipe_d[3*(IWIDTH+2)-1:2*(IWIDTH+2)];\n"
 	"\n"
 	"\t\treg\t\t\tmpy_pipe_v;\n"
 	"\t\treg\t\t[2:0]\tce_phase;\n"
@@ -651,6 +783,7 @@ SLASHLINE
 "\n");
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
+		"\t\t// {{{\n"
 		"\t\twire\t[CWIDTH:0]	f_past_ic;\n"
 		"\t\twire\t[IWIDTH+1:0]	f_past_id;\n"
 "\n"
@@ -660,28 +793,58 @@ SLASHLINE
 		"\t\treg\t[IWIDTH+1:0]	f_rpone_id, f_rptwo_id, f_rpthree_id,\n"
 					"\t\t\t\t\tf_rp2one_id, f_rp2two_id, f_rp2three_id,\n"
 					"\t\t\t\t\tf_rp3one_id;\n"
+		"\t\t// }}}\n"
 "`endif\n"
+	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\n"
+				"\t\t\t\trp_one,  rp_two,  rp_three,\n"
+				"\t\t\t\trp2_one, rp2_two, rp2_three,\n"
+				"\t\t\t\trp3_one;\n"
+"\n"
+	"\t\t// }}}\n"
+	"\t\tassign\tmpy_pipe_vc =  mpy_pipe_c[3*(CWIDTH+1)-1:2*(CWIDTH+1)];\n"
+	"\t\tassign\tmpy_pipe_vd =  mpy_pipe_d[3*(IWIDTH+2)-1:2*(IWIDTH+2)];\n"
 "\n");
 
 	fprintf(fp,
-	"\t\tinitial\tce_phase = 3'b011;\n"
-	"\t\talways @(posedge i_clk)\n"
-	"\t\tif (i_reset)\n"
+	"\t\t// ce_phase\n"
+	"\t\t// {{{\n"
+	"\t\t// We\'re sharing our multiply hardware across three multiplies\n"
+	"\t\t// ce_phase controls which of the multiplies needs to be set up\n"
+	"\t\t// at each time step\n"
+	"\t\tinitial\tce_phase = 3'b011;\n");
+
+	if (async_reset)
+		fprintf(fp,
+		"\t\talways @(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+	else
+		fprintf(fp,
+		"\t\talways @(posedge i_clk)\n"
+		"\t\tif (i_reset)\n");
+
+	fprintf(fp,
 		"\t\t\tce_phase <= 3'b011;\n"
 	"\t\telse if (i_ce)\n"
 		"\t\t\tce_phase <= 3'b000;\n"
 	"\t\telse if (ce_phase != 3'b011)\n"
 		"\t\t\tce_phase <= ce_phase + 1'b1;\n"
+	"\t\t// }}}\n"
 "\n"
+	"\t\t// mpy_pipe_v : does the multiply have valid incoming data?\n"
+	"\t\t// {{{\n"
 	"\t\talways @(*)\n"
 		"\t\t\tmpy_pipe_v = (i_ce)||(ce_phase < 3'b010);\n"
+	"\t\t// }}}\n"
 "\n");
 
 	fprintf(fp,
+	"\t\t// mpy_pipe_c, mpy_pipe_d: coefficient and data inputs to mpy\n"
+	"\t\t// {{{\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif (ce_phase == 3\'b000)\n"
 	"\t\tbegin\n"
-		"\t\t\t// Second clock\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t// Second clock -- load the inputs like shift registers\n"
 		"\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:(CWIDTH+1)] <= {\n"
 		"\t\t\t\tir_coef_r[CWIDTH-1], ir_coef_r,\n"
 		"\t\t\t\tir_coef_i[CWIDTH-1], ir_coef_i };\n"
@@ -690,17 +853,24 @@ SLASHLINE
 		"\t\t\t\tr_dif_r[IWIDTH], r_dif_r,\n"
 		"\t\t\t\tr_dif_i[IWIDTH], r_dif_i };\n"
 		"\t\t\tmpy_pipe_d[(IWIDTH+2)-1:0] <= r_dif_r + r_dif_i;\n"
-"\n"
+		"\t\t\t// }}}\n"
 	"\t\tend else if (mpy_pipe_v)\n"
 	"\t\tbegin\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t// Shift the registers to produce the next values\n"
 		"\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:0] <= {\n"
 		"\t\t\t\tmpy_pipe_c[2*(CWIDTH+1)-1:0], {(CWIDTH+1){1\'b0}} };\n"
 		"\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:0] <= {\n"
 		"\t\t\t\tmpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1\'b0}} };\n"
+		"\t\t\t// }}}\n"
 	"\t\tend\n"
+	"\t\t// }}}\n"
 "\n");
 	fprintf(fp,
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2) mpy(i_clk, mpy_pipe_v,\n"
+		"\t\t// mpy_pipe_out = mpy_pipe_vc * mpy_pipe_vd\n"
+		"\t\t// {{{\n"
+		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
+		"\t\tmpy(i_clk, mpy_pipe_v,\n"
 			"\t\t\t\tmpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out\n");
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
@@ -708,19 +878,17 @@ SLASHLINE
 "`endif\n");
 	fprintf(fp,
 		"\t\t\t);\n"
+		"\t\t// }}}\n"
 "\n");
 
-	fprintf(fp,
-	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\n"
-				"\t\t\t\trp_one,  rp_two,  rp_three,\n"
-				"\t\t\t\trp2_one, rp2_two, rp2_three,\n"
-				"\t\t\t\trp3_one;\n"
-"\n");
 
 	fprintf(fp,
+	"\t\t// Register the multiply outputs into their various results\n"
+	"\t\t// {{{\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif (MPYREMAINDER == 0)\n"
-	"\t\tbegin\n\n"
+	"\t\tbegin\n"
+	"\t\t\t// {{{\n"
 	"\t\t	if (i_ce)\n"
 	"\t\t	begin\n"
 	"\t\t		rp_two   <= mpy_pipe_out;\n");
@@ -749,8 +917,10 @@ SLASHLINE
 "`endif\n");
 	fprintf(fp,
 	"\t\t	end\n"
+	"\t\t\t// }}}\n"
 	"\t\tend else if (MPYREMAINDER == 1)\n"
-	"\t\tbegin\n\n"
+	"\t\tbegin\n"
+	"\t\t\t// {{{\n"
 	"\t\t	if (i_ce)\n"
 	"\t\t	begin\n"
 	"\t\t		rp_one   <= mpy_pipe_out;\n");
@@ -779,8 +949,10 @@ SLASHLINE
 "`endif\n");
 	fprintf(fp,
 	"\t\t	end\n"
+	"\t\t\t// }}}\n"
 	"\t\tend else // if (MPYREMAINDER == 2)\n"
-	"\t\tbegin\n\n"
+	"\t\tbegin\n"
+	"\t\t\t// {{{\n"
 	"\t\t	if (i_ce)\n"
 	"\t\t	begin\n"
 	"\t\t		rp_three <= mpy_pipe_out;\n");
@@ -809,9 +981,13 @@ SLASHLINE
 "`endif\n");
 	fprintf(fp,
 	"\t\t	end\n"
-	"\t\tend\n\n");
+	"\t\t\t// }}}\n"
+	"\t\tend\n"
+	"\t\t// }}}\n\n");
 
 	fprintf(fp,
+	"\t\t// rp2_one, rp2_two, rp2_three, rp3_one\n"
+	"\t\t// {{{\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif (i_ce)\n"
 	"\t\tbegin\n"
@@ -822,6 +998,7 @@ SLASHLINE
 
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
+			"\t\t\t// {{{\n"
 			"\t\t\tf_rp2one_ic <= f_rpone_ic;\n"
 			"\t\t\tf_rp2one_id <= f_rpone_id;\n"
 "\n"
@@ -832,18 +1009,23 @@ SLASHLINE
 			"\t\t\tf_rp2three_id <= (MPYREMAINDER==2) ? f_past_id : f_rpthree_id;\n"
 			"\t\t\tf_rp3one_ic <= (MPYREMAINDER==0) ? f_rp2one_ic : f_rpone_ic;\n"
 			"\t\t\tf_rp3one_id <= (MPYREMAINDER==0) ? f_rp2one_id : f_rpone_id;\n"
+			"\t\t\t// }}}\n"
 "`endif\n");
 
 
 	fprintf(fp,
 		"\t\tend\n"
+		"\t\t// }}}\n"
 "\n"
+	"\t\t// Final output assignments\n"
+	"\t\t// {{{\n"
 	"\t\tassign\tp_one   = rp3_one;\n"
 	"\t\tassign\tp_two   = rp2_two;\n"
 	"\t\tassign\tp_three = rp2_three;\n"
 "\n");
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
+		"\t\t// {{{\n"
 		"\t\tassign	fp_one_ic = f_rp3one_ic;\n"
 		"\t\tassign	fp_one_id = f_rp3one_id;\n"
 "\n"
@@ -852,30 +1034,36 @@ SLASHLINE
 "\n"
 		"\t\tassign	fp_three_ic = f_rp2three_ic;\n"
 		"\t\tassign	fp_three_id = f_rp2three_id;\n"
+		"\t\t// }}}\n"
 "`endif\n"
 "\n");
 
 	fprintf(fp,
-"\tend endgenerate\n");
+	"\t\t// }}}\n"
+	"\n"
+	"\t\t// }}}\n"
+"\tend endgenerate\n\t// }}}\n\n");
 
 	fprintf(fp,
+	"\t// fifo_r, fifo_i\n"
+	"\t// {{{\n"
 	"\t// These values are held in memory and delayed during the\n"
 	"\t// multiply.  Here, we recover them.  During the multiply,\n"
 	"\t// values were multiplied by 2^(CWIDTH-2)*exp{-j*2*pi*...},\n"
 	"\t// therefore, the left_x values need to be right shifted by\n"
 	"\t// CWIDTH-2 as well.  The additional bits come from a sign\n"
 	"\t// extension.\n"
-	"\twire\tsigned\t[(IWIDTH+CWIDTH):0]	fifo_i, fifo_r;\n"
-	"\treg\t\t[(2*IWIDTH+1):0]	fifo_read;\n"
 	"\tassign\tfifo_r = { {2{fifo_read[2*(IWIDTH+1)-1]}},\n"
 		"\t\tfifo_read[(2*(IWIDTH+1)-1):(IWIDTH+1)], {(CWIDTH-2){1\'b0}} };\n"
 	"\tassign\tfifo_i = { {2{fifo_read[(IWIDTH+1)-1]}},\n"
 		"\t\tfifo_read[((IWIDTH+1)-1):0], {(CWIDTH-2){1\'b0}} };\n"
-"\n"
-"\n"
-	"\treg\tsigned\t[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fp,
+	"\t// Rounding and shifting\n"
+	"\t// {{{\n"
+	"\t// Notes\n"
+	"\t// {{{\n"
 	"\t// Let's do some rounding and remove unnecessary bits.\n"
 	"\t// We have (IWIDTH+CWIDTH+3) bits here, we need to drop down to\n"
 	"\t// OWIDTH, and SHIFT by SHIFT bits in the process.  The trick is\n"
@@ -900,30 +1088,30 @@ SLASHLINE
 	"\t// Now, if the user wants to keep any extras of these (via OWIDTH),\n"
 	"\t// or if he wishes to arbitrarily shift some of these off (via\n"
 	"\t// SHIFT) we accomplish that here.\n"
+	"\t// }}}\n"
 "\n");
-	fprintf(fp,
-	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;\n\n");
 
 	fprintf(fp,
-	"\twire\tsigned\t[(CWIDTH+IWIDTH+3-1):0]\tleft_sr, left_si;\n"
 	"\tassign	left_sr = { {(2){fifo_r[(IWIDTH+CWIDTH)]}}, fifo_r };\n"
 	"\tassign	left_si = { {(2){fifo_i[(IWIDTH+CWIDTH)]}}, fifo_i };\n\n");
 
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_left_r(i_clk, i_ce,\n"
-	"\t\t\t\tleft_sr, rnd_left_r);\n\n",
-		rnd_string);
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_left_r(i_clk, i_ce, left_sr, rnd_left_r);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_left_i(i_clk, i_ce,\n"
-	"\t\t\t\tleft_si, rnd_left_i);\n\n",
-		rnd_string);
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_left_i(i_clk, i_ce, left_si, rnd_left_i);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_r(i_clk, i_ce,\n"
-	"\t\t\t\tmpy_r, rnd_right_r);\n\n", rnd_string);
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_r(i_clk, i_ce, mpy_r, rnd_right_r);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_i(i_clk, i_ce,\n"
-	"\t\t\t\tmpy_i, rnd_right_i);\n\n", rnd_string);
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_i(i_clk, i_ce, mpy_i, rnd_right_i);\n", rnd_string);
+	fprintf(fp, "\t// }}}\n\n");
 	fprintf(fp,
+	"\t// fifo_read, mpy_r, mpy_i\n"
+	"\t// {{{\n"
+	"\t// Unwrap the three multiplies into the two multiply results\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 	"\tbegin\n"
@@ -936,10 +1124,12 @@ SLASHLINE
 		"\t\tmpy_r <= p_one - p_two;\n"
 		"\t\tmpy_i <= p_three - p_one - p_two;\n"
 	"\tend\n"
+	"\t// }}}\n"
 "\n");
 
 	fprintf(fp,
-	"\treg\t[(AUXLEN-1):0]\taux_pipeline;\n"
+	"\t// aux_pipeline\n"
+	"\t// {{{\n"
 	"\tinitial\taux_pipeline = 0;\n");
 	if (async_reset)
 		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
@@ -949,8 +1139,11 @@ SLASHLINE
 	"\t\taux_pipeline <= 0;\n"
 	"\telse if (i_ce)\n"
 	"\t\taux_pipeline <= { aux_pipeline[(AUXLEN-2):0], i_aux };\n"
+	"\t// }}}\n"
 "\n");
 	fprintf(fp,
+	"\t// o_aux\n"
+	"\t// {{{\n"
 	"\tinitial o_aux = 1\'b0;\n");
 	if (async_reset)
 		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
@@ -963,28 +1156,52 @@ SLASHLINE
 			"\t\t// Second clock, latch for final clock\n"
 			"\t\to_aux <= aux_pipeline[AUXLEN-1];\n"
 		"\tend\n"
+	"\t// }}}\n"
 "\n");
 
 	fprintf(fp,
+	"\t// o_left, o_right\n"
+	"\t// {{{\n"
 	"\t// As a final step, we pack our outputs into two packed two\'s\n"
 	"\t// complement numbers per output word, so that each output word\n"
 	"\t// has (2*OWIDTH) bits in it, with the top half being the real\n"
 	"\t// portion and the bottom half being the imaginary portion.\n"
 	"\tassign	o_left = { rnd_left_r, rnd_left_i };\n"
 	"\tassign	o_right= { rnd_right_r,rnd_right_i};\n"
+	"\t// }}}\n"
 "\n");
 
 	fprintf(fp,
+SLASHLINE
+SLASHLINE
+SLASHLINE
+"//\n"
+"// Formal property section\n"
+"// {{{\n"
+SLASHLINE
+SLASHLINE
+SLASHLINE
 "`ifdef	FORMAL\n");
 	if (formal_property_flag) {
 		fprintf(fp,
-	"\tinitial\tf_dlyaux[0] = 0;\n"
+	"\tinitial\tf_dlyaux[0] = 0;\n");
+
+		if (async_reset)
+			fprintf(fp,
+	"\talways @(posedge i_clk, negedge i_areset_n)\n"
+	"\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
 	"\talways @(posedge i_clk)\n"
-	"\tif (i_reset)\n"
+	"\tif (i_reset)\n");
+
+		fprintf(fp,
 		"\t\tf_dlyaux\t<= 0;\n"
 	"\telse if (i_ce)\n"
 		"\t\tf_dlyaux\t<= { f_dlyaux[F_DEPTH-2:0], i_aux };\n"
 "\n"
+	"\t// f_dly[left|right|coef]_[i|r][0]\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
 	"\tbegin\n"
@@ -995,7 +1212,10 @@ SLASHLINE
 	"\t	f_dlycoeff_r[0]  <= i_coef[ (2*CWIDTH-1):CWIDTH];\n"
 	"\t	f_dlycoeff_i[0]  <= i_coef[ (  CWIDTH-1):0];\n"
 	"\tend\n"
+	"\t// }}}\n"
 "\n"
+	"\t// f_dly[left|right|coef]_[i|r][F_DEPTH-1:1]\n"
+	"\t// {{{\n"
 	"\tgenvar	k;\n"
 	"\tgenerate for(k=1; k<F_DEPTH; k=k+1)\n"
 	"\tbegin : F_PROPAGATE_DELAY_LINES\n"
@@ -1013,6 +1233,7 @@ SLASHLINE
 		"\t\tend\n"
 "\n"
 	"\tend endgenerate\n"
+	"\t// }}}\n"
 "\n"
 "`ifndef VERILATOR\n"
 	"\t//\n"
@@ -1021,7 +1242,7 @@ SLASHLINE
 	"\t//\n"
 	"\tgenerate if (CKPCE <= 1)\n"
 	"\tbegin\n"
-"\n"
+		"\t\t// {{{\n"
 		"\t\t// No primary i_ce assumption.  i_ce can be anything\n"
 		"\t\t//\n"
 		"\t\t// First induction i_ce assumption: No more than one\n"
@@ -1039,10 +1260,10 @@ SLASHLINE
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (($past(i_ce))&&(!$past(i_ce,2)))\n"
 			"\t\t\tassume(i_ce);\n"
-"\n"
+		"\t\t// }}}\n"
 	"\tend else if (CKPCE == 2)\n"
 	"\tbegin : F_CKPCE_TWO\n"
-"\n"
+		"\t\t// {{{\n"
 		"\t\t// Primary i_ce assumption: Every i_ce cycle is followed\n"
 		"\t\t// by a non-i_ce cycle, so the multiplies can be\n"
 		"\t\t// multiplexed\n"
@@ -1060,10 +1281,10 @@ SLASHLINE
 		"\t\tif ((!$past(i_ce))&&($past(i_ce,2))\n"
 			"\t\t\t\t&&(!$past(i_ce,3))&&(!$past(i_ce,4)))\n"
 			"\t\t\tassume(i_ce);\n"
-"\n"
+		"\t\t// }}}\n"
 	"\tend else if (CKPCE == 3)\n"
 	"\tbegin : F_CKPCE_THREE\n"
-"\n"
+		"\t\t// {{{\n"
 		"\t\t// Primary i_ce assumption: Following any i_ce cycle,\n"
 		"\t\t// there must be two clock cycles with i_ce de-asserted\n"
 		"\t\talways @(posedge i_clk)\n"
@@ -1086,14 +1307,23 @@ SLASHLINE
 			"\t\t\t&&($past(i_ce,3))&&(!$past(i_ce,4))\n"
 			"\t\t\t&&(!$past(i_ce,5))&&(!$past(i_ce,6)))\n"
 			"\t\t\tassume(i_ce);\n"
-"\n"
+		"\t\t// }}}\n"
 	"\tend endgenerate\n"
 "`endif\n"
 "\n"
 	"\treg	[F_LGDEPTH:0]	f_startup_counter;\n"
-	"\tinitial	f_startup_counter = 0;\n"
-	"\talways @(posedge i_clk)\n"
-	"\tif (i_reset)\n"
+	"\tinitial	f_startup_counter = 0;\n");
+
+		if (async_reset)
+			fprintf(fp,
+			"\talways @(posedge i_clk, negedge i_areset_n)\n"
+			"\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
+				"\talways @(posedge i_clk)\n"
+				"\tif (i_reset)\n");
+
+		fprintf(fp,
 	"\t	f_startup_counter <= 0;\n"
 	"\telse if ((i_ce)&&(!(&f_startup_counter)))\n"
 	"\t	f_startup_counter <= f_startup_counter + 1;\n"
@@ -1225,7 +1455,7 @@ SLASHLINE
 		"\t\t// verilator lint_on  WIDTH\n"
 "`ifdef	VERILATOR\n"
 		"\t\t// Check that the multiplies match--but *ONLY* if using\n"
-		"\t\t// Verilator, and not if using formal proper\n"
+		"\t\t// Veri1lator, and not if using formal proper\n"
 		"\t\tassert(p_one   == f_predifr * f_dlycoeff_r[F_D-1]);\n"
 		"\t\tassert(p_two   == f_predifi * f_dlycoeff_i[F_D-1]);\n"
 		"\t\tassert(p_three == f_sumdiff * f_sumcoef);\n"
@@ -1274,6 +1504,7 @@ SLASHLINE
 "`endif // FORMAL\n");
 
 	fprintf(fp,
+"// }}}\n"
 "endmodule\n");
 	fclose(fp);
 }
@@ -1344,105 +1575,143 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	hwbfly(i_clk, %s, i_ce, i_coef, i_left, i_right, i_aux,\n"
-		"\t\to_left, o_right, o_aux);\n"
-	"\t// Public changeable parameters ...\n"
-	"\t//	- IWIDTH, number of bits in each component of the input\n"
-	"\t//	- CWIDTH, number of bits in each component of the twiddle factor\n"
-	"\t//	- OWIDTH, number of bits in each component of the output\n"
-	"\tparameter IWIDTH=16,CWIDTH=IWIDTH+%d,OWIDTH=IWIDTH+1;\n"
-	"\t// Drop an additional bit on the output?\n"
-	"\tparameter\t\tSHIFT=0;\n"
-	"\t// The number of clocks per clock enable, 1, 2, or 3.\n"
-	"\tparameter\t[1:0]\tCKPCE=%d;\n\t//\n", resetw.c_str(), xtracbits,
-		ckpce);
+"module	hwbfly #(\n"
+	// (i_clk, %s, i_ce, i_coef, i_left, i_right, i_aux,\n"
+	//	"\t\to_left, o_right, o_aux);\n"
+		"\t\t// {{{\n"
+		"\t\t// Public changeable parameters ...\n"
+		"\t\t//	- IWIDTH, number of bits in each component of the input\n"
+		"\t\t//	- CWIDTH, number of bits in each component of the\n"
+		"\t\t//\ttwiddle factor\n"
+		"\t\t//	- OWIDTH, number of bits in each component of the\n"
+		"\t\t//\toutput\n"
+		"\t\tparameter IWIDTH=16,CWIDTH=IWIDTH+%d,OWIDTH=IWIDTH+1,\n"
+		"\t\t// SHIFT\n"
+		"\t\t// {{{\n"
+		"\t\t// Drop an additional bit on the output?\n"
+		"\t\tparameter\t\tSHIFT=0,\n"
+		"\t\t// }}}\n"
+		"\t\t// CKPCE\n"
+		"\t\t// {{{\n"
+		"\t\t// The number of clocks per clock enable, 1, 2, or 3.\n"
+		"\t\tparameter\t[1:0]\tCKPCE=%d\n\t\t// }}}\n\t\t// }}}\n",
+			xtracbits, ckpce);
 
 	fprintf(fp,
-	"\tinput\twire\ti_clk, %s, i_ce;\n"
-	"\tinput\twire\t[(2*CWIDTH-1):0]\ti_coef;\n"
-	"\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right;\n"
-	"\tinput\twire\ti_aux;\n"
-	"\toutput\twire\t[(2*OWIDTH-1):0]\to_left, o_right;\n"
-	"\toutput\treg\to_aux;\n\n"
+	"\t) (\n"
+	"\t\t// {{{\n"
+	"\t\tinput\twire\ti_clk, %s, i_ce,\n"
+	"\t\tinput\twire\t[(2*CWIDTH-1):0]\ti_coef,\n"
+	"\t\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right,\n"
+	"\t\tinput\twire\ti_aux,\n"
+	"\t\toutput\twire\t[(2*OWIDTH-1):0]\to_left, o_right,\n"
+	"\t\toutput\treg\to_aux\n"
+	"\t\t// }}}\n"
+	"\t);\n"
 "\n", resetw.c_str());
 
 	fprintf(fp,
+	"\t// Local signal declarations\n"
+	"\t// {{{\n"
 	"\treg\t[(2*IWIDTH-1):0]	r_left, r_right;\n"
 	"\treg\t			r_aux, r_aux_2;\n"
 	"\treg\t[(2*CWIDTH-1):0]	r_coef;\n"
 	"\twire	signed	[(IWIDTH-1):0]	r_left_r, r_left_i, r_right_r, r_right_i;\n"
-	"\tassign\tr_left_r  = r_left[ (2*IWIDTH-1):(IWIDTH)];\n"
-	"\tassign\tr_left_i  = r_left[ (IWIDTH-1):0];\n"
-	"\tassign\tr_right_r = r_right[(2*IWIDTH-1):(IWIDTH)];\n"
-	"\tassign\tr_right_i = r_right[(IWIDTH-1):0];\n"
 	"\treg	signed	[(CWIDTH-1):0]	ir_coef_r, ir_coef_i;\n"
 "\n"
 	"\treg	signed	[(IWIDTH):0]	r_sum_r, r_sum_i, r_dif_r, r_dif_i;\n"
 "\n"
 	"\treg	[(2*IWIDTH+2):0]	leftv, leftvv;\n"
+	"\n"
+	"\twire\tsigned	[((IWIDTH+1)+(CWIDTH)-1):0]	p_one, p_two;\n"
+	"\twire\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	p_three;\n"
+	"\n"
+	"\twire\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	w_one, w_two;\n"
 "\n"
+	"\twire\taux_s;\n"
+	"\twire\tsigned\t[(IWIDTH+CWIDTH):0]	left_si, left_sr;\n"
+	"\treg\t\t[(2*IWIDTH+2):0]	left_saved;\n"
+	"\t(* use_dsp48=\"no\" *)\n"
+	"\treg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n"
+	"\n"
+	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;\n"
+	"\t// }}}\n"
+"\n"
+	"\tassign\tr_left_r  = r_left[ (2*IWIDTH-1):(IWIDTH)];\n"
+	"\tassign\tr_left_i  = r_left[ (IWIDTH-1):0];\n"
+	"\tassign\tr_right_r = r_right[(2*IWIDTH-1):(IWIDTH)];\n"
+	"\tassign\tr_right_i = r_right[(IWIDTH-1):0];\n"
+	"\n"
 	"\t// Set up the input to the multiply\n"
+	"\n"
+	"\t// r_aux, r_aux_2\n"
+	"\t// {{{\n"
 	"\tinitial r_aux   = 1\'b0;\n"
 	"\tinitial r_aux_2 = 1\'b0;\n");
 	if (async_reset)
-		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
-		fprintf(fp, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
-		"\t\tbegin\n"
-			"\t\t\tr_aux <= 1\'b0;\n"
-			"\t\t\tr_aux_2 <= 1\'b0;\n"
-		"\t\tend else if (i_ce)\n"
-		"\t\tbegin\n"
-			"\t\t\t// One clock just latches the inputs\n"
-			"\t\t\tr_aux <= i_aux;\n"
-			"\t\t\t// Next clock adds/subtracts\n"
-			"\t\t\t// Other inputs are simply delayed on second clock\n"
-			"\t\t\tr_aux_2 <= r_aux;\n"
-		"\t\tend\n"
+		"\tbegin\n"
+			"\t\tr_aux <= 1\'b0;\n"
+			"\t\tr_aux_2 <= 1\'b0;\n"
+		"\tend else if (i_ce)\n"
+		"\tbegin\n"
+			"\t\t// One clock just latches the inputs\n"
+			"\t\tr_aux <= i_aux;\n"
+			"\t\t// Next clock adds/subtracts\n"
+			"\t\t// Other inputs are simply delayed on second clock\n"
+			"\t\tr_aux_2 <= r_aux;\n"
+		"\tend\n"
+	"\t// }}}\n\n"
+	"\t// r_[left|right|coef], r_[sum|dif]_[r|i], ir_coef_[r|i]\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk)\n"
-		"\t\tif (i_ce)\n"
-		"\t\tbegin\n"
-			"\t\t\t// One clock just latches the inputs\n"
-			"\t\t\tr_left <= i_left;	// No change in # of bits\n"
-			"\t\t\tr_right <= i_right;\n"
-			"\t\t\tr_coef  <= i_coef;\n"
-			"\t\t\t// Next clock adds/subtracts\n"
-			"\t\t\tr_sum_r <= r_left_r + r_right_r; // Now IWIDTH+1 bits\n"
-			"\t\t\tr_sum_i <= r_left_i + r_right_i;\n"
-			"\t\t\tr_dif_r <= r_left_r - r_right_r;\n"
-			"\t\t\tr_dif_i <= r_left_i - r_right_i;\n"
-			"\t\t\t// Other inputs are simply delayed on second clock\n"
-			"\t\t\tir_coef_r <= r_coef[(2*CWIDTH-1):CWIDTH];\n"
-			"\t\t\tir_coef_i <= r_coef[(CWIDTH-1):0];\n"
-		"\t\tend\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\t// One clock just latches the inputs\n"
+		"\t\tr_left <= i_left;	// No change in # of bits\n"
+		"\t\tr_right <= i_right;\n"
+		"\t\tr_coef  <= i_coef;\n"
+		"\t\t// Next clock adds/subtracts\n"
+		"\t\tr_sum_r <= r_left_r + r_right_r; // Now IWIDTH+1 bits\n"
+		"\t\tr_sum_i <= r_left_i + r_right_i;\n"
+		"\t\tr_dif_r <= r_left_r - r_right_r;\n"
+		"\t\tr_dif_i <= r_left_i - r_right_i;\n"
+		"\t\t// Other inputs are simply delayed on second clock\n"
+		"\t\tir_coef_r <= r_coef[(2*CWIDTH-1):CWIDTH];\n"
+		"\t\tir_coef_i <= r_coef[(CWIDTH-1):0];\n"
+	"\tend\n"
+	"\t// }}}\n"
 	"\n\n");
 	fprintf(fp,
 "\t// See comments in the butterfly.v source file for a discussion of\n"
 "\t// these operations and the appropriate bit widths.\n\n");
 	fprintf(fp,
-	"\twire\tsigned	[((IWIDTH+1)+(CWIDTH)-1):0]	p_one, p_two;\n"
-	"\twire\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	p_three;\n"
 "\n"
+	"\t// leftv, leftvv\n"
+	"\t// {{{\n"
 	"\tinitial leftv    = 0;\n"
 	"\tinitial leftvv   = 0;\n");
 	if (async_reset)
-		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
-		fprintf(fp, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
-		"\t\tbegin\n"
-			"\t\t\tleftv <= 0;\n"
-			"\t\t\tleftvv <= 0;\n"
-		"\t\tend else if (i_ce)\n"
-		"\t\tbegin\n"
-			"\t\t\t// Second clock, pipeline = 1\n"
-			"\t\t\tleftv <= { r_aux_2, r_sum_r, r_sum_i };\n"
+		"\tbegin\n"
+			"\t\tleftv <= 0;\n"
+			"\t\tleftvv <= 0;\n"
+		"\tend else if (i_ce)\n"
+		"\tbegin\n"
+			"\t\t// Second clock, pipeline = 1\n"
+			"\t\tleftv <= { r_aux_2, r_sum_r, r_sum_i };\n"
 "\n"
-			"\t\t\t// Third clock, pipeline = 3\n"
-			"\t\t\t//   As desired, each of these lines infers a DSP48\n"
-			"\t\t\tleftvv <= leftv;\n"
-		"\t\tend\n"
+			"\t\t// Third clock, pipeline = 3\n"
+			"\t\t//   As desired, each of these lines infers a DSP48\n"
+			"\t\tleftvv <= leftv;\n"
+		"\tend\n"
+		"\t// }}}\n"
 "\n");
 
 	// Nominally, we should handle code for 1, 2, or 3 clocks per CE, with
@@ -1458,9 +1727,14 @@ SLASHLINE
 	///	One clock per CE, so CE, CE, CE, CE, CE is possible
 	///
 	fprintf(fp,
+"\t// Core multiply section\n"
+"\t// {{{\n"
 "\tgenerate if (CKPCE <= 1)\n\tbegin : CKPCE_ONE\n");
 
 	fprintf(fp,
+	"\t\t// {{{\n"
+	"\t\t// Local declarations\n"
+	"\t\t// {{{\n"
 	"\t\t// Coefficient multiply inputs\n"
 	"\t\treg\tsigned	[(CWIDTH-1):0]	p1c_in, p2c_in;\n"
 	"\t\t// Data multiply inputs\n"
@@ -1473,9 +1747,12 @@ SLASHLINE
 	fprintf(fp,
 	"\t\treg\tsigned	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one, rp_two;\n"
 	"\t\treg\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
+	"\t\t// }}}\n"
 "\n");
 
 	fprintf(fp,
+	"\t\t// p[1|2]c_in, p[1|2|3]d_in\n"
+	"\t\t// {{{\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif (i_ce)\n"
 	"\t\tbegin\n"
@@ -1486,10 +1763,12 @@ SLASHLINE
 		"\t\t\tp2d_in <= r_dif_i;\n"
 		"\t\t\tp3c_in <= ir_coef_i + ir_coef_r;\n"
 		"\t\t\tp3d_in <= r_dif_r + r_dif_i;\n"
-	"\t\tend\n\n");
+	"\t\tend\n\t\t// }}}\n\n");
 
 	if (formal_property_flag)
 		fprintf(fp,
+	"\t\t// Perform our multiplies\n"
+	"\t\t// {{{\n"
 "`ifndef	FORMAL\n");
 
 	fprintf(fp,
@@ -1506,6 +1785,7 @@ SLASHLINE
 	if (formal_property_flag)
 		fprintf(fp,
 "`else\n"
+		"\t\t// {{{\n"
 		"\t\twire	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	pre_rp_one, pre_rp_two;\n"
 		"\t\twire	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]	pre_rp_three;\n"
 "\n"
@@ -1519,17 +1799,19 @@ SLASHLINE
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 		"\t\tbegin\n"
-		"\t\t	rp_one   = pre_rp_one;\n"
-		"\t\t	rp_two   = pre_rp_two;\n"
-		"\t\t	rp_three = pre_rp_three;\n"
+		"\t\t	rp_one   <= pre_rp_one;\n"
+		"\t\t	rp_two   <= pre_rp_two;\n"
+		"\t\t	rp_three <= pre_rp_three;\n"
 		"\t\tend\n"
-"`endif // FORMAL\n");
+		"\t\t// }}}\n"
+"`endif // FORMAL\n"
+		"\t\t// }}}\n");
 
 	fprintf(fp,"\n"
 	"\t\tassign\tp_one   = rp_one;\n"
 	"\t\tassign\tp_two   = rp_two;\n"
 	"\t\tassign\tp_three = rp_three;\n"
-"\n");
+	"\t\t// }}}\n");
 
 	///////////////////////////////////////////
 	///
@@ -1538,6 +1820,9 @@ SLASHLINE
 	fprintf(fp,
 	"\tend else if (CKPCE <= 2)\n"
 	"\tbegin : CKPCE_TWO\n"
+		"\t\t// {{{\n"
+		"\t\t// Local declarations\n"
+		"\t\t// {{{\n"
 		"\t\t// Coefficient multiply inputs\n"
 		"\t\treg		[2*(CWIDTH)-1:0]	mpy_pipe_c;\n"
 		"\t\t// Data multiply inputs\n"
@@ -1548,28 +1833,48 @@ SLASHLINE
 		"\t\treg	signed	[(CWIDTH+1)-1:0]	mpy_cof_sum;\n"
 		"\t\treg	signed	[(IWIDTH+2)-1:0]	mpy_dif_sum;\n"
 "\n"
-		"\t\tassign	mpy_pipe_vc =  mpy_pipe_c[2*(CWIDTH)-1:CWIDTH];\n"
-		"\t\tassign	mpy_pipe_vd =  mpy_pipe_d[2*(IWIDTH+1)-1:IWIDTH+1];\n"
-"\n"
 		"\t\treg			mpy_pipe_v;\n"
 		"\t\treg			ce_phase;\n"
 "\n"
 		"\t\treg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
 		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
+		"\n"
+		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one,\n"
+				"\t\t\t\t\t\t\trp2_one, rp_two;\n"
+		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\tassign	mpy_pipe_vc =  mpy_pipe_c[2*(CWIDTH)-1:CWIDTH];\n"
+		"\t\tassign	mpy_pipe_vd =  mpy_pipe_d[2*(IWIDTH+1)-1:IWIDTH+1];\n"
 "\n"
-		"\t\tinitial	ce_phase = 1'b1;\n"
+		"\t\t// ce_phase\n"
+		"\t\t// {{{\n"
+		"\t\tinitial	ce_phase = 1'b1;\n");
+	if (async_reset)
+		fprintf(fp,
+		"\t\talways @(posedge i_clk, negedge i_areset_n)\n"
+		"\t\tif (!i_areset_n)\n");
+	else
+		fprintf(fp,
 		"\t\talways @(posedge i_clk)\n"
-		"\t\tif (i_reset)\n"
+		"\t\tif (i_reset)\n");
+
+	fprintf(fp,
 			"\t\t\tce_phase <= 1'b1;\n"
 		"\t\telse if (i_ce)\n"
 			"\t\t\tce_phase <= 1'b0;\n"
 		"\t\telse\n"
 			"\t\t\tce_phase <= 1'b1;\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\t// mpy_pipe_v\n"
+		"\t\t// {{{\n"
 		"\t\talways @(*)\n"
 			"\t\t\tmpy_pipe_v = (i_ce)||(!ce_phase);\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\t// mpy_pipe_c, mpy_pipe_d, mpy_cof_sum, mpy_dif_sum\n"
+		"\t\t// {{{\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (!ce_phase)\n"
 		"\t\tbegin\n"
@@ -1589,8 +1894,9 @@ SLASHLINE
 				"\t\t\t\tmpy_pipe_c[(CWIDTH)-1:0], {(CWIDTH){1'b0}} };\n"
 			"\t\t\tmpy_pipe_d[2*(IWIDTH+1)-1:0] <= {\n"
 				"\t\t\t\tmpy_pipe_d[(IWIDTH+1)-1:0], {(IWIDTH+1){1'b0}} };\n"
-		"\t\tend\n\n");
+		"\t\tend\n\t\t// }}}\n\n");
 
+	fprintf(fp, "\t\t// Perform the actual multiplies\n\t\t// {{{\n");
 	if (formal_property_flag)
 		fprintf(fp, "`ifndef	FORMAL\n");
 
@@ -1605,6 +1911,7 @@ SLASHLINE
 
 	if (formal_property_flag)
 		fprintf(fp, "`else\n"
+		"\t\t// {{{\n"
 		"\t\twire	signed [IWIDTH+CWIDTH+3-1:0]	pre_longmpy;\n"
 		"\t\twire	signed	[(CWIDTH+IWIDTH+1)-1:0]	pre_mpy_pipe_out;\n"
 "\n"
@@ -1622,13 +1929,13 @@ SLASHLINE
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (mpy_pipe_v)\n"
 		"\t\t	mpy_pipe_out <= pre_mpy_pipe_out;\n"
-"`endif\n");
+		"\t\t// }}}\n"
+"`endif\n"
+	"\t\t// }}}\n");
 
 	fprintf(fp,"\n"
-		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one,\n"
-				"\t\t\t\t\t\t\trp2_one, rp_two;\n"
-		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]	rp_three;\n"
-"\n"
+		"\t\t// Register our outputs\n"
+		"\t\t// {{{\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (!ce_phase) // 1.5 clock\n"
 			"\t\t\trp_one <= mpy_pipe_out;\n"
@@ -1638,14 +1945,21 @@ SLASHLINE
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce) // Second clock\n"
 			"\t\t\trp_three<= longmpy;\n"
+		"\n"
+		"\t\t// Reclock rp_one when i_ce is true next\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 			"\t\t\trp2_one<= rp_one;\n"
+		"\t\t// }}}\n"
 "\n"
+		"\t\t// Assign our output values\n"
+		"\t\t// {{{\n"
 		"\t\tassign	p_one  = rp2_one;\n"
 		"\t\tassign	p_two  = rp_two;\n"
 		"\t\tassign	p_three= rp_three;\n"
-"\n");
+		"\t\t// }}}\n"
+		"\n"
+		"\t\t// }}}\n");
 
 	/////////////////////////
 	///
@@ -1655,6 +1969,9 @@ SLASHLINE
 "\tend else if (CKPCE <= 2'b11)\n\tbegin : CKPCE_THREE\n");
 
 	fprintf(fp,
+	"\t\t// {{{\n"
+	"\t\t// Local declarations\n"
+	"\t\t// {{{\n"
 	"\t\t// Coefficient multiply inputs\n"
 	"\t\treg\t\t[3*(CWIDTH+1)-1:0]\tmpy_pipe_c;\n"
 	"\t\t// Data multiply inputs\n"
@@ -1662,192 +1979,241 @@ SLASHLINE
 	"\t\twire\tsigned	[(CWIDTH):0]	mpy_pipe_vc;\n"
 	"\t\twire\tsigned	[(IWIDTH+1):0]	mpy_pipe_vd;\n"
 	"\n"
-	"\t\tassign\tmpy_pipe_vc =  mpy_pipe_c[3*(CWIDTH+1)-1:2*(CWIDTH+1)];\n"
-	"\t\tassign\tmpy_pipe_vd =  mpy_pipe_d[3*(IWIDTH+2)-1:2*(IWIDTH+2)];\n"
-	"\n"
 	"\t\treg\t\t\tmpy_pipe_v;\n"
 	"\t\treg\t\t[2:0]\tce_phase;\n"
 	"\n"
 	"\t\treg\tsigned	[  (CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
+	"\n"
+	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp_one, rp_two,\n"
+					"\t\t\t\t\t\trp2_one, rp2_two;\n"
+	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\trp_three, rp2_three;\n"
+
+	"\t\t// }}}\n"
 "\n");
 	fprintf(fp,
-	"\t\tinitial\tce_phase = 3'b011;\n"
-	"\t\talways @(posedge i_clk)\n"
-	"\t\tif (i_reset)\n"
+	"\n"
+	"\t\tassign\tmpy_pipe_vc =  mpy_pipe_c[3*(CWIDTH+1)-1:2*(CWIDTH+1)];\n"
+	"\t\tassign\tmpy_pipe_vd =  mpy_pipe_d[3*(IWIDTH+2)-1:2*(IWIDTH+2)];\n"
+	"\n"
+	"\t\t// ce_phase\n"
+	"\t\t// {{{\n"
+	"\t\tinitial\tce_phase = 3'b011;\n");
+
+	if (async_reset)
+		fprintf(fp,
+			"\t\talways @(posedge i_clk, negedge i_areset_n)\n"
+			"\t\tif (!i_areset_n)\n");
+	else
+		fprintf(fp,
+			"\t\talways @(posedge i_clk)\n"
+			"\t\tif (i_reset)\n");
+
+	fprintf(fp,
 		"\t\t\tce_phase <= 3'b011;\n"
 	"\t\telse if (i_ce)\n"
 		"\t\t\tce_phase <= 3'b000;\n"
 	"\t\telse if (ce_phase != 3'b011)\n"
 		"\t\t\tce_phase <= ce_phase + 1'b1;\n"
+	"\t\t// }}}\n"
 "\n"
+	"\t\t// mpy_pipe_v\n"
+	"\t\t// {{{\n"
 	"\t\talways @(*)\n"
 		"\t\t\tmpy_pipe_v = (i_ce)||(ce_phase < 3'b010);\n"
+	"\t\t// }}}\n"
 "\n");
 
 	fprintf(fp,
+	"\t\t// mpy_pipe_c, mpy_pipe_d\n"
+	"\t\t// {{{\n"
 	"\t\talways @(posedge i_clk)\n"
-		"\t\t\tif (ce_phase == 3\'b000)\n"
-		"\t\t\tbegin\n"
-			"\t\t\t\t// Second clock\n"
-			"\t\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:(CWIDTH+1)] <= {\n"
-			"\t\t\t\t\tir_coef_r[CWIDTH-1], ir_coef_r,\n"
-			"\t\t\t\t\tir_coef_i[CWIDTH-1], ir_coef_i };\n"
-			"\t\t\t\tmpy_pipe_c[CWIDTH:0] <= ir_coef_i + ir_coef_r;\n"
-			"\t\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:(IWIDTH+2)] <= {\n"
-			"\t\t\t\t\tr_dif_r[IWIDTH], r_dif_r,\n"
-			"\t\t\t\t\tr_dif_i[IWIDTH], r_dif_i };\n"
-			"\t\t\t\tmpy_pipe_d[(IWIDTH+2)-1:0] <= r_dif_r + r_dif_i;\n"
+		"\t\tif (ce_phase == 3\'b000)\n"
+		"\t\tbegin\n"
+			"\t\t\t// Second clock\n"
+			"\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:(CWIDTH+1)] <= {\n"
+			"\t\t\t\tir_coef_r[CWIDTH-1], ir_coef_r,\n"
+			"\t\t\t\tir_coef_i[CWIDTH-1], ir_coef_i };\n"
+			"\t\t\tmpy_pipe_c[CWIDTH:0] <= ir_coef_i + ir_coef_r;\n"
+			"\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:(IWIDTH+2)] <= {\n"
+			"\t\t\t\tr_dif_r[IWIDTH], r_dif_r,\n"
+			"\t\t\t\tr_dif_i[IWIDTH], r_dif_i };\n"
+			"\t\t\tmpy_pipe_d[(IWIDTH+2)-1:0] <= r_dif_r + r_dif_i;\n"
 "\n"
-		"\t\t\tend else if (mpy_pipe_v)\n"
-		"\t\t\tbegin\n"
-			"\t\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:0] <= {\n"
-			"\t\t\t\t\tmpy_pipe_c[2*(CWIDTH+1)-1:0], {(CWIDTH+1){1\'b0}} };\n"
-			"\t\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:0] <= {\n"
-			"\t\t\t\t\tmpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1\'b0}} };\n"
-		"\t\t\tend\n\n");
+		"\t\tend else if (mpy_pipe_v)\n"
+		"\t\tbegin\n"
+			"\t\t\tmpy_pipe_c[3*(CWIDTH+1)-1:0] <= {\n"
+			"\t\t\t\tmpy_pipe_c[2*(CWIDTH+1)-1:0], {(CWIDTH+1){1\'b0}} };\n"
+			"\t\t\tmpy_pipe_d[3*(IWIDTH+2)-1:0] <= {\n"
+			"\t\t\t\tmpy_pipe_d[2*(IWIDTH+2)-1:0], {(IWIDTH+2){1\'b0}} };\n"
+		"\t\tend\n\t\t// }}}\n\n");
 
+	fprintf(fp,
+		"\t\t// Perform our actual multiplies\n"
+		"\t\t// {{{\n");
 	if (formal_property_flag)
 		fprintf(fp, "`ifndef\tFORMAL\n");
 
 	fprintf(fp,
+	"\t\t// mpy_pipe_out\n"
+	"\t\t// {{{\n"
 	"\t\talways @(posedge i_clk)\n"
-	"\t\t\tif (mpy_pipe_v)\n"
-			"\t\t\t\tmpy_pipe_out <= mpy_pipe_vc * mpy_pipe_vd;\n"
+	"\t\tif (mpy_pipe_v)\n"
+		"\t\t\tmpy_pipe_out <= mpy_pipe_vc * mpy_pipe_vd;\n"
+	"\t\t// }}}\n"
 "\n");
 
 	if (formal_property_flag)
 		fprintf(fp,
 "`else\t// FORMAL\n"
+		"\t\t// {{{\n"
 		"\t\twire	signed	[  (CWIDTH+IWIDTH+3)-1:0] pre_mpy_pipe_out;\n"
 "\n"
 		"\t\tabs_mpy #(CWIDTH+1,IWIDTH+2,1)\n"
 		"\t\t	mpy_pipe_outi(mpy_pipe_vc, mpy_pipe_vd, pre_mpy_pipe_out);\n"
 		"\t\talways @(posedge i_clk)\n"
-		"\t\t	if (mpy_pipe_v)\n"
-		"\t\t		mpy_pipe_out <= pre_mpy_pipe_out;\n"
-"`endif\t// FORMAL\n\n");
+		"\t\tif (mpy_pipe_v)\n"
+		"\t\t	mpy_pipe_out <= pre_mpy_pipe_out;\n"
+		"\t\t// }}}\n"
+"`endif\t// FORMAL\n"
+	"\t\t// }}}\n");
 
 
-	fprintf(fp,
-	"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]\trp_one, rp_two,\n"
-					"\t\t\t\t\t\trp2_one, rp2_two;\n"
-	"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\trp_three, rp2_three;\n"
-
-"\n");
 
 	fprintf(fp,
+	"\t\t// rp_[one|two|three], rp2_[one|two|three]--Sync outputs to i_ce\n"
+	"\t\t// {{{\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif(i_ce)\n"
 		"\t\t\trp_one <= mpy_pipe_out[(CWIDTH+IWIDTH):0];\n"
+	"\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif(ce_phase == 3'b000)\n"
 		"\t\t\trp_two <= mpy_pipe_out[(CWIDTH+IWIDTH):0];\n"
+	"\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif(ce_phase == 3'b001)\n"
 		"\t\t\trp_three <= mpy_pipe_out;\n"
+	"\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif (i_ce)\n"
 	"\t\tbegin\n"
 		"\t\t\trp2_one<= rp_one;\n"
 		"\t\t\trp2_two<= rp_two;\n"
 		"\t\t\trp2_three<= rp_three;\n"
-	"\t\tend\n");
+	"\t\tend\n"
+	"\t\t// }}}\n\n");
 	fprintf(fp,
+	"\t\t// Assign to p_* values\n"
+	"\t\t// {{{\n"
 	"\t\tassign	p_one\t= rp2_one;\n"
 	"\t\tassign	p_two\t= rp2_two;\n"
 	"\t\tassign\tp_three\t= rp2_three;\n"
-"\n");
+	"\t\t// }}}\n"
+	"\n"
+	"\t\t// }}}\n");
 
 	fprintf(fp,
-"\tend endgenerate\n");
+"\tend endgenerate\n"
+"\t// }}}\n");
 
 	fprintf(fp,
-	"\twire\tsigned	[((IWIDTH+2)+(CWIDTH+1)-1):0]	w_one, w_two;\n"
+	"\n"
 	"\tassign\tw_one = { {(2){p_one[((IWIDTH+1)+(CWIDTH)-1)]}}, p_one };\n"
 	"\tassign\tw_two = { {(2){p_two[((IWIDTH+1)+(CWIDTH)-1)]}}, p_two };\n"
-"\n");
-
-	fprintf(fp,
+	"\n"
+	"\t// left_sr, left_si\n"
+	"\t// {{{\n"
 	"\t// These values are held in memory and delayed during the\n"
 	"\t// multiply.  Here, we recover them.  During the multiply,\n"
 	"\t// values were multiplied by 2^(CWIDTH-2)*exp{-j*2*pi*...},\n"
 	"\t// therefore, the left_x values need to be right shifted by\n"
 	"\t// CWIDTH-2 as well.  The additional bits come from a sign\n"
 	"\t// extension.\n"
-	"\twire\taux_s;\n"
-	"\twire\tsigned\t[(IWIDTH+CWIDTH):0]	left_si, left_sr;\n"
-	"\treg\t\t[(2*IWIDTH+2):0]	left_saved;\n"
 	"\tassign\tleft_sr = { {2{left_saved[2*(IWIDTH+1)-1]}}, left_saved[(2*(IWIDTH+1)-1):(IWIDTH+1)], {(CWIDTH-2){1\'b0}} };\n"
 	"\tassign\tleft_si = { {2{left_saved[(IWIDTH+1)-1]}}, left_saved[((IWIDTH+1)-1):0], {(CWIDTH-2){1\'b0}} };\n"
+	"\t// }}}\n"
 	"\tassign\taux_s = left_saved[2*IWIDTH+2];\n"
-"\n"
-	"\t(* use_dsp48=\"no\" *)\n"
-	"\treg	signed	[(CWIDTH+IWIDTH+3-1):0]	mpy_r, mpy_i;\n"
 "\n");
 
 	fprintf(fp,
+	"\t// left_saved, o_aux\n"
+	"\t// {{{\n"
 	"\tinitial left_saved = 0;\n"
 	"\tinitial o_aux      = 1\'b0;\n");
 	if (async_reset)
-		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
-		fprintf(fp, "\talways @(posedge i_clk)\n\t\tif (i_reset)\n");
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
-	"\t\tbegin\n"
-		"\t\t\tleft_saved <= 0;\n"
-		"\t\t\to_aux <= 1\'b0;\n"
-	"\t\tend else if (i_ce)\n"
-	"\t\tbegin\n"
-		"\t\t\t// First clock, recover all values\n"
-		"\t\t\tleft_saved <= leftvv;\n"
+	"\tbegin\n"
+		"\t\tleft_saved <= 0;\n"
+		"\t\to_aux <= 1\'b0;\n"
+	"\tend else if (i_ce)\n"
+	"\tbegin\n"
+		"\t\t// First clock, recover all values\n"
+		"\t\tleft_saved <= leftvv;\n"
 "\n"
-		"\t\t\t// Second clock, round and latch for final clock\n"
-		"\t\t\to_aux <= aux_s;\n"
-	"\t\tend\n"
+		"\t\t// Second clock, round and latch for final clock\n"
+		"\t\to_aux <= aux_s;\n"
+	"\tend\n\t// }}}\n\n"
+	"\t// mpy_r, mpy_i\n"
+	"\t// {{{\n"
 	"\talways @(posedge i_clk)\n"
-	"\t\tif (i_ce)\n"
-	"\t\tbegin\n"
-		"\t\t\t// These values are IWIDTH+CWIDTH+3 bits wide\n"
-		"\t\t\t// although they only need to be (IWIDTH+1)\n"
-		"\t\t\t// + (CWIDTH) bits wide.  (We've got two\n"
-		"\t\t\t// extra bits we need to get rid of.)\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+		"\t\t// These values are IWIDTH+CWIDTH+3 bits wide\n"
+		"\t\t// although they only need to be (IWIDTH+1)\n"
+		"\t\t// + (CWIDTH) bits wide.  (We've got two\n"
+		"\t\t// extra bits we need to get rid of.)\n"
 		"\n"
-		"\t\t\t// These two lines also infer DSP48\'s.\n"
-		"\t\t\t// To keep from using extra DSP48 resources,\n"
-		"\t\t\t// they are prevented from using DSP48\'s\n"
-		"\t\t\t// by the (* use_dsp48 ... *) comment above.\n"
-		"\t\t\tmpy_r <= w_one - w_two;\n"
-		"\t\t\tmpy_i <= p_three - w_one - w_two;\n"
-	"\t\tend\n"
+		"\t\t// These two lines also infer DSP48\'s.\n"
+		"\t\t// To keep from using extra DSP48 resources,\n"
+		"\t\t// they are prevented from using DSP48\'s\n"
+		"\t\t// by the (* use_dsp48 ... *) comment above.\n"
+		"\t\tmpy_r <= w_one - w_two;\n"
+		"\t\tmpy_i <= p_three - w_one - w_two;\n"
+	"\tend\n"
+	"\t// }}}\n"
 	"\n");
 
 	fprintf(fp,
 	"\t// Round the results\n"
-	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_left_r, rnd_left_i, rnd_right_r, rnd_right_i;\n\n");
+	"\t// {{{\n"
+	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2)\n"
+	"\tdo_rnd_left_r(i_clk, i_ce, left_sr, rnd_left_r);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_r(i_clk, i_ce,\n"
-	"\t\t\t\tleft_sr, rnd_left_r);\n\n",
-		rnd_string);
+	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2)\n"
+	"\tdo_rnd_left_i(i_clk, i_ce, left_si, rnd_left_i);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2) do_rnd_left_i(i_clk, i_ce,\n"
-	"\t\t\t\tleft_si, rnd_left_i);\n\n",
-		rnd_string);
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_r(i_clk, i_ce, mpy_r, rnd_right_r);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_r(i_clk, i_ce,\n"
-	"\t\t\t\tmpy_r, rnd_right_r);\n\n", rnd_string);
-	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4) do_rnd_right_i(i_clk, i_ce,\n"
-	"\t\t\t\tmpy_i, rnd_right_i);\n\n", rnd_string);
+	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_i(i_clk, i_ce, mpy_i, rnd_right_i);\n\t// }}}\n\n", rnd_string);
 
 
 	fprintf(fp,
+	"\t// o_left, o_right\n"
+	"\t// {{{\n"
 	"\t// As a final step, we pack our outputs into two packed two's\n"
 	"\t// complement numbers per output word, so that each output word\n"
 	"\t// has (2*OWIDTH) bits in it, with the top half being the real\n"
 	"\t// portion and the bottom half being the imaginary portion.\n"
 	"\tassign\to_left = { rnd_left_r, rnd_left_i };\n"
 	"\tassign\to_right= { rnd_right_r,rnd_right_i};\n"
+	"// }}}\n"
 "\n");
+
+	fprintf(fp,
+SLASHLINE
+SLASHLINE
+SLASHLINE
+"//\n"
+"// Formal property section\n"
+"// {{{\n"
+SLASHLINE
+SLASHLINE
+SLASHLINE );
 
 	if (formal_property_flag) {
 		fprintf(fp,
@@ -1863,9 +2229,29 @@ SLASHLINE
 	"\treg	signed	[CWIDTH-1:0]	f_dlycoeff_r [0:F_DEPTH-1];\n"
 	"\treg	signed	[CWIDTH-1:0]	f_dlycoeff_i [0:F_DEPTH-1];\n"
 	"\treg	signed	[F_DEPTH-1:0]	f_dlyaux;\n"
-"\n"
+	"\treg	[F_LGDEPTH-1:0]	f_startup_counter;\n"
+	"\treg	signed	[IWIDTH:0]	f_sumr, f_sumi;\n"
+	"\treg	signed	[IWIDTH+CWIDTH:0]	f_sumrx, f_sumix;\n"
+	"\treg	signed	[IWIDTH:0]	f_difr, f_difi;\n"
+	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;\n"
+	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;\n"
+	"\treg	signed	[IWIDTH:0]	f_predifr, f_predifi;\n"
+	"\twire	signed	[IWIDTH+CWIDTH+1-1:0]	f_predifrx, f_predifix;\n"
+	"\treg	signed	[CWIDTH:0]	f_sumcoef;\n"
+	"\treg	signed	[IWIDTH+1:0]	f_sumdiff;\n"
+"\n");
+
+		if (async_reset)
+			fprintf(fp,
+	"\talways @(posedge i_clk, negedge i_areset_n)\n"
+	"\tif (!i_areset_n)\n");
+
+		else
+			fprintf(fp,
 	"\talways @(posedge i_clk)\n"
-	"\tif (i_reset)\n"
+	"\tif (i_reset)\n");
+
+		fprintf(fp,
 		"\t\tf_dlyaux <= 0;\n"
 	"\telse if (i_ce)\n"
 		"\t\tf_dlyaux <= { f_dlyaux[F_DEPTH-2:0], i_aux };\n"
@@ -1947,37 +2333,40 @@ SLASHLINE
 	"\tend endgenerate\n"
 "`endif"
 "\n"
-	"\treg	[F_LGDEPTH-1:0]	f_startup_counter;\n"
-	"\tinitial	f_startup_counter = 0;\n"
-	"\talways @(posedge i_clk)\n"
-	"\tif (i_reset)\n"
+	"\tinitial	f_startup_counter = 0;\n");
+
+		if (async_reset)
+			fprintf(fp,
+			"\talways @(posedge i_clk, negedge i_areset_n)\n"
+			"\tif (!i_areset_n)\n");
+		else
+			fprintf(fp,
+			"\talways @(posedge i_clk)\n"
+			"\tif (i_reset)\n");
+
+		fprintf(fp,
 		"\t\tf_startup_counter <= 0;\n"
 	"\telse if ((i_ce)&&(!(&f_startup_counter)))\n"
 		"\t\tf_startup_counter <= f_startup_counter + 1;\n"
 "\n"
-	"\twire	signed	[IWIDTH:0]	f_sumr, f_sumi;\n"
 	"\talways @(*)\n"
 	"\tbegin\n"
 		"\t\tf_sumr = f_dlyleft_r[F_D] + f_dlyright_r[F_D];\n"
 		"\t\tf_sumi = f_dlyleft_i[F_D] + f_dlyright_i[F_D];\n"
 	"\tend\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH:0]	f_sumrx, f_sumix;\n"
 	"\tassign	f_sumrx = { {(2){f_sumr[IWIDTH]}}, f_sumr, {(CWIDTH-2){1'b0}} };\n"
 	"\tassign	f_sumix = { {(2){f_sumi[IWIDTH]}}, f_sumi, {(CWIDTH-2){1'b0}} };\n"
 	"\n"
-	"\twire	signed	[IWIDTH:0]	f_difr, f_difi;\n"
 	"\talways @(*)\n"
 	"\tbegin\n"
 		"\t\tf_difr = f_dlyleft_r[F_D] - f_dlyright_r[F_D];\n"
 		"\t\tf_difi = f_dlyleft_i[F_D] - f_dlyright_i[F_D];\n"
 	"\tend\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_difrx, f_difix;\n"
 	"\tassign	f_difrx = { {(CWIDTH+2){f_difr[IWIDTH]}}, f_difr };\n"
 	"\tassign	f_difix = { {(CWIDTH+2){f_difi[IWIDTH]}}, f_difi };\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH+3-1:0]	f_widecoeff_r, f_widecoeff_i;\n"
 	"\tassign	f_widecoeff_r = {{(IWIDTH+3){f_dlycoeff_r[F_D][CWIDTH-1]}},\n"
 	"\t		f_dlycoeff_r[F_D] };\n"
 	"\tassign	f_widecoeff_i = {{(IWIDTH+3){f_dlycoeff_i[F_D][CWIDTH-1]}},\n"
@@ -2033,19 +2422,15 @@ SLASHLINE
 	"\t// help induction finish one (or more) clocks ealier than\n"
 	"\t// otherwise\n"
 "\n\n"
-	"\twire	signed	[IWIDTH:0]	f_predifr, f_predifi;\n"
 	"\talways @(*)\n"
 	"\tbegin\n"
 		"\t\tf_predifr = f_dlyleft_r[F_D-1] - f_dlyright_r[F_D-1];\n"
 		"\t\tf_predifi = f_dlyleft_i[F_D-1] - f_dlyright_i[F_D-1];\n"
 	"\tend\n"
 "\n"
-	"\twire	signed	[IWIDTH+CWIDTH+1-1:0]	f_predifrx, f_predifix;\n"
 	"\tassign	f_predifrx = { {(CWIDTH){f_predifr[IWIDTH]}}, f_predifr };\n"
 	"\tassign	f_predifix = { {(CWIDTH){f_predifi[IWIDTH]}}, f_predifi };\n"
 "\n"
-	"\twire	signed	[CWIDTH:0]	f_sumcoef;\n"
-	"\twire	signed	[IWIDTH+1:0]	f_sumdiff;\n"
 	"\talways @(*)\n"
 	"\tbegin\n"
 		"\t\tf_sumcoef = f_dlycoeff_r[F_D-1] + f_dlycoeff_i[F_D-1];\n"
@@ -2095,9 +2480,11 @@ SLASHLINE
 "`endif	// VERILATOR\n"
 	"\tend\n\n"
 "`endif // FORMAL\n");
-	}
+	} else
+		fprintf(fp, "// This code has not been generated with formal properties\n");
 
 	fprintf(fp,
+"// }}}\n"
 "endmodule\n");
 
 	fclose(fp);

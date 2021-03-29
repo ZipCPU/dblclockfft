@@ -49,33 +49,35 @@
 //
 `default_nettype	none
 //
-module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
-`ifdef	FORMAL
-	, f_past_a_unsorted, f_past_b_unsorted
-`endif
-		);
-	parameter	IAW=8,	// The width of i_a, min width is 5
-			IBW=12;	// The width of i_b, can be anything
+module	longbimpy #(
+		// {{{
+		parameter	IAW=8,	// The width of i_a, min width is 5
+				IBW=12,	// The width of i_b, can be anything
 			// The following three parameters should not be changed
 			// by any implementation, but are based upon hardware
 			// and the above values:
 			// OW=IAW+IBW;	// The output width
-	localparam	AW = (IAW<IBW) ? IAW : IBW,
-			BW = (IAW<IBW) ? IBW : IAW,
-			IW=(AW+1)&(-2),	// Internal width of A
-			LUTB=2,	// How many bits we can multiply by at once
-			TLEN=(AW+(LUTB-1))/LUTB; // Nmbr of rows in our tableau
-	input	wire			i_clk, i_ce;
-	input	wire	[(IAW-1):0]	i_a_unsorted;
-	input	wire	[(IBW-1):0]	i_b_unsorted;
-	output	reg	[(AW+BW-1):0]	o_r;
+		localparam	AW = (IAW<IBW) ? IAW : IBW,
+				BW = (IAW<IBW) ? IBW : IAW,
+				IW=(AW+1)&(-2),	// Internal width of A
+				LUTB=2,	// How many bits to mpy at once
+				TLEN=(AW+(LUTB-1))/LUTB // Rows in our tableau
+		// }}}
+	) (
+		// {{{
+		input	wire			i_clk, i_ce,
+		input	wire	[(IAW-1):0]	i_a_unsorted,
+		input	wire	[(IBW-1):0]	i_b_unsorted,
+		output	reg	[(AW+BW-1):0]	o_r
 
 `ifdef	FORMAL
-	output	wire	[(IAW-1):0]	f_past_a_unsorted;
-	output	wire	[(IBW-1):0]	f_past_b_unsorted;
+		, output	wire	[(IAW-1):0]	f_past_a_unsorted,
+		output	wire	[(IBW-1):0]	f_past_b_unsorted
 `endif
-
-	//
+		// }}}
+	);
+	// Local declarations
+	// {{{
 	// Swap parameter order, so that AW <= BW -- for performance
 	// reasons
 	wire	[AW-1:0]	i_a;
@@ -99,6 +101,10 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	reg	[(IW+BW-1):0]		acc[0:(TLEN-2)];
 	genvar k;
 
+	wire	[(BW+LUTB-1):0]	pr_a, pr_b;
+	wire	[(IW+BW-1):0]	w_r;
+	// }}}
+
 	// First step:
 	// Switch to unsigned arithmetic for our multiply, keeping track
 	// of the along the way.  We'll then add the sign again later at
@@ -108,18 +114,24 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	// taking the absolute value here would require an additional bit.
 	// However, because our results are now unsigned, we can stay
 	// within the number of bits given (for now).
+
+	// u_a
+	// {{{
 	initial u_a = 0;
 	generate if (IW > AW)
 	begin : ABS_AND_ADD_BIT_TO_A
 		always @(posedge i_clk)
-			if (i_ce)
-				u_a <= { 1'b0, (i_a[AW-1])?(-i_a):(i_a) };
+		if (i_ce)
+			u_a <= { 1'b0, (i_a[AW-1])?(-i_a):(i_a) };
 	end else begin : ABS_A
 		always @(posedge i_clk)
-			if (i_ce)
-				u_a <= (i_a[AW-1])?(-i_a):(i_a);
+		if (i_ce)
+			u_a <= (i_a[AW-1])?(-i_a):(i_a);
 	end endgenerate
+	// }}}
 
+	// sgn, u_b
+	// {{{
 	initial sgn = 0;
 	initial u_b = 0;
 	always @(posedge i_clk)
@@ -128,8 +140,7 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 		u_b <= (i_b[BW-1])?(-i_b):(i_b);
 		sgn <= i_a[AW-1] ^ i_b[BW-1];
 	end
-
-	wire	[(BW+LUTB-1):0]	pr_a, pr_b;
+	// }}}
 
 	//
 	// Second step: First two 2xN products.
@@ -142,21 +153,31 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	bimpy	#(BW) lmpy_0(i_clk,1'b0,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);
 	bimpy	#(BW) lmpy_1(i_clk,1'b0,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);
 
+	// r_s, r_a[0], r_b[0]
+	// {{{
 	initial r_s    = 0;
 	initial r_a[0] = 0;
 	initial r_b[0] = 0;
 	always @(posedge i_clk)
-		if (i_ce) r_a[0] <= u_a[(IW-1):(2*LUTB)];
-	always @(posedge i_clk)
-		if (i_ce) r_b[0] <= u_b;
-	always @(posedge i_clk)
-		if (i_ce) r_s <= { r_s[(TLEN-2):0], sgn };
+	if (i_ce)
+	begin
+		r_a[0] <= u_a[(IW-1):(2*LUTB)];
+		r_b[0] <= u_b;
+		r_s <= { r_s[(TLEN-2):0], sgn };
+	end
+	// }}}
 
+	// acc[0]
+	// {{{
 	initial acc[0] = 0;
 	always @(posedge i_clk) // One clk after p[0],p[1] become valid
-	if (i_ce) acc[0] <= { {(IW-LUTB){1'b0}}, pr_a}
+	if (i_ce)
+		acc[0] <= { {(IW-LUTB){1'b0}}, pr_a}
 		  +{ {(IW-(2*LUTB)){1'b0}}, pr_b, {(LUTB){1'b0}} };
+	// }}}
 
+	// r_a[TLEN-3:1], r_b[TLEN-3:1]
+	// {{{
 	generate // Keep track of intermediate values, before multiplying them
 	if (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)
 	begin : GENCOPIES
@@ -171,14 +192,18 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 			r_b[k+1] <= r_b[k];
 		end
 	end endgenerate
+	// }}}
 
+	// acc[TLEN-2:1]
+	// {{{
 	generate // The actual multiply and accumulate stage
 	if (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)
 	begin : GENSTAGES
 		wire	[(BW+LUTB-1):0] genp;
 
 		// First, the multiply: 2-bits times BW bits
-		bimpy #(BW) genmpy(i_clk,1'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);
+		bimpy #(BW)
+		genmpy(i_clk,1'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);
 
 		// Then the accumulate step -- on the next clock
 		initial acc[k+1] = 0;
@@ -187,23 +212,37 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 			acc[k+1] <= acc[k] + {{(IW-LUTB*(k+3)){1'b0}},
 				genp, {(LUTB*(k+2)){1'b0}} };
 	end endgenerate
+	// }}}
 
-	wire	[(IW+BW-1):0]	w_r;
 	assign	w_r = (r_s[TLEN-1]) ? (-acc[TLEN-2]) : acc[TLEN-2];
 
+	// o_r
+	// {{{
 	initial o_r = 0;
 	always @(posedge i_clk)
 	if (i_ce)
 		o_r <= w_r[(AW+BW-1):0];
+	// }}}
 
+	// Make Verilator happy
+	// {{{
 	generate if (IW > AW)
 	begin : VUNUSED
 		// verilator lint_off UNUSED
-		wire	[(IW-AW)-1:0]	unused;
-		assign	unused = w_r[(IW+BW-1):(AW+BW)];
+		wire	unused;
+		assign	unused = &{ 1'b0, w_r[(IW+BW-1):(AW+BW)] };
 		// verilator lint_on UNUSED
 	end endgenerate
-
+	// }}}
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//
+// Formal property section
+// {{{
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 `ifdef	FORMAL
 	reg	f_past_valid;
 	initial	f_past_valid = 1'b0;
@@ -271,13 +310,15 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	if ((f_past_valid)&&($past(i_ce)))
 	begin
 		if ($past(i_a)==0)
+		begin
 			`ASSERT(u_a == 0);
-		else if ($past(i_a[AW-1]) == 1'b0)
+		end else if ($past(i_a[AW-1]) == 1'b0)
 			`ASSERT(u_a == $past(i_a));
 
 		if ($past(i_b)==0)
+		begin
 			`ASSERT(u_b == 0);
-		else if ($past(i_b[BW-1]) == 1'b0)
+		end else if ($past(i_b[BW-1]) == 1'b0)
 			`ASSERT(u_b == $past(i_b));
 	end
 
@@ -288,8 +329,9 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 		if (i_ce)
 		begin
 			if (f_past_a[k]==0)
+			begin
 				`ASSERT(r_a[k] == 0);
-			else if (f_past_a[k]==1)
+			end else if (f_past_a[k]==1)
 				`ASSERT(r_a[k] == 0);
 			`ASSERT(r_b[k] == f_past_b[k]);
 		end
@@ -328,8 +370,9 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	if ((f_past_valid)&&($past(i_ce)))
 	begin
 		if ((f_past_a[TLEN]==0)||(f_past_b[TLEN]==0))
+		begin
 			`ASSERT(o_r == 0);
-		else if (f_past_a[TLEN]==1)
+		end else if (f_past_a[TLEN]==1)
 		begin
 			if ((f_sgn_a[TLEN+1]^f_sgn_b[TLEN+1])==0)
 			begin
@@ -431,4 +474,5 @@ module	longbimpy(i_clk, i_ce, i_a_unsorted, i_b_unsorted, o_r
 	end endgenerate
 `endif	// BUTTERFLY
 `endif	// FORMAL
+// }}}
 endmodule

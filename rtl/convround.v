@@ -106,7 +106,7 @@ module	convround(i_clk, i_ce, i_val, o_val);
 		end
 
 	end else // If there's more than one bit we are dropping
-	begin : ROUND_RESULT 
+	begin : ROUND_RESULT
 		wire	[(OWID-1):0]	truncated_value, rounded_up;
 		wire			last_valid_bit, first_lost_bit;
 

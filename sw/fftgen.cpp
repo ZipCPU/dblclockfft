@@ -157,7 +157,7 @@ SLASHLINE
 	"\tinput\twire	[(2*IWIDTH-1):0]	i_data;\n"
 	"\toutput\treg	[(2*OWIDTH-1):0]	o_data;\n"
 	"\toutput\treg				o_sync;\n"
-	"\t\n", (dbg)?"_dbg":"",
+	"\n", (dbg)?"_dbg":"",
 	resetw.c_str(),
 	(dbg)?", o_dbg":"", TST_QTRSTAGE_IWIDTH,
 	TST_QTRSTAGE_LGWIDTH, resetw.c_str());
@@ -195,17 +195,17 @@ SLASHLINE
 	fprintf(fp,
 	"\t\t\t\t\tn_rnd_diff_r, n_rnd_diff_i;\n");
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_r(i_clk, i_ce,\n"
-	"\t\t\t\tsum_r, rnd_sum_r);\n\n", rnd_string);
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_sum_r(i_clk, i_ce, "
+	"sum_r, rnd_sum_r);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_i(i_clk, i_ce,\n"
-	"\t\t\t\tsum_i, rnd_sum_i);\n\n", rnd_string);
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_sum_i(i_clk, i_ce, "
+	"sum_i, rnd_sum_i);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_r(i_clk, i_ce,\n"
-	"\t\t\t\tdiff_r, rnd_diff_r);\n\n", rnd_string);
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_diff_r(i_clk, i_ce, "
+	"diff_r, rnd_diff_r);\n\n", rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_i(i_clk, i_ce,\n"
-	"\t\t\t\tdiff_i, rnd_diff_i);\n\n", rnd_string);
+	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_diff_i(i_clk, i_ce, "
+	"diff_i, rnd_diff_i);\n\n", rnd_string);
 	fprintf(fp, "\tassign n_rnd_diff_r = - rnd_diff_r;\n"
 		"\tassign n_rnd_diff_i = - rnd_diff_i;\n");
 
@@ -215,7 +215,7 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 			"\talways @(posedge i_clk, negedge i_areset_n)\n"
-			"\tif (!i_reset)\n");
+			"\tif (!i_areset_n)\n");
 	else
 		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
@@ -241,7 +241,7 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
-	"\tif (!i_reset)\n");
+	"\tif (!i_areset_n)\n");
 	else
 		fprintf(fp,
 	"\talways\t@(posedge i_clk)\n"
@@ -524,7 +524,7 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 			"\talways @(posedge i_clk, negedge i_areset_n)\n"
-			"\tif (!i_reset)\n");
+			"\tif (!i_areset_n)\n");
 	else
 		fprintf(fp,
 	"\talways @(posedge i_clk)\n"
@@ -554,7 +554,7 @@ SLASHLINE
 	if (async_reset)
 		fprintf(fp,
 	"\talways\t@(posedge i_clk, negedge i_areset_n)\n"
-	"\tif (!i_reset)\n");
+	"\tif (!i_areset_n)\n");
 	else
 		fprintf(fp,
 	"\talways\t@(posedge i_clk)\n"
@@ -632,10 +632,20 @@ SLASHLINE
 	if (formal_property_flag) {
 		fprintf(fp,
 "`ifdef	FORMAL\n"
-	"\treg	f_past_valid;\n"
+	"\t// Formal declarations\n"
+	"\t// {{{\n"
+	"\treg				f_past_valid;\n"
+	"\treg	signed [IWIDTH-1:0]	f_piped_real	[0:7];\n"
+	"\treg	signed [IWIDTH-1:0]	f_piped_imag	[0:7];\n"
+	"\treg				f_rsyncd;\n"
+	"\twire				f_syncd;\n"
+	"\treg	[1:0]			f_state;\n"
+	"\twire	signed [OWIDTH-1:0]	f_o_real, f_o_imag;\n"
+	"\t// }}}\n"
+"\n"
 	"\tinitial	f_past_valid = 1'b0;\n"
 	"\talways @(posedge i_clk)\n"
-	"\t	f_past_valid = 1'b1;\n"
+	"\t	f_past_valid <= 1'b1;\n"
 "\n"
 "`ifdef	QTRSTAGE\n"
 	"\talways @(posedge i_clk)\n"
@@ -645,8 +655,6 @@ SLASHLINE
 	"\t// The below logic only works if the rounding stage does nothing\n"
 	"\tinitial	assert(IWIDTH+1 == OWIDTH);\n"
 "\n"
-	"\treg	signed [IWIDTH-1:0]	f_piped_real	[0:7];\n"
-	"\treg	signed [IWIDTH-1:0]	f_piped_imag	[0:7];\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
 	"\tif (i_ce)\n"
@@ -676,23 +684,27 @@ SLASHLINE
 	"\t	f_piped_imag[7] <= f_piped_imag[6];\n"
 	"\tend\n"
 "\n"
-	"\treg	f_rsyncd;\n"
-	"\twire	f_syncd;\n"
 "\n"
-	"\tinitial	f_rsyncd = 0;\n"
-	"\talways @(posedge i_clk)\n"
-	"\tif(i_reset)\n"
+	"\tinitial	f_rsyncd = 0;\n");
+
+	if (async_reset)
+		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
+	else
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
+	fprintf(fp,
 	"\t	f_rsyncd <= 1'b0;\n"
 	"\telse if (!f_rsyncd)\n"
 	"\t	f_rsyncd <= (o_sync);\n"
 	"\tassign	f_syncd = (f_rsyncd)||(o_sync);\n"
 "\n"
-	"\treg	[1:0]	f_state;\n"
 "\n"
-"\n"
-	"\tinitial	f_state = 0;\n"
-	"\talways @(posedge i_clk)\n"
-	"\tif (i_reset)\n"
+	"\tinitial	f_state = 0;\n");
+	if (async_reset)
+		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
+	else
+		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
+
+	fprintf(fp,
 	"\t	f_state <= 0;\n"
 	"\telse if ((i_ce)&&((!wait_for_sync)||(i_sync)))\n"
 	"\t	f_state <= f_state + 1;\n"
@@ -704,11 +716,6 @@ SLASHLINE
 	"\talways @(posedge i_clk)\n"
 	"\t	assert(f_state[1:0] == iaddr[1:0]);\n"
 "\n"
-	"\twire	signed [2*IWIDTH-1:0]	f_i_real, f_i_imag;\n"
-	"\tassign			f_i_real = i_data[2*IWIDTH-1:IWIDTH];\n"
-	"\tassign			f_i_imag = i_data[  IWIDTH-1:0];\n"
-"\n"
-	"\twire	signed [OWIDTH-1:0]	f_o_real, f_o_imag;\n"
 	"\tassign			f_o_real = o_data[2*OWIDTH-1:OWIDTH];\n"
 	"\tassign			f_o_imag = o_data[  OWIDTH-1:0];\n"
 "\n"
@@ -765,8 +772,16 @@ SLASHLINE
 	"\tif (wait_for_sync)\n"
 	"\t	assert((iaddr == 0)&&(f_state == 2'b00)&&(!o_sync)&&(!f_rsyncd));\n"
 "\n"
-	"\talways @(posedge i_clk)\n"
-	"\tif ((f_past_valid)&&($past(i_ce))&&($past(i_sync))&&(!$past(i_reset)))\n"
+	"\talways @(posedge i_clk)\n");
+
+	if (async_reset)
+		fprintf(fp, "\tif ((f_past_valid && i_areset_n)&&($past(i_ce))"
+			"&&($past(i_sync))&&($past(i_areset_n)))\n");
+	else
+		fprintf(fp, "\tif ((f_past_valid)&&($past(i_ce))"
+			"&&($past(i_sync))&&(!$past(i_reset)))\n");
+
+	fprintf(fp,
 	"\t	assert(!wait_for_sync);\n"
 "\n"
 	"\talways @(posedge i_clk)\n"
@@ -821,49 +836,65 @@ SLASHLINE
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 
 	fprintf(fp,
-"module	laststage(i_clk, %s, i_ce, i_sync, i_val, o_val, o_sync);\n"
-"	parameter	IWIDTH=16,OWIDTH=IWIDTH+1, SHIFT=0;\n"
-"	input	wire				i_clk, %s, i_ce, i_sync;\n"
-"	input	wire	[(2*IWIDTH-1):0]	i_val;\n"
-"	output	wire	[(2*OWIDTH-1):0]	o_val;\n"
-"	output	reg				o_sync;\n\n",
-		resetw.c_str(), resetw.c_str());
+"module	laststage #(\n"
+	"\t\t// {{{\n"
+	"\t\tparameter IWIDTH=16,OWIDTH=IWIDTH+1, SHIFT=0\n"
+	"\t\t// }}}\n"
+	"\t) (\n"
+	"\t\t// {{{\n"
+	"\t\tinput\twire			i_clk, %s, i_ce, i_sync,\n"
+	"\t\tinput\twire  [(2*IWIDTH-1):0]	i_val,\n"
+	"\t\toutput\twire [(2*OWIDTH-1):0]	o_val,\n"
+	"\t\toutput\treg			o_sync\n"
+	"\t\t// }}}\n"
+	"\t);\n",
+		resetw.c_str());
 
 	fprintf(fp,
-"	reg	signed	[(IWIDTH-1):0]	m_r, m_i;\n"
-"	wire	signed	[(IWIDTH-1):0]	i_r, i_i;\n"
+	"\t// Local declarations\n"
+	"\t// {{{\n"
+	"\treg	signed	[(IWIDTH-1):0]	m_r, m_i;\n"
+	"\twire	signed	[(IWIDTH-1):0]	i_r, i_i;\n"
+"\n"
+	"\t// Don't forget that we accumulate a bit by adding two values\n"
+	"\t// together. Therefore our intermediate value must have one more\n"
+	"\t// bit than the two originals.\n"
+	"\treg	signed	[(IWIDTH):0]	rnd_r, rnd_i, sto_r, sto_i;\n"
+	"\treg				wait_for_sync, stage;\n"
+	"\treg		[1:0]		sync_pipe;\n"
+	"\twire	signed	[(OWIDTH-1):0]	o_r, o_i;\n"
+	"\t// }}}\n"
 "\n"
 "	assign	i_r = i_val[(2*IWIDTH-1):(IWIDTH)]; \n"
 "	assign	i_i = i_val[(IWIDTH-1):0]; \n"
 "\n"
-"	// Don't forget that we accumulate a bit by adding two values\n"
-"	// together. Therefore our intermediate value must have one more\n"
-"	// bit than the two originals.\n"
-"	reg	signed	[(IWIDTH):0]	rnd_r, rnd_i, sto_r, sto_i;\n"
-"	reg				wait_for_sync, stage;\n"
-"	reg		[1:0]		sync_pipe;\n"
-"\n"
+	"\t// wait_for_sync, stage\n"
+	"\t// {{{\n"
 "	initial	wait_for_sync = 1'b1;\n"
 "	initial	stage         = 1'b0;\n");
 
 	if (async_reset)
-		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+		fprintf(fp, "\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else
 		fprintf(fp, "\talways @(posedge i_clk)\n\tif (i_reset)\n");
 	fprintf(fp,
-"	begin\n"
-"		wait_for_sync <= 1'b1;\n"
-"		stage         <= 1'b0;\n"
-"	end else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))\n"
-"	begin\n"
-"		wait_for_sync <= 1'b0;\n"
-"		//\n"
-"		stage <= 1'b1;\n"
-"		//\n"
-"	end else if (i_ce)\n"
-"		stage <= 1'b0;\n\n");
+	"\tbegin\n"
+	"\t	wait_for_sync <= 1'b1;\n"
+	"\t	stage         <= 1'b0;\n"
+	"\tend else if ((i_ce)&&((!wait_for_sync)||(i_sync))&&(!stage))\n"
+	"\tbegin\n"
+	"\t	wait_for_sync <= 1'b0;\n"
+	"\t	//\n"
+	"\t	stage <= 1'b1;\n"
+	"\t	//\n"
+	"\tend else if (i_ce)\n"
+	"\t	stage <= 1'b0;\n"
+	"\t// }}}\n\n");
 
-	fprintf(fp, "\tinitial\tsync_pipe = 0;\n");
+	fprintf(fp,
+	"\t// sync_pipe\n"
+	"\t// {{{\n"
+	"\tinitial\tsync_pipe = 0;\n");
 	if (async_reset)
 		fprintf(fp,
 		"\talways @(posedge i_clk, negedge i_areset_n)\n"
@@ -876,9 +907,13 @@ SLASHLINE
 	fprintf(fp,
 		"\t\tsync_pipe <= 0;\n"
 		"\telse if (i_ce)\n"
-		"\t\tsync_pipe <= { sync_pipe[0], i_sync };\n\n");
+		"\t\tsync_pipe <= { sync_pipe[0], i_sync };\n"
+		"\t// }}}\n\n");
 
-	fprintf(fp, "\tinitial\to_sync = 1\'b0;\n");
+	fprintf(fp,
+	"\t// o_sync\n"
+	"\t// {{{\n"
+	"\tinitial\to_sync = 1\'b0;\n");
 	if (async_reset)
 		fprintf(fp,
 		"\talways @(posedge i_clk, negedge i_areset_n)\n"
@@ -891,46 +926,68 @@ SLASHLINE
 	fprintf(fp,
 		"\t\to_sync <= 1\'b0;\n"
 		"\telse if (i_ce)\n"
-		"\t\to_sync <= sync_pipe[1];\n\n");
+		"\t\to_sync <= sync_pipe[1];\n"
+		"\t// }}}\n\n");
 
 	fprintf(fp,
-"	always @(posedge i_clk)\n"
-"	if (i_ce)\n"
-"	begin\n"
-"		if (!stage)\n"
-"		begin\n"
-"			// Clock 1\n"
-"			m_r <= i_r;\n"
-"			m_i <= i_i;\n"
-"			// Clock 3\n"
-"			rnd_r <= sto_r;\n"
-"			rnd_i <= sto_i;\n"
-"			//\n"
-"		end else begin\n"
-"			// Clock 2\n"
-"			rnd_r <= m_r + i_r;\n"
-"			rnd_i <= m_i + i_i;\n"
-"			//\n"
-"			sto_r <= m_r - i_r;\n"
-"			sto_i <= m_i - i_i;\n"
-"			//\n"
-"		end\n"
-"	end\n"
+	"\t// m_r, m_i, rnd_r, rnd_i\n"
+	"\t// {{{\n"
+	"\talways @(posedge i_clk)\n"
+	"\tif (i_ce)\n"
+	"\tbegin\n"
+	"\t\tif (!stage)\n"
+	"\t\tbegin\n"
+	"\t\t\t// Clock 1\n"
+	"\t\t\tm_r <= i_r;\n"
+	"\t\t\tm_i <= i_i;\n"
+	"\t\t\t// Clock 3\n"
+	"\t\t\trnd_r <= sto_r;\n"
+	"\t\t\trnd_i <= sto_i;\n"
+	"\t\t\t//\n"
+	"\t\tend else begin\n"
+	"\t\t\t// Clock 2\n"
+	"\t\t\trnd_r <= m_r + i_r;\n"
+	"\t\t\trnd_i <= m_i + i_i;\n"
+	"\t\t\t//\n"
+	"\t\t\tsto_r <= m_r - i_r;\n"
+	"\t\t\tsto_i <= m_i - i_i;\n"
+	"\t\t\t//\n"
+	"\t\tend\n"
+	"\tend\n"
+	"\t// }}}\n"
 "\n"
 "	// Now that we have our results, let's round them and report them\n"
-"	wire	signed	[(OWIDTH-1):0]	o_r, o_i;\n"
 "\n"
+	"\t// Round the results, generating o_r, o_i, and thus o_val\n"
+	"\t// {{{\n"
 "	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_r(i_clk, i_ce, rnd_r, o_r);\n"
 "	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_i(i_clk, i_ce, rnd_i, o_i);\n"
 "\n"
 "	assign	o_val  = { o_r, o_i };\n"
+	"\t// }}}\n"
 "\n");
 
-
+	fprintf(fp,
+SLASHLINE
+SLASHLINE
+SLASHLINE
+"//\n"
+"// Formal properties\n"
+"// {{{\n"
+SLASHLINE
+SLASHLINE
+SLASHLINE );
 	if (formal_property_flag) {
 		fprintf(fp,
 	"`ifdef	FORMAL\n"
+		"\t// Local formal declarations\n"
+		"\t// {{{\n"
 		"\treg	f_past_valid;\n"
+		"\twire	f_syncd;\n"
+		"\treg	f_rsyncd;\n"
+		"\treg	f_state;\n"
+		"\t// }}}\n"
+	"\n"
 		"\tinitial	f_past_valid = 1'b0;\n"
 		"\talways @(posedge i_clk)\n"
 		"\t	f_past_valid <= 1'b1;\n"
@@ -960,9 +1017,6 @@ SLASHLINE
 		"\t	f_piped_imag[3] <= f_piped_imag[2];\n"
 		"\tend\n"
 	"\n"
-		"\twire	f_syncd;\n"
-		"\treg	f_rsyncd;\n"
-	"\n"
 		"\tinitial	f_rsyncd	= 0;\n"
 		"\talways @(posedge i_clk)\n"
 		"\tif (i_reset)\n"
@@ -971,7 +1025,6 @@ SLASHLINE
 		"\t	f_rsyncd <= o_sync;\n"
 		"\tassign	f_syncd = (f_rsyncd)||(o_sync);\n"
 	"\n"
-		"\treg	f_state;\n"
 		"\tinitial	f_state = 0;\n"
 		"\talways @(posedge i_clk)\n"
 		"\tif (i_reset)\n"
@@ -1008,10 +1061,16 @@ SLASHLINE
 		"\t	assert(!o_sync);\n"
 		"\t	assert(f_state == 0);\n"
 		"\tend\n\n");
+	} else {
+		fprintf(fp,
+		"//\n"
+		"// Formal properties have not been included in this build\n"
+		"//\n");
 	}
 
 	fprintf(fp,
 "`endif // FORMAL\n"
+"// }}}\n"
 "endmodule\n");
 
 	fclose(fp);
@@ -1026,6 +1085,7 @@ void	usage(void) {
 // "\tfftgen -i\n"
 "\t-1\tBuild a normal FFT, running at one clock per complex sample, or\n"
 "\t\t(for a real FFT) at one clock per two real input samples.\n"
+"\t-A\t(Experimental) Use a negative edged asynchronous reset.\n"
 "\t-a <hdrname>  Create a header of information describing the built-in\n"
 "\t\tparameters, useful for module-level testing with Verilator\n"
 "\t-c <cbits>\tCauses all internal complex coefficients to be\n"
@@ -1212,8 +1272,18 @@ int main(int argc, char **argv) {
 			;
 	}
 
-	if ((fftsize <= 0)||(nbitsin < 1)||(nbitsin>48)) {
-		printf("INVALID PARAMETERS!!!!\n");
+	if (fftsize <= 0) {
+		printf("ERROR: Invalid size.  FFT size (%d) may not be <= 0\n",
+			fftsize);
+		exit(EXIT_FAILURE);
+	}
+
+	if (nbitsin < 1) {
+		printf("ERROR: Not enough input bits, %d >= 1\n", nbitsin);
+		exit(EXIT_FAILURE);
+	} else if (nbitsin>48) {
+		printf("ERROR: Too many input bits, %d is greater than 48\n",
+			nbitsin);
 		exit(EXIT_FAILURE);
 	}
 
@@ -1357,6 +1427,10 @@ SLASHLINE
 			(inverse)?"I":"", nbitsout,
 			(inverse)?"I":"", lgsize,
 			(inverse)?"I":"", (inverse)?"I":"");
+		if (async_reset)
+			fprintf(hdr, "#define\tASYNC_RESETN\n");
+		else
+			fprintf(hdr, "// #define ASYNC_RESETN\n");
 		if (ckpce > 0)
 			fprintf(hdr, "#define\t%sFFT_CKPCE\t%d\t// Clocks per CE\n",
 				(inverse)?"I":"", ckpce);
@@ -1586,15 +1660,15 @@ SLASHLINE
 			fprintf(vmain, "\treg\tbr_start;\n");
 			fprintf(vmain, "\tinitial br_start = 1\'b0;\n");
 			if (async_reset) {
-				fprintf(vmain, "\talways @(posedge i_clk, negedge i_arese_n)\n");
-				fprintf(vmain, "\t\tif (!i_areset_n)\n");
+				fprintf(vmain, "\talways @(posedge i_clk, negedge i_areset_n)\n");
+				fprintf(vmain, "\tif (!i_areset_n)\n");
 			} else {
 				fprintf(vmain, "\talways @(posedge i_clk)\n");
-				fprintf(vmain, "\t\tif (i_reset)\n");
+				fprintf(vmain, "\tif (i_reset)\n");
 			}
-			fprintf(vmain, "\t\t\tbr_start <= 1\'b0;\n");
-			fprintf(vmain, "\t\telse if (i_ce)\n");
-			fprintf(vmain, "\t\t\tbr_start <= 1\'b1;\n");
+			fprintf(vmain, "\t\tbr_start <= 1\'b0;\n");
+			fprintf(vmain, "\telse if (i_ce)\n");
+			fprintf(vmain, "\t\tbr_start <= 1\'b1;\n");
 		}
 		fprintf(vmain, "\n\n");
 		fprintf(vmain, "\twire\t\tw_s2;\n");
@@ -1624,15 +1698,15 @@ SLASHLINE
 			fprintf(vmain, "\treg\tbr_start;\n");
 			fprintf(vmain, "\tinitial br_start = 1\'b0;\n");
 			if (async_reset) {
-				fprintf(vmain, "\talways @(posedge i_clk, negedge i_arese_n)\n");
-				fprintf(vmain, "\t\tif (!i_areset_n)\n");
+				fprintf(vmain, "\talways @(posedge i_clk, negedge i_areset_n)\n");
+				fprintf(vmain, "\tif (!i_areset_n)\n");
 			} else {
 				fprintf(vmain, "\talways @(posedge i_clk)\n");
-				fprintf(vmain, "\t\tif (i_reset)\n");
+				fprintf(vmain, "\tif (i_reset)\n");
 			}
-			fprintf(vmain, "\t\t\tbr_start <= 1\'b0;\n");
-			fprintf(vmain, "\t\telse if (i_ce)\n");
-			fprintf(vmain, "\t\t\tbr_start <= 1\'b1;\n");
+			fprintf(vmain, "\t\tbr_start <= 1\'b0;\n");
+			fprintf(vmain, "\telse if (i_ce)\n");
+			fprintf(vmain, "\t\tbr_start <= 1\'b1;\n");
 		}
 		fprintf(vmain, "\n\n");
 		fprintf(vmain, "\twire\t\tw_s4;\n");
@@ -1950,14 +2024,14 @@ SLASHLINE
 			fprintf(vmain, "\tinitial\tr_br_started = 1\'b0;\n");
 			if (async_reset) {
 				fprintf(vmain, "\talways @(posedge i_clk, negedge i_areset_n)\n");
-				fprintf(vmain, "\t\tif (!i_areset_n)\n");
+				fprintf(vmain, "\tif (!i_areset_n)\n");
 			} else {
 				fprintf(vmain, "\talways @(posedge i_clk)\n");
-				fprintf(vmain, "\t\tif (i_reset)\n");
+				fprintf(vmain, "\tif (i_reset)\n");
 			}
-			fprintf(vmain, "\t\t\tr_br_started <= 1\'b0;\n");
-			fprintf(vmain, "\t\telse if (i_ce)\n");
-			fprintf(vmain, "\t\t\tr_br_started <= r_br_started || w_s2;\n");
+			fprintf(vmain, "\t\tr_br_started <= 1\'b0;\n");
+			fprintf(vmain, "\telse if (i_ce)\n");
+			fprintf(vmain, "\t\tr_br_started <= r_br_started || w_s2;\n");
 			fprintf(vmain, "\tassign\tbr_start = r_br_started || w_s2;\n");
 			// }}}
 		}
@@ -1970,13 +2044,37 @@ SLASHLINE
 	fprintf(vmain, "\t// Now for the bit-reversal stage.\n");
 	if (bitreverse) {
 		if (single_clock) {
-			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
-			fprintf(vmain, "\t\t\t(i_ce & br_start), w_d2,\n");
-			fprintf(vmain, "\t\t\tbr_result, br_sync);\n");
+			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\trevstage(\n"
+				"\t\t// {{{\n"
+				"\t\t.i_clk(i_clk),\n"
+				"\t\t.%s(%s),\n", lgsize, nbitsout,
+				resetw.c_str(),
+				resetw.c_str());
+			fprintf(vmain,
+				"\t\t.i_ce(i_ce & br_start),\n"
+				"\t\t.i_in(w_d2),\n"
+				"\t\t.o_out(br_result),\n"
+				"\t\t.o_sync(br_sync)\n"
+				"\t\t// }}}\n"
+				"\t);\n");
 		} else {
-			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\t\trevstage(i_clk, %s,\n", lgsize, nbitsout, resetw.c_str());
-			fprintf(vmain, "\t\t\t(i_ce & br_start), w_e2, w_o2,\n");
-			fprintf(vmain, "\t\t\tbr_left, br_right, br_sync);\n");
+			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\trevstage(\n"
+				"\t\t// {{{\n"
+				"\t\t.i_clk(i_clk),\n"
+				"\t\t.%s(%s),\n", lgsize, nbitsout,
+				resetw.c_str(),
+				resetw.c_str());
+			fprintf(vmain,
+				"\t\t.i_ce(i_ce & br_start),\n"
+				"\t\t.i_in_0(w_e2),\n"
+				"\t\t.i_in_1(w_o2),\n"
+				"\t\t.o_out_0(br_left),\n"
+				"\t\t.o_out_1(br_right),\n"
+				"\t\t.o_sync(br_sync)\n"
+				"\t\t// }}}\n"
+				"\t);\n");
+			// fprintf(vmain, "\t\t\t(i_ce & br_start), w_e2, w_o2,\n");
+			// fprintf(vmain, "\t\t\tbr_left, br_right, br_sync);\n");
 		}
 	} else {
 		fprintf(vmain, "\t//\n"
@@ -2002,7 +2100,7 @@ SLASHLINE
 "\tinitial\to_sync  = 1\'b0;\n");
 	if (async_reset)
 		fprintf(vmain,
-"\talways @(posedge i_clk, negedge i_areset_n)\n\t\tif (!i_areset_n)\n");
+"\talways @(posedge i_clk, negedge i_areset_n)\n\tif (!i_areset_n)\n");
 	else {
 		fprintf(vmain,
 "\talways @(posedge i_clk)\n\tif (i_reset)\n");

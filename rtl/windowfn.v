@@ -824,7 +824,7 @@ module	windowfn #(
 	always @(posedge i_clk)
 	if ((i_reset)||(i_tap_wr))
 		{ f_this_oce, f_this_pce, f_this_dce } <= 3'h0;
-	else 
+	else
 		{ f_this_oce, f_this_pce, f_this_dce }
 			<= { f_this_pce, f_this_dce, (((i_ce)||(i_alt_ce))
 					&&(f_past_valid)&&(f_addr == didx)) };
