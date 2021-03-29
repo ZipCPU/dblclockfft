@@ -52,8 +52,8 @@ BENCHD  := ../bench/cpp
 SOURCES := bitreverse.cpp bldstage.cpp butterfly.cpp fftgen.cpp fftlib.cpp \
 		legal.cpp rounding.cpp softmpy.cpp
 TESTSZ  := -f 2048
-# CKPCE   := -1 -k 1
-CKPCE   := -2
+CKPCE   := -1 -k 1
+# CKPCE   := -2
 MPYS    := -p 0
 IWID    := -n 15
 FFTPARAMS := -d $(CORED) $(TESTSZ) $(CKPCE) $(MPYS) $(IWID)
