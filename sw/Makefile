@@ -81,6 +81,9 @@ fftgen: $(OBJECTS)
 test: fft ifft butterfly fftstage hwbfly longbimpy qtrstage
 test: bitreverse laststage
 
+.PHONY: force
+force: forcedfft forcedifft
+
 #
 # Although these parameters, a 2048 point FFT of 16 bits input, aren't
 # the only parameters the FFT can do, they are the ones that the test
@@ -123,7 +126,7 @@ $(VOBJDR)/Vidblfftmain__ALL.so: $(VOBJDR)/Vidblfftmain.h
 	cd $(VOBJDR); make -f Vidblfftmain.mk
 ## }}}
 
-.PHONY: ifft
+.PHONY: ifft forcedifft
 ## {{{
 ifft: $(VOBJDR)/Vifftmain__ALL.so
 $(CORED)/ifftmain.v: fftgen
@@ -132,6 +135,8 @@ $(VOBJDR)/Vifftmain.h: $(CORED)/ifftmain.v
 	cd $(CORED)/; $(VERILATOR) $(VFLAGS) ifftmain.v
 $(VOBJDR)/Vifftmain__ALL.so: $(VOBJDR)/Vifftmain.h
 	cd $(VOBJDR); make -f Vifftmain.mk
+forcedifft: fftgen
+	./fftgen -i $(FFTPARAMS) -a $(BENCHD)/ifftsize.h
 ## }}}
 
 .PHONY: longbimpy

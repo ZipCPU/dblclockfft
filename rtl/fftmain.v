@@ -99,76 +99,272 @@ module fftmain(i_clk, i_reset, i_ce,
 
 	wire		w_s2048;
 	wire	[31:0]	w_d2048;
-	fftstage	#(IWIDTH,IWIDTH+4,16,10,0,
-			0, 1, "cmem_2048.hex")
-		stage_2048(i_clk, i_reset, i_ce,
-			(!i_reset), i_sample, w_d2048, w_s2048);
+	fftstage	#(
+		// {{{
+		.IWIDTH(IWIDTH),
+		.CWIDTH(IWIDTH+4),
+		.OWIDTH(16),
+		.LGSPAN(10),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_2048.hex")
+		// }}}
+	) stage_2048(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(!i_reset),
+		.i_data(i_sample),
+		.o_data(w_d2048),
+		.o_sync(w_s2048)
+		// }}}
+	);
 
 
 	wire		w_s1024;
 	wire	[33:0]	w_d1024;
-	fftstage	#(16,20,17,9,0,
-			0, 1, "cmem_1024.hex")
-		stage_1024(i_clk, i_reset, i_ce,
-			w_s2048, w_d2048, w_d1024, w_s1024);
+	fftstage	#(
+		// {{{
+		.IWIDTH(16),
+		.CWIDTH(20),
+		.OWIDTH(17),
+		.LGSPAN(9),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_1024.hex")
+		// }}}
+	) stage_1024(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s2048),
+		.i_data(w_d2048),
+		.o_data(w_d1024),
+		.o_sync(w_s1024)
+		// }}}
+	);
 
 	wire		w_s512;
 	wire	[33:0]	w_d512;
-	fftstage	#(17,21,17,8,0,
-			0, 1, "cmem_512.hex")
-		stage_512(i_clk, i_reset, i_ce,
-			w_s1024, w_d1024, w_d512, w_s512);
+	fftstage	#(
+		// {{{
+		.IWIDTH(17),
+		.CWIDTH(21),
+		.OWIDTH(17),
+		.LGSPAN(8),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_512.hex")
+		// }}}
+	) stage_512(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s1024),
+		.i_data(w_d1024),
+		.o_data(w_d512),
+		.o_sync(w_s512)
+		// }}}
+	);
 
 	wire		w_s256;
 	wire	[35:0]	w_d256;
-	fftstage	#(17,21,18,7,0,
-			0, 1, "cmem_256.hex")
-		stage_256(i_clk, i_reset, i_ce,
-			w_s512, w_d512, w_d256, w_s256);
+	fftstage	#(
+		// {{{
+		.IWIDTH(17),
+		.CWIDTH(21),
+		.OWIDTH(18),
+		.LGSPAN(7),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_256.hex")
+		// }}}
+	) stage_256(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s512),
+		.i_data(w_d512),
+		.o_data(w_d256),
+		.o_sync(w_s256)
+		// }}}
+	);
 
 	wire		w_s128;
 	wire	[35:0]	w_d128;
-	fftstage	#(18,22,18,6,0,
-			0, 1, "cmem_128.hex")
-		stage_128(i_clk, i_reset, i_ce,
-			w_s256, w_d256, w_d128, w_s128);
+	fftstage	#(
+		// {{{
+		.IWIDTH(18),
+		.CWIDTH(22),
+		.OWIDTH(18),
+		.LGSPAN(6),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_128.hex")
+		// }}}
+	) stage_128(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s256),
+		.i_data(w_d256),
+		.o_data(w_d128),
+		.o_sync(w_s128)
+		// }}}
+	);
 
 	wire		w_s64;
 	wire	[37:0]	w_d64;
-	fftstage	#(18,22,19,5,0,
-			0, 1, "cmem_64.hex")
-		stage_64(i_clk, i_reset, i_ce,
-			w_s128, w_d128, w_d64, w_s64);
+	fftstage	#(
+		// {{{
+		.IWIDTH(18),
+		.CWIDTH(22),
+		.OWIDTH(19),
+		.LGSPAN(5),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_64.hex")
+		// }}}
+	) stage_64(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s128),
+		.i_data(w_d128),
+		.o_data(w_d64),
+		.o_sync(w_s64)
+		// }}}
+	);
 
 	wire		w_s32;
 	wire	[37:0]	w_d32;
-	fftstage	#(19,23,19,4,0,
-			0, 1, "cmem_32.hex")
-		stage_32(i_clk, i_reset, i_ce,
-			w_s64, w_d64, w_d32, w_s32);
+	fftstage	#(
+		// {{{
+		.IWIDTH(19),
+		.CWIDTH(23),
+		.OWIDTH(19),
+		.LGSPAN(4),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_32.hex")
+		// }}}
+	) stage_32(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s64),
+		.i_data(w_d64),
+		.o_data(w_d32),
+		.o_sync(w_s32)
+		// }}}
+	);
 
 	wire		w_s16;
 	wire	[39:0]	w_d16;
-	fftstage	#(19,23,20,3,0,
-			0, 1, "cmem_16.hex")
-		stage_16(i_clk, i_reset, i_ce,
-			w_s32, w_d32, w_d16, w_s16);
+	fftstage	#(
+		// {{{
+		.IWIDTH(19),
+		.CWIDTH(23),
+		.OWIDTH(20),
+		.LGSPAN(3),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_16.hex")
+		// }}}
+	) stage_16(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s32),
+		.i_data(w_d32),
+		.o_data(w_d16),
+		.o_sync(w_s16)
+		// }}}
+	);
 
 	wire		w_s8;
 	wire	[39:0]	w_d8;
-	fftstage	#(20,24,20,2,0,
-			0, 1, "cmem_8.hex")
-		stage_8(i_clk, i_reset, i_ce,
-			w_s16, w_d16, w_d8, w_s8);
+	fftstage	#(
+		// {{{
+		.IWIDTH(20),
+		.CWIDTH(24),
+		.OWIDTH(20),
+		.LGSPAN(2),
+		.BFLYSHIFT(0),
+		.OPT_HWMPY(0),
+		.CKPCE(1),
+		.COEFFILE("cmem_8.hex")
+		// }}}
+	) stage_8(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s16),
+		.i_data(w_d16),
+		.o_data(w_d8),
+		.o_sync(w_s8)
+		// }}}
+	);
 
 	wire		w_s4;
 	wire	[41:0]	w_d4;
-	qtrstage	#(20,21,11,0,0)	stage_4(i_clk, i_reset, i_ce,
-						w_s8, w_d8, w_d4, w_s4);
+	qtrstage	#(
+		// {{{
+		.IWIDTH(20),
+		.OWIDTH(21),
+		.LGWIDTH(11),
+		.INVERSE(0),
+		.SHIFT(0)
+		// }}}
+	) stage_4(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s8),
+		.i_data(w_d8),
+		.o_data(w_d4),
+		.o_sync(w_s4)
+		// }}}
+	);
+	// verilator lint_off UNUSED
 	wire		w_s2;
+	// verilator lint_on  UNUSED
 	wire	[41:0]	w_d2;
-	laststage	#(21,21,0)	stage_2(i_clk, i_reset, i_ce,
-					w_s4, w_d4, w_d2, w_s2);
+	laststage	#(
+		// {{{
+		.IWIDTH(21),
+		.OWIDTH(21),
+		.SHIFT(0)
+		// }}}
+	) stage_2(
+		// {{{
+		.i_clk(i_clk),
+		.i_reset(i_reset),
+		.i_ce(i_ce),
+		.i_sync(w_s4),
+		.i_val(w_d4),
+		.o_val(w_d2),
+		.o_sync(w_s2)
+		// }}}
+	);
 
 
 	wire	br_start;
@@ -182,8 +378,11 @@ module fftmain(i_clk, i_reset, i_ce,
 	assign	br_start = r_br_started || w_s2;
 
 	// Now for the bit-reversal stage.
-	bitreverse	#(11,21)
-	revstage(
+	bitreverse	#(
+		// {{{
+		.LGSIZE(11), .WIDTH(21)
+		// }}}
+	) revstage (
 		// {{{
 		.i_clk(i_clk),
 		.i_reset(i_reset),

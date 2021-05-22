@@ -1671,18 +1671,47 @@ SLASHLINE
 			fprintf(vmain, "\t\tbr_start <= 1\'b1;\n");
 		}
 		fprintf(vmain, "\n\n");
-		fprintf(vmain, "\twire\t\tw_s2;\n");
+		fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_s2;\n\t// verilator lint_on  UNUSED\n");
 		if (single_clock) {
 			fprintf(vmain, "\twire\t[%d:0]\tw_d2;\n",
 				2*nbitsout-1);
-			fprintf(vmain, "\tlaststage\t#(IWIDTH,OWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
-			fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d2, w_s2);\n",
+			fprintf(vmain, "\tlaststage\t#(\n"
+				"\t\t// {{{\n"
+				"\t\t.IWIDTH(IWIDTH),\n"
+				"\t\t.OWIDTH(OWIDTH)\n"
+				"\t\t// }}}\n"
+				"\t) stage_2(\n"
+				"\t\t// {{{\n"
+				"\t\t.i_clk(i_clk),\n"
+				"\t\t.%s(%s),\n"
+				"\t\t.i_ce(i_ce),\n",
+				resetw.c_str(), resetw.c_str());
+			fprintf(vmain, "\t\t.i_sync(%s%s),\n"
+					"\t\t.i_val(i_sample),\n"
+					"\t\t.o_val(w_d2),\n"
+					"\t\t.o_sync(w_s2)\n"
+					"\t\t// }}}\n"
+					"\t);\n",
 				(async_reset)?"":"!", resetw.c_str());
 		} else {
 			fprintf(vmain, "\twire\t[%d:0]\tw_e2, w_o2;\n",
 				2*nbitsout-1);
-			fprintf(vmain, "\tlaststage\t#(IWIDTH,OWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
-			fprintf(vmain, "\t\t\t(%s%s), i_left, i_right, w_e2, w_o2, w_s2);\n",
+			fprintf(vmain, "\tlaststage\t#(\n"
+				"\t\t// {{{\n"
+				"\t\t.IWIDTH(IWIDTH),\n"
+				"\t\t.OWIDTH(OWIDTH)\n"
+				"\t\t// }}}\n"
+				"\t) stage_2(\n"
+				"\t\t.i_clk(i_clk),\n"
+				"\t\t.%s(%s),\n"
+				"\t\t.i_ce(i_ce),\n",
+				resetw.c_str(), resetw.c_str());
+			fprintf(vmain, "\t\t.i_sync(%s%s),\n"
+					"\t\t.i_left(i_left), .i_right(i_right),\n"
+					"\t\t.o_left(w_e2), .o_right(w_o2),\n"
+					"\t\t.o_sync(w_s2)\n"
+					"\t\t// }}}\n"
+					"\t);\n",
 				(async_reset)?"":"!", resetw.c_str());
 		}
 		fprintf(vmain, "\n\n");
@@ -1711,15 +1740,46 @@ SLASHLINE
 		fprintf(vmain, "\n\n");
 		fprintf(vmain, "\twire\t\tw_s4;\n");
 		fprintf(vmain, "\twire\t[%d:0]\tw_d4;\n", 2*nbitsout-1);
-		fprintf(vmain, "\tqtrstage\t#(IWIDTH,OWIDTH)\tstage_4(i_clk, %s, i_ce,\n", resetw.c_str());
-		fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d4, w_s4);\n",
+		fprintf(vmain, "\tqtrstage\t#(\n"
+				"\t\t// {{{\n"
+				"\t\t.IWIDTH(IWIDTH),\n"
+				"\t\t.OWIDTH(OWIDTH)\n"
+				"\t\t// }}}\n"
+				"\t) stage_4(\n"
+				"\t\t// {{{\n"
+				"\t\t.i_clk(i_clk),\n"
+				"\t\t.%s(%s),\n"
+				"\t\t.i_ce(i_ce),\n",
+				resetw.c_str(), resetw.c_str());
+		fprintf(vmain, "\t\t.i_sync(%s%s),\n"
+				"\t\t.i_data(i_sample),\n"
+				"\t\t.o_data(w_d4),\n"
+				"\t\t.o_sync(w_s4)\n"
+				"\t\t// }}}\n"
+				"\t);\n",
 			(async_reset)?"":"!", resetw.c_str());
 		fprintf(vmain, "\n\n");
 
-		fprintf(vmain, "\twire\t\tw_s2;\n");
+		fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_s2;\n\t// verilator lint_on  UNUSED\n");
 		fprintf(vmain, "\twire\t[%d:0]\tw_d2;\n", 2*nbitsout-1);
-		fprintf(vmain, "\tlaststage\t#(OWIDTH,OWIDTH)\tstage_2(i_clk, %s, i_ce,\n", resetw.c_str());
-		fprintf(vmain, "\t\t\tw_s4, w_d4, w_d2, w_s2);\n");
+		fprintf(vmain, "\tlaststage\t#(\n"
+				"\t\t// {{{\n"
+				"\t\t.IWIDTH(OWIDTH),\n"
+				"\t\t.OWIDTH(OWIDTH)\n"
+				"\t\t// }}}\n"
+				"\t) stage_2(\n"
+				"\t\t// {{{\n"
+				"\t\t.i_clk(i_clk),\n"
+				"\t\t.%s(%s),\n"
+				"\t\t.i_ce(i_ce),\n",
+				resetw.c_str(),
+				resetw.c_str());
+		fprintf(vmain, "\t\t.i_sync(w_s4),\n"
+				"\t\t.i_val(w_d4),\n"
+				"\t\t.o_val(w_d2),\n"
+				"\t\t.o_sync(w_s2)\n"
+				"\t\t// }}}\n"
+				"\t);\n");
 		// }}}
 	} else { // General case -- build the FFT stages
 		// {{{
@@ -1751,13 +1811,33 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage%s\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(IWIDTH),\n"
+					"\t\t.CWIDTH(IWIDTH+%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.LGSPAN(%d),\n"
+					"\t\t.BFLYSHIFT(0),\n"
+					"\t\t.OPT_HWMPY(%d),\n"
+					"\t\t.CKPCE(%d),\n"
+					"\t\t.COEFFILE(\"%s\")\n"
+					"\t\t// }}}\n"
+					"\t) stage_%d(\n"
+					"\t\t// {{{\n"
+					"\t\t.i_clk(i_clk),\n"
+					"\t\t.%s(%s),\n"
+					"\t\t.i_ce(i_ce),\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgtmp-1, (mpystage)?1:0,
 					ckpce, cmem.c_str(),
-					fftsize, resetw.c_str());
-				fprintf(vmain, "\t\t\t(%s%s), i_sample, w_d%d, w_s%d%s);\n",
+					fftsize, resetw.c_str(), resetw.c_str());
+				fprintf(vmain, "\t\t.i_sync(%s%s),\n"
+					"\t\t.i_data(i_sample),\n"
+					"\t\t.o_data(w_d%d),\n"
+					"\t\t.o_sync(w_s%d%s)\n"
+					"\t\t// }}}\n"
+					"\t);\n",
 					(async_reset)?"":"!", resetw.c_str(),
 					fftsize, fftsize,
 					((dbg)&&(dbgstage == fftsize))
@@ -1771,13 +1851,34 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(IWIDTH,IWIDTH+%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage%s\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(IWIDTH),\n"
+					"\t\t.CWIDTH(IWIDTH+%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.LGSPAN(%d),\n"
+					"\t\t.BFLYSHIFT(0),\n"
+					"\t\t.OPT_HWMPY(%d),\n"
+					"\t\t.CKPCE(%d),\n"
+					"\t\t.COEFFILE(\"%s\")\n"
+					"\t\t// }}}\n"
+					"\t) stage_e%d(\n"
+					"\t\t// {{{\n"
+					"\t\t.i_clk(i_clk),\n"
+					"\t\t.%s(%s),\n"
+					"\t\t.i_ce(i_ce),\n",
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgtmp-2, (mpystage)?1:0,
 					ckpce, cmem.c_str(),
-					fftsize, resetw.c_str());
-				fprintf(vmain, "\t\t\t(%s%s), i_left, w_e%d, w_s%d%s);\n",
+					fftsize, resetw.c_str(),
+					resetw.c_str());
+				fprintf(vmain, "\t\t.i_sync(%s%s),\n"
+					"\t\t.i_data(i_left),\n"
+					"\t\t.o_data(w_e%d),\n"
+					"\t\t.o_sync(w_s%d%s)\n"
+					"\t\t// }}}\n"
+					"\t);\n",
 					(async_reset)?"":"!", resetw.c_str(),
 					fftsize, fftsize,
 					((dbg)&&(dbgstage == fftsize))?", o_dbg":"");
@@ -1785,12 +1886,33 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
-				fprintf(vmain, "\tfftstage\t#(IWIDTH,IWIDTH+%d,%d,%d,0,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tfftstage\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(IWIDTH),\n"
+					"\t\t.CWIDTH(IWIDTH+%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.LGSPAN(%d),\n"
+					"\t\t.BFLYSHIFT(0),\n"
+					"\t\t.OPT_HWMPY(%d),\n"
+					"\t\t.CKPCE(%d),\n"
+					"\t\t.COEFFILE(\"%s\")\n"
+					"\t\t// }}}\n"
+					"\t) stage_o%d(\n"
+					"\t\t// {{{\n"
+					"\t\t.i_clk(i_clk),\n"
+					"\t\t.%s(%s),\n"
+					"\t\t.i_ce(i_ce),\n",
 					xtracbits, obits+xtrapbits,
 					lgtmp-2, (mpystage)?1:0,
 					ckpce, cmem.c_str(),
-					fftsize, resetw.c_str());
-				fprintf(vmain, "\t\t\t(%s%s), i_right, w_o%d, w_os%d);\n",
+					fftsize, resetw.c_str(),
+					resetw.c_str());
+				fprintf(vmain, "\t\t.i_sync(%s%s),\n"
+					"\t\t.i_data(i_right),\n"
+					"\t\t.o_data(w_o%d),\n"
+					"\t\t.o_sync(w_os%d)\n"
+					"\t\t// }}}\n"
+					"\t);\n",
 					(async_reset)?"":"!",resetw.c_str(),
 					fftsize, fftsize);
 				// }}}
@@ -1860,7 +1982,22 @@ SLASHLINE
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 1, 0, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage%s\t#(\n"
+						"\t\t// {{{\n"
+						"\t\t.IWIDTH(%d),\n"
+						"\t\t.CWIDTH(%d),\n"
+						"\t\t.OWIDTH(%d),\n"
+						"\t\t.LGSPAN(%d),\n"
+						"\t\t.BFLYSHIFT(%d),\n"
+						"\t\t.OPT_HWMPY(%d),\n"
+						"\t\t.CKPCE(%d),\n"
+						"\t\t.COEFFILE(\"%s\")\n"
+						"\t\t// }}}\n"
+						"\t) stage_%d(\n"
+						"\t\t// {{{\n"
+						"\t\t.i_clk(i_clk),\n"
+						"\t\t.%s(%s),\n"
+						"\t\t.i_ce(i_ce),\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -1868,8 +2005,14 @@ SLASHLINE
 						lgtmp-1, (dropbit)?0:0, (mpystage)?1:0,
 						ckpce,
 						cmem.c_str(), tmp_size,
+						resetw.c_str(),
 						resetw.c_str());
-					fprintf(vmain, "\t\t\tw_s%d, w_d%d, w_d%d, w_s%d%s);\n",
+					fprintf(vmain, "\t\t.i_sync(w_s%d),\n"
+						"\t\t.i_data(w_d%d),\n"
+						"\t\t.o_data(w_d%d),\n"
+						"\t\t.o_sync(w_s%d%s)\n"
+						"\t\t// }}}\n"
+						"\t);\n",
 						tmp_size<<1, tmp_size<<1,
 						tmp_size, tmp_size,
 						((dbg)&&(dbgstage == tmp_size))
@@ -1887,7 +2030,22 @@ SLASHLINE
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 2, 0, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_e%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage%s\t#(\n"
+						"\t\t// {{{\n"
+						"\t\t.IWIDTH(%d),\n"
+						"\t\t.CWIDTH(%d),\n"
+						"\t\t.OWIDTH(%d),\n"
+						"\t\t.LGSPAN(%d),\n"
+						"\t\t.BFLYSHIFT(%d),\n"
+						"\t\t.OPT_HWMPY(%d),\n"
+						"\t\t.CKPCE(%d),\n"
+						"\t\t.COEFFILE(\"%s\")\n"
+						"\t\t// }}}\n"
+						"\t) stage_e%d(\n"
+						"\t\t// {{{\n"
+						"\t\t.i_clk(i_clk),\n"
+						"\t\t.%s(%s),\n"
+						"\t\t.i_ce(i_ce),\n",
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -1895,8 +2053,14 @@ SLASHLINE
 						lgtmp-2, (dropbit)?0:0, (mpystage)?1:0,
 						ckpce,
 						cmem.c_str(), tmp_size,
+						resetw.c_str(),
 						resetw.c_str());
-					fprintf(vmain, "\t\t\tw_s%d, w_e%d, w_e%d, w_s%d%s);\n",
+					fprintf(vmain, "\t\t.i_sync(w_s%d),\n"
+						"\t\t.i_data(w_e%d),\n"
+						"\t\t.o_data(w_e%d),\n"
+						"\t\t.o_sync(w_s%d%s)\n"
+						"\t\t// }}}\n"
+						"\t);\n",
 						tmp_size<<1, tmp_size<<1,
 						tmp_size, tmp_size,
 						((dbg)&&(dbgstage == tmp_size))
@@ -1909,14 +2073,35 @@ SLASHLINE
 						2, 1, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR,
 						tmp_size, 2, 1, inverse);
-					fprintf(vmain, "\tfftstage\t#(%d,%d,%d,%d,%d,\n\t\t\t%d, %d, \"%s\")\n\t\tstage_o%d(i_clk, %s, i_ce,\n",
+					fprintf(vmain, "\tfftstage\t#(\n"
+						"\t\t// {{{\n"
+						"\t\t.IWIDTH(%d),\n"
+						"\t\t.CWIDTH(%d),\n"
+						"\t\t.OWIDTH(%d),\n"
+						"\t\t.LGSPAN(%d),\n"
+						"\t\t.BFLYSHIFT(%d),\n"
+						"\t\t.OPT_HWMPY(%d),\n"
+						"\t\t.CKPCE(%d),\n"
+						"\t\t.COEFFILE(\"%s\")\n"
+						"\t\t// }}}\n"
+						"\n) \tstage_o%d(\n"
+						"\t\t// {{{\n"
+						"\t\t.i_clk(i_clk),\n"
+						"\t\t.%s(%s),\n"
+						"\t\t.i_ce(i_ce),\n",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
 						lgtmp-2, (dropbit)?0:0, (mpystage)?1:0,
 						ckpce, cmem.c_str(), tmp_size,
+						resetw.c_str(),
 						resetw.c_str());
-					fprintf(vmain, "\t\t\tw_s%d, w_o%d, w_o%d, w_os%d);\n",
+					fprintf(vmain, "\t\t.i_sync(w_s%d),\n"
+						"\t\t.i_data(w_o%d),\n"
+						"\t\t.o_data(w_o%d),\n"
+						"\t\t.o_sync(w_os%d)\n"
+						"\t\t// }}}\n"
+						"\t);\n",
 						tmp_size<<1, tmp_size<<1,
 						tmp_size, tmp_size);
 					// }}}
@@ -1944,29 +2129,85 @@ SLASHLINE
 				// {{{
 				fprintf(vmain, "\twire\t[%d:0]\tw_d4;\n",
 					2*(obits+xtrapbits)-1);
-				fprintf(vmain, "\tqtrstage%s\t#(%d,%d,%d,%d,%d)\tstage_4(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tqtrstage%s\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.LGWIDTH(%d),\n"
+					"\t\t.INVERSE(%d),\n"
+					"\t\t.SHIFT(%d)\n"
+					"\t\t// }}}\n"
+					"\t) stage_4(\n"
+						"\t\t// {{{\n"
+						"\t\t.i_clk(i_clk),\n"
+						"\t\t.%s(%s),\n"
+						"\t\t.i_ce(i_ce),\n",
 					((dbg)&&(dbgstage==4))?"_dbg":"",
 					nbits+xtrapbits, obits+xtrapbits, lgsize,
 					(inverse)?1:0, (dropbit)?0:0,
+					resetw.c_str(),
 					resetw.c_str());
-				fprintf(vmain, "\t\t\t\t\t\tw_s8, w_d8, w_d4, w_s4%s);\n",
+				fprintf(vmain, "\t\t.i_sync(w_s8),\n"
+					"\t\t.i_data(w_d8),\n"
+					"\t\t.o_data(w_d4),\n"
+					"\t\t.o_sync(w_s4%s)\n"
+					"\t\t// }}}\n"
+					"\t);\n",
 					((dbg)&&(dbgstage==4))?", o_dbg":"");
 				// }}}
 			} else {
 				// {{{
 				fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os4;\n\t// verilator lint_on  UNUSED\n");
 				fprintf(vmain, "\twire\t[%d:0]\tw_e4, w_o4;\n", 2*(obits+xtrapbits)-1);
-				fprintf(vmain, "\tqtrstage%s\t#(%d,%d,%d,0,%d,%d)\tstage_e4(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tqtrstage%s\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.LGWIDTH(%d),\n"
+					"\t\t.ODD(0),\n"
+					"\t\t.INVERSE(%d),\n"
+					"\t\t.SHIFT(%d)\n"
+					"\t\t// }}}\n"
+					"\t) stage_e4(\n"
+					"\t\t// {{{\n"
+					"\t\t.i_clk(i_clk),\n"
+					"\t\t.%s(%s),\n"
+					"\t\t.i_ce(i_ce),\n",
 					((dbg)&&(dbgstage==4))?"_dbg":"",
 					nbits+xtrapbits, obits+xtrapbits, lgsize,
 					(inverse)?1:0, (dropbit)?0:0,
+					resetw.c_str(),
 					resetw.c_str());
-				fprintf(vmain, "\t\t\t\t\t\tw_s8, w_e8, w_e4, w_s4%s);\n",
+				fprintf(vmain, "\t\t.i_sync(w_s8),\n"
+					"\t\t.i_data(w_e8),\n"
+					"\t\t.o_data(w_e4),\n"
+					"\t\t.o_sync(w_s4%s)\n"
+					"\t\t// }}}\n"
+					"\t);\n",
 					((dbg)&&(dbgstage==4))?", o_dbg":"");
-				fprintf(vmain, "\tqtrstage\t#(%d,%d,%d,1,%d,%d)\tstage_o4(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tqtrstage\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.LGWIDTH(%d),\n"
+					"\t\t.ODD(1),\n"
+					"\t\t.INVERSE(%d),\n"
+					"\t\t.SHIFT(%d)\n"
+					"\t\t// }}}\n"
+					"\t) stage_o4(\n"
+					"\t\t// {{{\n"
+					"\t\t.i_clk(i_clk),\n"
+					"\t\t.%s(%s),\n"
+					"\t\t.i_ce(i_ce),\n",
 					nbits+xtrapbits, obits+xtrapbits, lgsize, (inverse)?1:0, (dropbit)?0:0,
+					resetw.c_str(),
 					resetw.c_str());
-				fprintf(vmain, "\t\t\t\t\t\tw_s8, w_o8, w_o4, w_os4);\n");
+				fprintf(vmain, "\t\t.i_sync(w_s8),\n"
+					"\t\t.i_data(w_o8),\n"
+					"\t\t.o_data(w_o4),\n"
+					"\t\t.o_sync(w_os4)\n"
+					"\t\t// }}}\n"
+					"\t);\n");
 				// }}}
 			}
 			dropbit ^= 1;
@@ -1983,7 +2224,7 @@ SLASHLINE
 				obits = nbitsout;
 			if ((maxbitsout>0)&&(obits > maxbitsout))
 				obits = maxbitsout;
-			fprintf(vmain, "\twire\t\tw_s2;\n");
+			fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_s2;\n\t// verilator lint_on  UNUSED\n");
 			if (single_clock) {
 				fprintf(vmain, "\twire\t[%d:0]\tw_d2;\n",
 					2*obits-1);
@@ -1998,17 +2239,47 @@ SLASHLINE
 
 			if (single_clock) {
 				// {{{
-				fprintf(vmain, "\tlaststage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tlaststage\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.SHIFT(%d)\n"
+					"\t\t// }}}\n"
+					"\t) stage_2(\n"
+					"\t\t// {{{\n"
+					"\t\t.i_clk(i_clk),\n"
+					"\t\t.%s(%s),\n"
+					"\t\t.i_ce(i_ce),\n",
 					nbits+xtrapbits, obits,(dropbit)?0:1,
-					resetw.c_str());
-				fprintf(vmain, "\t\t\t\t\tw_s4, w_d4, w_d2, w_s2);\n");
+					resetw.c_str(), resetw.c_str());
+				fprintf(vmain, "\t\t.i_sync(w_s4),\n"
+						"\t\t.i_val(w_d4),\n"
+						"\t\t.o_val(w_d2),\n"
+						"\t\t.o_sync(w_s2)\n"
+						"\t\t// }}}\n"
+						"\t);\n");
 				// }}}
 			} else {
 				// {{{
-				fprintf(vmain, "\tlaststage\t#(%d,%d,%d)\tstage_2(i_clk, %s, i_ce,\n",
+				fprintf(vmain, "\tlaststage\t#(\n"
+					"\t\t// {{{\n"
+					"\t\t.IWIDTH(%d),\n"
+					"\t\t.OWIDTH(%d),\n"
+					"\t\t.SHIFT(%d)\n"
+					"\t\t// }}}\n"
+					"\t) stage_2(\n"
+					"\t\t// {{{\n"
+					"\t\t.i_clk(i_clk),\n"
+					"\t\t.%s(%s),\n"
+					"\t\t.i_ce(i_ce),\n",
 					nbits+xtrapbits, obits,(dropbit)?0:1,
-					resetw.c_str());
-				fprintf(vmain, "\t\t\t\t\tw_s4, w_e4, w_o4, w_e2, w_o2, w_s2);\n");
+					resetw.c_str(), resetw.c_str());
+				fprintf(vmain, "\t\t.i_sync(w_s4),\n"
+					"\t\t.i_left(w_e4), .i_right(w_o4),\n"
+					"\t\t.o_left(w_e2), .o_right(w_o2),\n"
+					"\t\t.o_sync(w_s2)\n"
+					"\t\t// }}}\n"
+					"\t);\n");
 				// }}}
 			}
 
@@ -2044,7 +2315,11 @@ SLASHLINE
 	fprintf(vmain, "\t// Now for the bit-reversal stage.\n");
 	if (bitreverse) {
 		if (single_clock) {
-			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\trevstage(\n"
+			fprintf(vmain, "\tbitreverse\t#(\n"
+				"\t\t// {{{\n"
+				"\t\t.LGSIZE(%d), .WIDTH(%d)\n"
+				"\t\t// }}}\n"
+				"\t) revstage (\n"
 				"\t\t// {{{\n"
 				"\t\t.i_clk(i_clk),\n"
 				"\t\t.%s(%s),\n", lgsize, nbitsout,
@@ -2058,12 +2333,16 @@ SLASHLINE
 				"\t\t// }}}\n"
 				"\t);\n");
 		} else {
-			fprintf(vmain, "\tbitreverse\t#(%d,%d)\n\trevstage(\n"
+			fprintf(vmain, "\tbitreverse\t#(\n"
+				"\t\t// {{{\n"
+				"\t\t.LGSIZE(%d),\n"
+				"\t\t.WIDTH(%d)\n"
+				"\t\t// }}}\n"
+				"\t) revstage (\n"
 				"\t\t// {{{\n"
 				"\t\t.i_clk(i_clk),\n"
 				"\t\t.%s(%s),\n", lgsize, nbitsout,
-				resetw.c_str(),
-				resetw.c_str());
+				resetw.c_str(), resetw.c_str());
 			fprintf(vmain,
 				"\t\t.i_ce(i_ce & br_start),\n"
 				"\t\t.i_in_0(w_e2),\n"
