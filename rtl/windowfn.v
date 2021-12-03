@@ -120,7 +120,8 @@ module	windowfn #(
 	reg	[(IW-1):0]	dmem	[0:(1<<LGNFFT)-1];
 
 	reg		[LGNFFT-1:0]	dwidx, didx; // Data indices: write&read
-	reg		[LGNFFT-1:0]	tidx;	// Coefficient index
+	wire		[LGNFFT-1:0]	tidx;	// Coefficient index
+	reg				r_tidx;	// Coefficient index, MSB
 	reg				top_of_block, first_block;
 	reg		[1:0]		frame_count;
 	reg				p_ce, d_ce;
@@ -282,25 +283,24 @@ module	windowfn #(
 		// Process the next point in this FFT
 		didx <= didx + 1'b1;
 
-	always @(*)
-		tidx[LGNFFT-2:0] = didx[LGNFFT-2:0];
+	assign tidx = { r_tidx, didx[LGNFFT-2:0] };
 
-	initial	tidx[LGNFFT-1] = 0;
+	initial	r_tidx = 0;
 	always @(posedge i_clk)
 	if (i_reset)
-		tidx[LGNFFT-1] <= 0;
+		r_tidx <= 0;
 	else if ((i_alt_ce)&&(dwidx[LGNFFT-2:0]==0))
 	begin
 		// Restart the counter for the first point
 		// of the next FFT.
-		tidx[LGNFFT-1] <= 0;
+		r_tidx <= 0;
 	end else if ((i_ce)||(i_alt_ce))
 	begin
 		// Process the next point in the window function
 		//
 		// Here we implement the carry only
 		if (&tidx[LGNFFT-2:0])
-			tidx[LGNFFT-1] <= !tidx[LGNFFT-1];
+			r_tidx <= !r_tidx;
 	end
 	// }}}
 
@@ -492,6 +492,11 @@ module	windowfn #(
 `ifdef	FORMAL
 	// Declarations
 	// {{{
+`ifdef	WINDOWFN
+`define	ASSUME	assume
+`else
+`define	ASSUME	assert
+`endif
 	reg			f_past_valid;
 	reg			f_waiting_for_first_frame;
 	reg	[LGNFFT-1:0]	f_tidx;
@@ -555,28 +560,28 @@ module	windowfn #(
 	//
 	always @(*)
 	if (tapwidx != 0)
-		assume(!i_ce);
+		`ASSUME(!i_ce);
 
 	always @(*)
 	if (i_tap_wr)
-		assume((!i_ce)&&(!i_alt_ce));
+		`ASSUME((!i_ce)&&(!i_alt_ce));
 
 	//
 	// Assume the user isn't writing to our taps at all
 	//
 	always @(*)
-		assume(!i_tap_wr);
+		`ASSUME(!i_tap_wr);
 
 	//
 	// Insist that the various CE's alternate: i_ce, i_alt_ce, i_ce, etc.
 	//
 	always @(posedge i_clk)
 	if (f_phase[0])
-		assume(!i_ce);
+		`ASSUME(!i_ce);
 
 	always @(posedge i_clk)
 	if (!f_phase[0])
-		assume(!i_alt_ce);
+		`ASSUME(!i_alt_ce);
 
 	always @(*)
 		assert(!i_ce || !i_alt_ce);
