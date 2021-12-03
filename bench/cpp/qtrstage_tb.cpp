@@ -56,7 +56,13 @@
 #define	ASIZ	32
 #define	AMSK	(ASIZ-1)
 
-#ifdef	NEW_VERILATOR
+#ifdef	ROOT_VERILATOR
+
+#include "Vqtrstage___024root.h"
+
+#define	VVAR(A)	rootp->qtrstage__DOT_ ## A
+
+#elif	defined(NEW_VERILATOR)
 #define	VVAR(A)	qtrstage__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A

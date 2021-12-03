@@ -55,7 +55,12 @@
 #define	DATAMSK	(DATALEN-1)
 #define	PAGEMSK	(FFTSIZE)
 
-#ifdef	NEW_VERILATOR
+#ifdef	ROOT_VERILATOR
+
+#include "Vbitreverse___024root.h"
+#define	VVAR(A)	rootp->bitreverse__DOT_ ## A
+
+#elif	defined(NEW_VERILATOR)
 #define	VVAR(A)	bitreverse__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A

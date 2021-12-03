@@ -49,7 +49,13 @@
 #include "twoc.h"
 #include "fftsize.h"
 
-#ifdef	NEW_VERILATOR
+#ifdef	ROOT_VERILATOR
+
+#include "Vhwbfly___024root.h"
+
+#define	VVAR(A)	rootp->hwbfly__DOT_ ## A
+
+#elif	defined(NEW_VERILATOR)
 #define	VVAR(A)	hwbfly__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A

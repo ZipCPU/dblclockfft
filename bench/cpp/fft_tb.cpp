@@ -53,7 +53,13 @@
 #include "fftsize.h"
 
 
-#ifdef	NEW_VERILATOR
+#ifdef	ROOT_VERILATOR
+
+#include "Vfftmain___024root.h"
+
+#define	VVAR(A)	rootp->fftmain__DOT_ ## A
+
+#elif	defined(NEW_VERILATOR)
 #define	VVAR(A)	fftmain__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A
@@ -529,7 +535,7 @@ int	main(int argc, char **argv, char **envp) {
 		exit(-1);
 	}
 
-	// fft->opentrace("fft.vcd");
+	fft->opentrace("fft.vcd");
 	fft->reset();
 
 	{

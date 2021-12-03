@@ -609,9 +609,9 @@ SLASHLINE
 		"\t\t\t.i_clk(i_clk), .i_reset(i_reset), .i_ce(i_ce),\n");
 
 		fprintf(fstage,
-		"\t\t\t.i_coef((idle && !i_ce) ? 0:ib_c),\n"
-		"\t\t\t.i_left((idle && !i_ce) ? 0:ib_a),\n"
-		"\t\t\t.i_right((idle && !i_ce) ? 0:ib_b),\n"
+		"\t\t\t.i_coef( (idle && !i_ce) ? {(2*CWIDTH){1\'b0}}:ib_c),\n"
+		"\t\t\t.i_left( (idle && !i_ce) ? {(2*IWIDTH){1\'b0}}:ib_a),\n"
+		"\t\t\t.i_right((idle && !i_ce) ? {(2*IWIDTH){1\'b0}}:ib_b),\n"
 		"\t\t\t.i_aux(ib_sync && i_ce),\n"
 		"\t\t\t.o_left(ob_a), .o_right(ob_b), .o_aux(ob_sync)\n"
 		"\t\t\t// }}}\n"
@@ -638,9 +638,9 @@ SLASHLINE
 		"\t\t\t.i_clk(i_clk), .i_reset(i_reset), .i_ce(i_ce),\n");
 
 		fprintf(fstage,
-		"\t\t\t.i_coef( (idle && !i_ce)?0:ib_c),\n"
-		"\t\t\t.i_left( (idle && !i_ce)?0:ib_a),\n"
-		"\t\t\t.i_right((idle && !i_ce)?0:ib_b),\n"
+		"\t\t\t.i_coef( (idle && !i_ce)? {(2*CWIDTH){1\'b0}} :ib_c),\n"
+		"\t\t\t.i_left( (idle && !i_ce)? {(2*IWIDTH){1\'b0}} :ib_a),\n"
+		"\t\t\t.i_right((idle && !i_ce)? {(2*IWIDTH){1\'b0}} :ib_b),\n"
 		"\t\t\t.i_aux(ib_sync && i_ce),\n"
 		"\t\t\t.o_left(ob_a), .o_right(ob_b), .o_aux(ob_sync)\n"
 		"\t\t\t// }}}\n"

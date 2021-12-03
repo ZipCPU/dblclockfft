@@ -52,7 +52,13 @@
 #include "fftsize.h"
 
 
-#ifdef	NEW_VERILATOR
+#ifdef	ROOT_VERILATOR
+
+#include "Vfftstage___024root.h"
+
+#define	VVAR(A)	rootp->fftstage__DOT_ ## A
+
+#elif	defined(NEW_VERILATOR)
 #define	VVAR(A)	fftstage__DOT_ ## A
 #else
 #define	VVAR(A)	v__DOT_ ## A
@@ -300,14 +306,14 @@ assert(OWIDTH == IWIDTH+1);
 
 			if (gbl_debug) printf("IB-SYNC!!!!  Offset = %d\n", m_ib_offset);
 		} else if ((m_ib_syncd)&&(ib_addr <(1<<(LGSPAN)))) {
-			unsigned long	ib_a, ib_b, ib_c;
-			ib_a = m_vals[ib_addr&SPANMASK];
-			ib_b = i_data; // m_vals[(m_iaddr-m_ib_offset+(1<<(LGSPAN-1)))&(SPANMASK)];
-			ib_c = m_ftstage->cmem[(m_iaddr-m_ib_offset)&(SPANMASK)];
+			unsigned long	ib_av, ib_bv, ib_cv;
+			ib_av = m_vals[ib_addr&SPANMASK];
+			ib_bv = i_data; // m_vals[(m_iaddr-m_ib_offset+(1<<(LGSPAN-1)))&(SPANMASK)];
+			ib_cv = m_ftstage->cmem[(m_iaddr-m_ib_offset)&(SPANMASK)];
 
-			assert(m_ftstage->ib_a == ib_a);
-			assert(m_ftstage->ib_b == ib_b);
-			// assert(m_ftstage->ib_a == ib_a);
+			assert(m_ftstage->ib_a == ib_av);
+			assert(m_ftstage->ib_b == ib_bv);
+			// assert(m_ftstage->ib_a == ib_av);
 		}
 
 		if ((!m_ob_syncd)&&(m_ftstage->ob_sync)) {
