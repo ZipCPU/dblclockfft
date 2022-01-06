@@ -57,7 +57,7 @@
 #include <stdlib.h>
 
 #ifdef _MSC_VER //  added for ms vs compatibility
-
+// {{{
 #include <io.h>
 #include <direct.h>
 #define _USE_MATH_DEFINES
@@ -81,12 +81,20 @@ int lstat(const char *filename, struct stat *buf) { return 1; };
 #define	mkdir(A,B)	_mkdir(A)
 
 #define access _access
-
+// }}}
+#elif defined(__MINGW32__)
+// Macintosh environment(s)
+// {{{
+#include <direct.h>	// mkdir
+#define	mkdir(A,B)	_mkdir(A)
+#define	lstat(p,s)	stat(p,s)
+// }}}
 #else
 // And for G++/Linux environment
-
+// {{{
 #include <unistd.h>	// Defines the R_OK/W_OK/etc. macros
 #include <sys/stat.h>
+// }}}
 #endif
 
 #include <string.h>
