@@ -83,9 +83,12 @@ int lstat(const char *filename, struct stat *buf) { return 1; };
 #define access _access
 // }}}
 #elif defined(__MINGW32__)
-// Macintosh environment(s)
+// MinGW - Minimalist GNU for Windows -- also MinGW-w64/MSYS2
 // {{{
 #include <direct.h>	// mkdir
+#include <unistd.h>
+#include <sys/stat.h>
+
 #define	mkdir(A,B)	_mkdir(A)
 #define	lstat(p,s)	stat(p,s)
 // }}}
