@@ -8,7 +8,8 @@ smtbmc yices
 [script]
 read_verilog -formal -DLASTSTAGE convround.v
 read_verilog -formal -DLASTSTAGE laststage.v
-chparam -set IWIDTH 3 -set OWIDTH 4 laststage
+hierarchy -top laststage -chparam IWIDTH 3 -chparam OWIDTH 4
+proc -norom
 prep -top laststage
 
 [files]

@@ -20,7 +20,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -82,14 +82,15 @@ module	longbimpy #(
 	// reasons
 	wire	[AW-1:0]	i_a;
 	wire	[BW-1:0]	i_b;
-	generate if (IAW <= IBW)
+	generate begin : PARAM_CHECK
+	if (IAW <= IBW)
 	begin : NO_PARAM_CHANGE_I
 		assign i_a = i_a_unsorted;
 		assign i_b = i_b_unsorted;
 	end else begin : SWAP_PARAMETERS_I
 		assign i_a = i_b_unsorted;
 		assign i_b = i_a_unsorted;
-	end endgenerate
+	end end endgenerate
 
 	reg	[(IW-1):0]	u_a;
 	reg	[(BW-1):0]	u_b;
@@ -118,7 +119,8 @@ module	longbimpy #(
 	// u_a
 	// {{{
 	initial u_a = 0;
-	generate if (IW > AW)
+	generate begin : ABS
+	if (IW > AW)
 	begin : ABS_AND_ADD_BIT_TO_A
 		always @(posedge i_clk)
 		if (i_ce)
@@ -127,7 +129,7 @@ module	longbimpy #(
 		always @(posedge i_clk)
 		if (i_ce)
 			u_a <= (i_a[AW-1])?(-i_a):(i_a);
-	end endgenerate
+	end end endgenerate
 	// }}}
 
 	// sgn, u_b
@@ -150,8 +152,26 @@ module	longbimpy #(
 	// For the next round, we'll then have a previous sum to accumulate
 	// with new and subsequent product, and so only do one product at
 	// a time can follow this--but the first clock can do two at a time.
-	bimpy	#(BW) lmpy_0(i_clk,1'b0,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);
-	bimpy	#(BW) lmpy_1(i_clk,1'b0,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);
+	bimpy	#(
+		.BW(BW)
+	) lmpy_0(
+		// {{{
+		.i_clk(i_clk),.i_reset(1'b0),.i_ce(i_ce),
+		.i_a(u_a[(  LUTB-1):   0]),
+		.i_b(u_b),
+		.o_r(pr_a)
+		// }}}
+	);
+	bimpy	#(
+		.BW(BW)
+	) lmpy_1(
+		// {{{
+		.i_clk(i_clk),.i_reset(1'b0),.i_ce(i_ce),
+		.i_a(u_a[(2*LUTB-1):LUTB]),
+		.i_b(u_b),
+		.o_r(pr_b)
+		// }}}
+	);
 
 	// r_s, r_a[0], r_b[0]
 	// {{{
@@ -178,8 +198,10 @@ module	longbimpy #(
 
 	// r_a[TLEN-3:1], r_b[TLEN-3:1]
 	// {{{
-	generate // Keep track of intermediate values, before multiplying them
-	if (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)
+	generate begin : COPY
+	// Keep track of intermediate values, before multiplying them
+	if (TLEN > 3) begin : FOR
+	for(k=0; k<TLEN-3; k=k+1)
 	begin : GENCOPIES
 
 		initial r_a[k+1] = 0;
@@ -191,19 +213,29 @@ module	longbimpy #(
 				r_a[k][(IW-1-(2*LUTB)):LUTB] };
 			r_b[k+1] <= r_b[k];
 		end
-	end endgenerate
+	end end end endgenerate
 	// }}}
 
 	// acc[TLEN-2:1]
 	// {{{
-	generate // The actual multiply and accumulate stage
-	if (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)
+	generate begin : STAGES
+	// The actual multiply and accumulate stage
+	if (TLEN > 2) begin : FOR
+	for(k=0; k<TLEN-2; k=k+1)
 	begin : GENSTAGES
 		wire	[(BW+LUTB-1):0] genp;
 
 		// First, the multiply: 2-bits times BW bits
-		bimpy #(BW)
-		genmpy(i_clk,1'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);
+		bimpy #(
+			.BW(BW)
+		) genmpy(
+			// {{{
+			.i_clk(i_clk),.i_reset(1'b0),.i_ce(i_ce),
+			.i_a(r_a[k][(LUTB-1):0]),
+			.i_b(r_b[k]),
+			.o_r(genp)
+			// }}}
+		);
 
 		// Then the accumulate step -- on the next clock
 		initial acc[k+1] = 0;
@@ -211,7 +243,7 @@ module	longbimpy #(
 		if (i_ce)
 			acc[k+1] <= acc[k] + {{(IW-LUTB*(k+3)){1'b0}},
 				genp, {(LUTB*(k+2)){1'b0}} };
-	end endgenerate
+	end end end endgenerate
 	// }}}
 
 	assign	w_r = (r_s[TLEN-1]) ? (-acc[TLEN-2]) : acc[TLEN-2];
@@ -226,13 +258,14 @@ module	longbimpy #(
 
 	// Make Verilator happy
 	// {{{
-	generate if (IW > AW)
+	generate begin : GUNUSED
+	if (IW > AW)
 	begin : VUNUSED
 		// verilator lint_off UNUSED
 		wire	unused;
 		assign	unused = &{ 1'b0, w_r[(IW+BW-1):(AW+BW)] };
 		// verilator lint_on UNUSED
-	end endgenerate
+	end end endgenerate
 	// }}}
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -276,7 +309,7 @@ module	longbimpy #(
 	end
 
 	generate for(k=0; k<TLEN; k=k+1)
-	begin
+	begin : F_PAST
 		initial	f_past_a[k+1] = 0;
 		initial	f_past_b[k+1] = 0;
 		initial	f_sgn_a[k+1] = 0;
@@ -322,8 +355,10 @@ module	longbimpy #(
 			`ASSERT(u_b == $past(i_b));
 	end
 
-	generate // Keep track of intermediate values, before multiplying them
-	if (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)
+	generate begin : F_ASSERT_ZERO
+	// Keep track of intermediate values, before multiplying them
+	if (TLEN > 3) begin : FOR
+	for(k=0; k<TLEN-3; k=k+1)
 	begin : ASSERT_GENCOPY
 		always @(posedge i_clk)
 		if (i_ce)
@@ -335,10 +370,12 @@ module	longbimpy #(
 				`ASSERT(r_a[k] == 0);
 			`ASSERT(r_b[k] == f_past_b[k]);
 		end
-	end endgenerate
+	end end end endgenerate
 
-	generate // The actual multiply and accumulate stage
-	if (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)
+	generate begin : F_ACC
+	// The actual multiply and accumulate stage
+	if (TLEN > 2) begin : FOR
+	for(k=0; k<TLEN-2; k=k+1)
 	begin : ASSERT_GENSTAGE
 		always @(posedge i_clk)
 		if ((f_past_valid)&&($past(i_ce)))
@@ -356,7 +393,7 @@ module	longbimpy #(
 				`ASSERT(acc[k][(IW+BW-1):(2*k)+4] == 0);
 			end
 		end
-	end endgenerate
+	end end end endgenerate
 
 	wire	[AW-1:0]	f_past_a_neg = - f_past_a[TLEN];
 	wire	[BW-1:0]	f_past_b_neg = - f_past_b[TLEN];
@@ -411,7 +448,8 @@ module	longbimpy #(
 		end
 	end
 
-	generate if (IAW <= IBW)
+	generate begin : F_ABS
+	if (IAW <= IBW)
 	begin : NO_PARAM_CHANGE_II
 		assign f_past_a_unsorted = (!f_sgn_a[TLEN+1])
 					? f_past_a[TLEN] : f_past_a_neg;
@@ -422,7 +460,7 @@ module	longbimpy #(
 					? f_past_b[TLEN] : f_past_b_neg;
 		assign f_past_b_unsorted = (!f_sgn_a[TLEN+1])
 					? f_past_a[TLEN] : f_past_a_neg;
-	end endgenerate
+	end end endgenerate
 `ifdef	BUTTERFLY
 	// The following properties artificially restrict the inputs
 	// to this long binary multiplier to only those values whose
@@ -452,26 +490,29 @@ module	longbimpy #(
 	// If the inputs have these properties, then so too do many of
 	// our internal values.  ASSERT therefore that we never get out
 	// of bounds
-	generate for(k=0; k<TLEN; k=k+1)
-	begin
+	generate begin : F_PAST_ZERO
+	for(k=0; k<TLEN; k=k+1)
+	begin : F
 		always @(*)
 		begin
 			assert(f_past_a[k][AW-1:3] == 0);
 			assert(f_past_b[k][BW-1:3] == 0);
 		end
-	end endgenerate
+	end end endgenerate
 
-	generate for(k=0; k<TLEN-1; k=k+1)
-	begin
+	generate begin : F_ACC_ZERO
+	for(k=0; k<TLEN-1; k=k+1)
+	begin : F
 		always @(*)
 			assert(acc[k][IW+BW-1:6] == 0);
-	end endgenerate
+	end end endgenerate
 
-	generate for(k=0; k<TLEN-2; k=k+1)
-	begin
+	generate begin : F_RBZ
+	for(k=0; k<TLEN-2; k=k+1)
+	begin : F
 		always @(*)
 			assert(r_b[k][BW-1:3] == 0);
-	end endgenerate
+	end end endgenerate
 `endif	// BUTTERFLY
 `endif	// FORMAL
 // }}}

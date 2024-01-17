@@ -33,7 +33,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -345,7 +345,7 @@ module	fftstage #(
 	if (i_ce)
 		nxt_oaddr[0] <= oaddr[0];
 	generate if (LGSPAN>1)
-	begin
+	begin : WIDE_LGSPAN
 
 		always @(posedge i_clk)
 		if (i_ce)

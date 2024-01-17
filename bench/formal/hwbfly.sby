@@ -14,11 +14,17 @@ smtbmc
 read_verilog -formal -DHWBFLY abs_mpy.v
 read_verilog -formal -DHWBFLY convround.v
 read_verilog -formal -DHWBFLY hwbfly.v
-
-one:   chparam -set CKPCE 1 -set IWIDTH 4 -set CWIDTH 6 hwbfly
-two:   chparam -set CKPCE 2 -set IWIDTH 4 -set CWIDTH 6 hwbfly
-three: chparam -set CKPCE 3 -set IWIDTH 4 -set CWIDTH 6 hwbfly
-
+--pycode-begin--
+cmd = "hierarchy -top hwbfly"
+if ("one" in tags):
+	cmd += " -chparam CKPCE 1 -chparam IWIDTH 4 -chparam CWIDTH 6"
+elif ("two" in tags):
+	cmd += " -chparam CKPCE 2 -chparam IWIDTH 4 -chparam CWIDTH 6"
+elif ("three" in tags):
+	cmd += " -chparam CKPCE 3 -chparam IWIDTH 4 -chparam CWIDTH 6"
+output(cmd)
+--pycode-end--
+proc -norom
 prep -top hwbfly
 
 [files]

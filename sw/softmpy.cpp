@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -382,14 +382,15 @@ SLASHLINE
 	"\t// reasons\n"
 	"\twire	[AW-1:0]	i_a;\n"
 	"\twire	[BW-1:0]	i_b;\n"
-	"\tgenerate if (IAW <= IBW)\n"
+	"\tgenerate begin : PARAM_CHECK\n"
+	"\tif (IAW <= IBW)\n"
 	"\tbegin : NO_PARAM_CHANGE_I\n"
 	"\t\tassign i_a = i_a_unsorted;\n"
 	"\t\tassign i_b = i_b_unsorted;\n"
 	"\tend else begin : SWAP_PARAMETERS_I\n"
 	"\t\tassign i_a = i_b_unsorted;\n"
 	"\t\tassign i_b = i_a_unsorted;\n"
-	"\tend endgenerate\n"
+	"\tend end endgenerate\n"
 "\n"
 	"\treg\t[(IW-1):0]\tu_a;\n"
 	"\treg\t[(BW-1):0]\tu_b;\n"
@@ -420,7 +421,8 @@ SLASHLINE
 	"\t// u_a\n"
 	"\t// {{{\n"
 	"\tinitial u_a = 0;\n"
-	"\tgenerate if (IW > AW)\n"
+	"\tgenerate begin : ABS\n"
+	"\tif (IW > AW)\n"
 	"\tbegin : ABS_AND_ADD_BIT_TO_A\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
@@ -429,7 +431,7 @@ SLASHLINE
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
 			"\t\t\tu_a <= (i_a[AW-1])?(-i_a):(i_a);\n"
-	"\tend endgenerate\n"
+	"\tend end endgenerate\n"
 	"\t// }}}\n"
 "\n");
 
@@ -454,8 +456,26 @@ SLASHLINE
 	"\t// For the next round, we'll then have a previous sum to accumulate\n"
 	"\t// with new and subsequent product, and so only do one product at\n"
 	"\t// a time can follow this--but the first clock can do two at a time.\n"
-	"\tbimpy\t#(BW) lmpy_0(i_clk,1\'b0,i_ce,u_a[(  LUTB-1):   0], u_b, pr_a);\n"
-	"\tbimpy\t#(BW) lmpy_1(i_clk,1\'b0,i_ce,u_a[(2*LUTB-1):LUTB], u_b, pr_b);\n"
+	"\tbimpy\t#(\n"
+	"\t\t.BW(BW)\n"
+	"\t) lmpy_0(\n"
+	"\t\t// {{{\n"
+	"\t\t.i_clk(i_clk),.i_reset(1\'b0),.i_ce(i_ce),\n"
+	"\t\t.i_a(u_a[(  LUTB-1):   0]),\n"
+	"\t\t.i_b(u_b),\n"
+	"\t\t.o_r(pr_a)\n"
+	"\t\t// }}}\n"
+	"\t);\n"
+	"\tbimpy\t#(\n"
+	"\t\t.BW(BW)\n"
+	"\t) lmpy_1(\n"
+	"\t\t// {{{\n"
+	"\t\t.i_clk(i_clk),.i_reset(1\'b0),.i_ce(i_ce),\n"
+	"\t\t.i_a(u_a[(2*LUTB-1):LUTB]),\n"
+	"\t\t.i_b(u_b),\n"
+	"\t\t.o_r(pr_b)\n"
+	"\t\t// }}}\n"
+	"\t);\n"
 	"\n"
 	"\t// r_s, r_a[0], r_b[0]\n"
 	"\t// {{{\n"
@@ -481,8 +501,10 @@ SLASHLINE
 "\n"
 	"\t// r_a[TLEN-3:1], r_b[TLEN-3:1]\n"
 	"\t// {{{\n"
-	"\tgenerate // Keep track of intermediate values, before multiplying them\n"
-	"\tif (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)\n"
+	"\tgenerate begin : COPY\n"
+	"\t// Keep track of intermediate values, before multiplying them\n"
+	"\tif (TLEN > 3) begin : FOR\n"
+	"\tfor(k=0; k<TLEN-3; k=k+1)\n"
 	"\tbegin : GENCOPIES\n"
 		"\n"
 		"\t\tinitial r_a[k+1] = 0;\n"
@@ -494,19 +516,29 @@ SLASHLINE
 				"\t\t\t\tr_a[k][(IW-1-(2*LUTB)):LUTB] };\n"
 			"\t\t\tr_b[k+1] <= r_b[k];\n"
 			"\t\tend\n"
-	"\tend endgenerate\n"
+	"\tend end end endgenerate\n"
 	"\t// }}}\n"
 "\n"
 	"\t// acc[TLEN-2:1]\n"
 	"\t// {{{\n"
-	"\tgenerate // The actual multiply and accumulate stage\n"
-	"\tif (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)\n"
+	"\tgenerate begin : STAGES\n"
+	"\t// The actual multiply and accumulate stage\n"
+	"\tif (TLEN > 2) begin : FOR\n"
+	"\tfor(k=0; k<TLEN-2; k=k+1)\n"
 	"\tbegin : GENSTAGES\n"
 		"\t\twire\t[(BW+LUTB-1):0] genp;\n"
 		"\n"
 		"\t\t// First, the multiply: 2-bits times BW bits\n"
-		"\t\tbimpy #(BW)\n"
-		"\t\tgenmpy(i_clk,1\'b0,i_ce,r_a[k][(LUTB-1):0],r_b[k], genp);\n"
+		"\t\tbimpy #(\n"
+		"\t\t\t.BW(BW)\n"
+		"\t\t) genmpy(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.i_clk(i_clk),.i_reset(1\'b0),.i_ce(i_ce),\n"
+		"\t\t\t.i_a(r_a[k][(LUTB-1):0]),\n"
+		"\t\t\t.i_b(r_b[k]),\n"
+		"\t\t\t.o_r(genp)\n"
+		"\t\t\t// }}}\n"
+		"\t\t);\n"
 "\n"
 		"\t\t// Then the accumulate step -- on the next clock\n"
 		"\t\tinitial acc[k+1] = 0;\n"
@@ -514,7 +546,7 @@ SLASHLINE
 		"\t\tif (i_ce)\n"
 			"\t\t\tacc[k+1] <= acc[k] + {{(IW-LUTB*(k+3)){1\'b0}},\n"
 				"\t\t\t\tgenp, {(LUTB*(k+2)){1\'b0}} };\n"
-	"\tend endgenerate\n"
+	"\tend end end endgenerate\n"
 	"\t// }}}\n"
 "\n"
 	"\tassign\tw_r = (r_s[TLEN-1]) ? (-acc[TLEN-2]) : acc[TLEN-2];\n"
@@ -531,13 +563,14 @@ SLASHLINE
 	fprintf(fp,
 	"\t// Make Verilator happy\n"
 	"\t// {{{\n"
-	"\tgenerate if (IW > AW)\n"
+	"\tgenerate begin : GUNUSED\n"
+	"\tif (IW > AW)\n"
 	"\tbegin : VUNUSED\n"
 	"\t\t// verilator lint_off UNUSED\n"
 	"\t\twire\tunused;\n"
 	"\t\tassign\tunused = &{ 1\'b0, w_r[(IW+BW-1):(AW+BW)] };\n"
 	"\t\t// verilator lint_on UNUSED\n"
-	"\tend endgenerate\n"
+	"\tend end endgenerate\n"
 	"\t// }}}\n");
 
 	// The formal property section
@@ -596,7 +629,7 @@ SLASHLINE
 
 		fprintf(fp,
 	"\tgenerate for(k=0; k<TLEN; k=k+1)\n"
-	"\tbegin\n"
+	"\tbegin : F_PAST\n"
 		"\t\tinitial\tf_past_a[k+1] = 0;\n"
 		"\t\tinitial\tf_past_b[k+1] = 0;\n"
 		"\t\tinitial\tf_sgn_a[k+1] = 0;\n"
@@ -650,8 +683,10 @@ SLASHLINE
 "\n");
 
 		fprintf(fp,
-	"\tgenerate // Keep track of intermediate values, before multiplying them\n"
-	"\tif (TLEN > 3) for(k=0; k<TLEN-3; k=k+1)\n"
+	"\tgenerate begin : F_ASSERT_ZERO\n"
+	"\t// Keep track of intermediate values, before multiplying them\n"
+	"\tif (TLEN > 3) begin : FOR\n"
+	"\tfor(k=0; k<TLEN-3; k=k+1)\n"
 	"\tbegin : ASSERT_GENCOPY\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif (i_ce)\n"
@@ -663,12 +698,14 @@ SLASHLINE
 				"\t\t\t\t`ASSERT(r_a[k] == 0);\n"
 			"\t\t\t`ASSERT(r_b[k] == f_past_b[k]);\n"
 		"\t\tend\n"
-	"\tend endgenerate\n"
+	"\tend end end endgenerate\n"
 "\n");
 
 		fprintf(fp,
-	"\tgenerate // The actual multiply and accumulate stage\n"
-	"\tif (TLEN > 2) for(k=0; k<TLEN-2; k=k+1)\n"
+	"\tgenerate begin : F_ACC\n"
+	"\t// The actual multiply and accumulate stage\n"
+	"\tif (TLEN > 2) begin : FOR\n"
+	"\tfor(k=0; k<TLEN-2; k=k+1)\n"
 	"\tbegin : ASSERT_GENSTAGE\n"
 		"\t\talways @(posedge i_clk)\n"
 		"\t\tif ((f_past_valid)&&($past(i_ce)))\n"
@@ -686,7 +723,7 @@ SLASHLINE
 				"\t\t\t\t`ASSERT(acc[k][(IW+BW-1):(2*k)+4] == 0);\n"
 			"\t\t\tend\n"
 		"\t\tend\n"
-	"\tend endgenerate\n"
+	"\tend end end endgenerate\n"
 "\n");
 
 		fprintf(fp,
@@ -746,7 +783,8 @@ SLASHLINE
 "\n");
 
 		fprintf(fp,
-	"\tgenerate if (IAW <= IBW)\n"
+	"\tgenerate begin : F_ABS\n"
+	"\tif (IAW <= IBW)\n"
 	"\tbegin : NO_PARAM_CHANGE_II\n"
 		"\t\tassign f_past_a_unsorted = (!f_sgn_a[TLEN+1])\n"
 				"\t\t\t\t\t? f_past_a[TLEN] : f_past_a_neg;\n"
@@ -757,7 +795,7 @@ SLASHLINE
 				"\t\t\t\t\t? f_past_b[TLEN] : f_past_b_neg;\n"
 		"\t\tassign f_past_b_unsorted = (!f_sgn_a[TLEN+1])\n"
 				"\t\t\t\t\t? f_past_a[TLEN] : f_past_a_neg;\n"
-	"\tend endgenerate\n");
+	"\tend end endgenerate\n");
 
 		fprintf(fp,
 "`ifdef	BUTTERFLY\n"
@@ -789,26 +827,29 @@ SLASHLINE
 	"\t// If the inputs have these properties, then so too do many of\n"
 	"\t// our internal values.  ASSERT therefore that we never get out\n"
 	"\t// of bounds\n"
-	"\tgenerate for(k=0; k<TLEN; k=k+1)\n"
-	"\tbegin\n"
+	"\tgenerate begin : F_PAST_ZERO\n"
+	"\tfor(k=0; k<TLEN; k=k+1)\n"
+	"\tbegin : F\n"
 		"\t\talways @(*)\n"
 		"\t\tbegin\n"
 			"\t\t\tassert(f_past_a[k][AW-1:3] == 0);\n"
 			"\t\t\tassert(f_past_b[k][BW-1:3] == 0);\n"
 		"\t\tend\n"
-	"\tend endgenerate\n"
+	"\tend end endgenerate\n"
 "\n"
-	"\tgenerate for(k=0; k<TLEN-1; k=k+1)\n"
-	"\tbegin\n"
+	"\tgenerate begin : F_ACC_ZERO\n"
+	"\tfor(k=0; k<TLEN-1; k=k+1)\n"
+	"\tbegin : F\n"
 		"\t\talways @(*)\n"
 			"\t\t\tassert(acc[k][IW+BW-1:6] == 0);\n"
-	"\tend endgenerate\n"
+	"\tend end endgenerate\n"
 "\n"
-	"\tgenerate for(k=0; k<TLEN-2; k=k+1)\n"
-	"\tbegin\n"
+	"\tgenerate begin : F_RBZ\n"
+	"\tfor(k=0; k<TLEN-2; k=k+1)\n"
+	"\tbegin : F\n"
 		"\t\talways @(*)\n"
 			"\t\t\tassert(r_b[k][BW-1:3] == 0);\n"
-	"\tend endgenerate\n"
+	"\tend end endgenerate\n"
 "`endif	// BUTTERFLY\n");
 
 

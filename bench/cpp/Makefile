@@ -19,7 +19,7 @@
 ##
 ################################################################################
 ## }}}
-## Copyright (C) 2015-2021 Gisselquist Technology, LLC
+## Copyright (C) 2015-2024 Gisselquist Technology, LLC
 ## {{{
 ## This program is free software (firmware): you can redistribute it and/or
 ## modify it under the terms of  the GNU General Public License as published
@@ -69,34 +69,34 @@ HWBFY:= $(OBJDR)/Vhwbfly__ALL.a
 FFTLB:= $(OBJDR)/Vfftmain__ALL.a
 IFTLB:= $(TBODR)/Vifft_tb__ALL.a
 STGLB:= $(OBJDR)/Vfftstage__ALL.a
-VSRCS:= $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_vcd_c.cpp
+VSRCS:= $(VROOT)/include/verilated.cpp $(VROOT)/include/verilated_vcd_c.cpp $(VROOT)/include/verilated_threads.cpp
 
 mpy_tb: mpy_tb.cpp fftsize.h twoc.h $(MPYLB)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(MPYLB) $(VSRCS) -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(MPYLB) $(VSRCS) -lpthread -o $@
 
 bitreverse_tb: bitreverse_tb.cpp twoc.cpp twoc.h fftsize.h $(BTREV)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(BTREV) $(VSRCS) -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(BTREV) $(VSRCS) -lpthread -o $@
 
 laststage_tb: laststage_tb.cpp twoc.cpp twoc.h $(LSTSG)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(LSTSG) $(VSRCS) -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(LSTSG) $(VSRCS) -lpthread -o $@
 
 qtrstage_tb: qtrstage_tb.cpp twoc.cpp twoc.h $(QTRSG)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(QTRSG) $(VSRCS) -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(QTRSG) $(VSRCS) -lpthread -o $@
 
 butterfly_tb: butterfly_tb.cpp twoc.cpp twoc.h fftsize.h $(BFLYL)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(BFLYL) $(VSRCS) -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(BFLYL) $(VSRCS) -lpthread -o $@
 
 hwbfly_tb: hwbfly_tb.cpp twoc.cpp twoc.h $(HWBFY)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(HWBFY) $(VSRCS) -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(HWBFY) $(VSRCS) -lpthread -o $@
 
 fftstage_tb: fftstage_tb.cpp twoc.cpp twoc.h $(STGLB)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(STGLB) $(VSRCS) -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(STGLB) $(VSRCS) -lpthread -o $@
 
 fft_tb: fft_tb.cpp twoc.cpp twoc.h fftsize.h $(FFTLB)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(FFTLB) $(VSRCS) -lfftw3 -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(FFTLB) $(VSRCS) -lpthread -lfftw3 -o $@
 
 ifft_tb: ifft_tb.cpp twoc.cpp twoc.h fftsize.h $(IFTLB)
-	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(IFTLB) $(VSRCS) -lfftw3 -o $@
+	g++ -g $(VINC) $(VDEFS) $< twoc.cpp $(IFTLB) $(VSRCS) -lpthread -lfftw3 -o $@
 
 .PHONY: HEX
 HEX:

@@ -37,19 +37,26 @@ read -formal -DBUTTERFLY convround.v
 read -formal -DBUTTERFLY bimpy.v
 read -formal -DBUTTERFLY longbimpy.v
 read -formal -DBUTTERFLY butterfly.v
-
 # While I'd love to change the width of the inputs and the coefficients,
 # doing so would adjust the width of the firmware multiplies, and so defeat
 # our purpose here.
-# ck1:    chparam -set CKPCE 1 butterfly
-ck1:    chparam -set CKPCE 1 -set CWIDTH 19 -set IWIDTH 15 butterfly
-#
-ck2_r0: chparam -set CKPCE 2 -set CWIDTH 20 -set IWIDTH 12 -set F_CHECK 1 butterfly
-ck2_r1: chparam -set CKPCE 2 -set CWIDTH 16 -set IWIDTH 6 -set F_CHECK 0 butterfly
-#
-ck3_r0: chparam -set CKPCE 3 -set CWIDTH 16 -set IWIDTH 12 -set F_CHECK 0 butterfly
-ck3_r1: chparam -set CKPCE 3 -set CWIDTH 18 -set IWIDTH 14 -set F_CHECK 1 butterfly
-ck3_r2: chparam -set CKPCE 3 -set CWIDTH 20 -set IWIDTH 16 -set F_CHECK 2 butterfly
+--pycode-begin--
+cmd = "hierarchy -top butterfly"
+if ("ck1" in tags):
+	cmd += " -chparam CKPCE 1 -chparam CWIDTH 19 -chparam IWIDTH 15"
+elif ("ck2_r0" in tags):
+	cmd += " -chparam CKPCE 2 -chparam CWIDTH 20 -chparam IWIDTH 12 -chparam F_CHECK 1"
+elif ("ck2_r1" in tags):
+	cmd += " -chparam CKPCE 2 -chparam CWIDTH 16 -chparam IWIDTH  6 -chparam F_CHECK 0"
+elif ("ck3_r0" in tags):
+	cmd += " -chparam CKPCE 3 -chparam CWIDTH 16 -chparam IWIDTH 12 -chparam F_CHECK 0"
+elif ("ck3_r1" in tags):
+	cmd += " -chparam CKPCE 3 -chparam CWIDTH 18 -chparam IWIDTH 14 -chparam F_CHECK 1"
+elif("ck_r2" in tags):
+	cmd += " -chparam CKPCE 3 -chparam CWIDTH 20 -chparam IWIDTH 16 -chparam F_CHECK 2"
+output(cmd)
+--pycode-end--
+proc -norom
 prep -top butterfly
 
 [files]

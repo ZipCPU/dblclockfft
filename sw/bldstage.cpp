@@ -15,7 +15,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This program is free software (firmware): you can redistribute it and/or
 // modify it under the terms of  the GNU General Public License as published
@@ -704,7 +704,7 @@ SLASHLINE
 	"\tif (i_ce)\n"
 		"\t\tnxt_oaddr[0] <= oaddr[0];\n"
 	"\tgenerate if (LGSPAN>1)\n"
-	"\tbegin\n"
+	"\tbegin : WIDE_LGSPAN\n"
 "\n"
 	"\t\talways @(posedge i_clk)\n"
 	"\t\tif (i_ce)\n"

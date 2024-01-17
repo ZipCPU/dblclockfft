@@ -13,7 +13,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -463,7 +463,7 @@ SLASHLINE
 	"\t// Instantiate the multiplies\n"
 	"\t// {{{\n"
 	"\tgenerate if (CKPCE <= 1)\n"
-	"\tbegin\n"
+	"\tbegin : CKPCE_ONE\n"
 		"\t\t// {{{\n"
 		"\t\t// Local declarations\n"
 		"\t\t// {{{\n"
@@ -479,43 +479,59 @@ SLASHLINE
 		"\t\t// We need to pad these first two multiplies by an extra\n"
 		"\t\t// bit just to keep them aligned with the third,\n"
 		"\t\t// simpler, multiply.\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
-		"\t\tp1(i_clk, i_ce,\n"
-				"\t\t\t\t{ir_coef_r[CWIDTH-1],ir_coef_r},\n"
-				"\t\t\t\t{r_dif_r[IWIDTH],r_dif_r}, p_one");
+		"\t\tlongbimpy #(\n"
+		"\t\t\t.IAW(CWIDTH+1), .IBW(IWIDTH+2)\n"
+		"\t\t) p1(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.i_clk(i_clk), .i_ce(i_ce),\n"
+		"\t\t\t.i_a_unsorted({ir_coef_r[CWIDTH-1],ir_coef_r}),\n"
+		"\t\t\t.i_b_unsorted({r_dif_r[IWIDTH],r_dif_r}),\n"
+		"\t\t\t.o_r(p_one)\n");
 		if (formal_property_flag) fprintf(fp,
-"\n`ifdef\tFORMAL\n"
-				"\t\t\t\t, fp_one_ic, fp_one_id\n"
-"`endif\n"
-			"\t\t\t");
-		fprintf(fp, ");\n"
+"`ifdef\tFORMAL\n"
+				"\t\t\t, .f_past_a_unsorted(fp_one_ic),\n"
+				"\t\t\t.f_past_b_unsorted(fp_one_id)\n"
+"`endif\n");
+		fprintf(fp, "\t\t\t// }}}\n"
+			"\t\t);\n"
 		"\t\t// }}}\n"
 		"\n"
 		"\t\t// p_two = ir_coef_i * r_dif_i\n"
 		"\t\t// {{{\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
-		"\t\tp2(i_clk, i_ce,\n"
-				"\t\t\t\t{ir_coef_i[CWIDTH-1],ir_coef_i},\n"
-				"\t\t\t\t{r_dif_i[IWIDTH],r_dif_i}, p_two");
+		"\t\tlongbimpy #(\n"
+		"\t\t\t.IAW(CWIDTH+1), .IBW(IWIDTH+2)\n"
+		"\t\t) p2(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.i_clk(i_clk), .i_ce(i_ce),\n"
+			"\t\t\t.i_a_unsorted({ir_coef_i[CWIDTH-1],ir_coef_i}),\n"
+			"\t\t\t.i_b_unsorted({r_dif_i[IWIDTH],r_dif_i}),\n"
+			"\t\t\t.o_r(p_two)\n");
 		if (formal_property_flag) fprintf(fp,
-"\n`ifdef\tFORMAL\n"
-				"\t\t\t\t, fp_two_ic, fp_two_id\n"
-"`endif\n"
-			"\t\t\t");
-		fprintf(fp, ");\n"
+"`ifdef\tFORMAL\n"
+				"\t\t\t, .f_past_a_unsorted(fp_two_ic),\n"
+				"\t\t\t.f_past_b_unsorted(fp_two_id)\n"
+"`endif\n");
+		fprintf(fp, "\t\t\t// }}}\n"
+			"\t\t);\n"
 		"\t\t// }}}\n"
 		"\n"
 		"\t\t// p_three = (ir_coef_i + ir_coef_r) * (r_dif_r + r_dif_i)\n"
 		"\t\t// {{{\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
-		"\t\tp3(i_clk, i_ce,\n"
-			"\t\t\t\tp3c_in, p3d_in, p_three");
+		"\t\tlongbimpy #(\n"
+		"\t\t\t.IAW(CWIDTH+1), .IBW(IWIDTH+2)\n"
+		"\t\t) p3(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.i_clk(i_clk), .i_ce(i_ce),\n"
+		"\t\t\t.i_a_unsorted(p3c_in),\n"
+		"\t\t\t.i_b_unsorted(p3d_in),\n"
+		"\t\t\t.o_r(p_three)\n");
 		if (formal_property_flag) fprintf(fp,
-"\n`ifdef\tFORMAL\n"
-				"\t\t\t\t, fp_three_ic, fp_three_id\n"
-"`endif\n"
-			"\t\t\t");
-		fprintf(fp, ");\n"
+"`ifdef\tFORMAL\n"
+			"\t\t\t, .f_past_a_unsorted(fp_three_ic),\n"
+			"\t\t\t.f_past_b_unsorted(fp_three_id)\n"
+"`endif\n");
+		fprintf(fp, "\t\t\t// }}}\n"
+			"\t\t);\n"
 		"\t\t// }}}\n"
 		"\n"
 		"\t\t// }}}\n");
@@ -544,7 +560,7 @@ SLASHLINE
 		"\t\treg			ce_phase;\n"
 "\n"
 		"\t\treg	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;\n"
-		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
+		"\t\twire	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
 		"\t\treg\tsigned\t[((IWIDTH+2)+(CWIDTH+1)-1):0]\n"
 			"\t\t\t\t\trp_one, rp_two, rp_three,\n"
 			"\t\t\t\t\trp2_one, rp2_two, rp2_three;\n"
@@ -622,14 +638,21 @@ SLASHLINE
 	fprintf(fp,
 		"\t\t// longmpy = mpy_cof_sum * mpy_dif_sum\n"
 		"\t\t// {{{\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
-		"\t\tmpy0(i_clk, mpy_pipe_v,\n"
-			"\t\t\t\tmpy_cof_sum, mpy_dif_sum, longmpy\n");
+		"\t\tlongbimpy #(\n"
+		"\t\t\t.IAW(CWIDTH+1), .IBW(IWIDTH+2)\n"
+		"\t\t) mpy0(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.i_clk(i_clk), .i_ce(mpy_pipe_v),\n"
+			"\t\t\t.i_a_unsorted(mpy_cof_sum),\n"
+			"\t\t\t.i_b_unsorted(mpy_dif_sum),\n"
+			"\t\t\t.o_r(longmpy)\n");
 		if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
-			"\t\t\t\t, f_past_ic, f_past_id\n"
+			"\t\t\t, .f_past_a_unsorted(f_past_ic),\n"
+			"\t\t\t.f_past_b_unsorted(f_past_id)\n"
 "`endif\n");
-	fprintf(fp,"\t\t\t);\n"
+	fprintf(fp,"\t\t\t// }}}\n"
+		"\t\t);\n"
 		"\t\t// }}}\n"
 "\n");
 
@@ -638,17 +661,22 @@ SLASHLINE
 		"\t\t// {{{\n"
 		"\t\t// This is the shared multiply, but still multiplying\n"
 		"\t\t// a coefficient (i.e. twiddle factor) times data\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
-		"\t\tmpy1(i_clk, mpy_pipe_v,\n"
-			"\t\t\t\t{ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc },\n"
-			"\t\t\t\t{ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd },\n"
-			"\t\t\t\tmpy_pipe_out\n");
+		"\t\tlongbimpy #(\n"
+		"\t\t\t.IAW(CWIDTH+1), .IBW(IWIDTH+2)\n"
+		"\t\t) mpy1(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.i_clk(i_clk), .i_ce(mpy_pipe_v),\n"
+		"\t\t\t.i_a_unsorted({ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc }),\n"
+		"\t\t\t.i_b_unsorted({ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd }),\n"
+		"\t\t\t.o_r(mpy_pipe_out)\n");
 		if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
-			"\t\t\t\t, f_past_mux_ic, f_past_mux_id\n"
+			"\t\t\t, .f_past_a_unsorted(f_past_mux_ic),\n"
+			"\t\t\t.f_past_b_unsorted(f_past_mux_id)\n"
 "`endif\n");
-	fprintf(fp,"\t\t\t);\n"
-	"\t\t// }}}\n"
+	fprintf(fp,"\t\t\t// }}}\n"
+		"\t\t);\n"
+		"\t\t// }}}\n"
 "\n");
 
 	fprintf(fp,
@@ -869,18 +897,23 @@ SLASHLINE
 	fprintf(fp,
 		"\t\t// mpy_pipe_out = mpy_pipe_vc * mpy_pipe_vd\n"
 		"\t\t// {{{\n"
-		"\t\tlongbimpy #(CWIDTH+1,IWIDTH+2)\n"
-		"\t\tmpy(i_clk, mpy_pipe_v,\n"
-			"\t\t\t\tmpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out\n");
+		"\t\tlongbimpy #(\n"
+		"\t\t\t.IAW(CWIDTH+1), .IBW(IWIDTH+2)\n"
+		"\t\t) mpy(\n"
+		"\t\t\t// {{{\n"
+		"\t\t\t.i_clk(i_clk), .i_ce(mpy_pipe_v),\n"
+		"\t\t\t.i_a_unsorted(mpy_pipe_vc),\n"
+		"\t\t\t.i_b_unsorted(mpy_pipe_vd),\n"
+		"\t\t\t.o_r(mpy_pipe_out)\n");
 	if (formal_property_flag) fprintf(fp,
 "`ifdef	FORMAL\n"
-			"\t\t\t\t, f_past_ic, f_past_id\n"
+			"\t\t\t, .f_past_a_unsorted(f_past_ic),\n"
+			"\t\t\t.f_past_b_unsorted(f_past_id)\n"
 "`endif\n");
-	fprintf(fp,
-		"\t\t\t);\n"
+	fprintf(fp,"\t\t\t// }}}\n"
+		"\t\t);\n"
 		"\t\t// }}}\n"
 "\n");
-
 
 	fprintf(fp,
 	"\t\t// Register the multiply outputs into their various results\n"
@@ -1217,7 +1250,8 @@ SLASHLINE
 	"\t// f_dly[left|right|coef]_[i|r][F_DEPTH-1:1]\n"
 	"\t// {{{\n"
 	"\tgenvar	k;\n"
-	"\tgenerate for(k=1; k<F_DEPTH; k=k+1)\n"
+	"\tgenerate begin : FDLY\n"
+	"\tfor(k=1; k<F_DEPTH; k=k+1)\n"
 	"\tbegin : F_PROPAGATE_DELAY_LINES\n"
 "\n"
 "\n"
@@ -1232,7 +1266,7 @@ SLASHLINE
 		"\t\t	f_dlycoeff_i[k] <= f_dlycoeff_i[k-1];\n"
 		"\t\tend\n"
 "\n"
-	"\tend endgenerate\n"
+	"\tend end endgenerate\n"
 	"\t// }}}\n"
 "\n"
 "`ifndef VERILATOR\n"
@@ -1241,7 +1275,7 @@ SLASHLINE
 	"\t// to get the design to pass induction.\n"
 	"\t//\n"
 	"\tgenerate if (CKPCE <= 1)\n"
-	"\tbegin\n"
+	"\tbegin : F_CKPCE_ONE\n"
 		"\t\t// {{{\n"
 		"\t\t// No primary i_ce assumption.  i_ce can be anything\n"
 		"\t\t//\n"
@@ -1836,7 +1870,7 @@ SLASHLINE
 		"\t\treg			mpy_pipe_v;\n"
 		"\t\treg			ce_phase;\n"
 "\n"
-		"\t\treg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
+		"\t\twire	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;\n"
 		"\t\treg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;\n"
 		"\n"
 		"\t\treg\tsigned\t[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one,\n"

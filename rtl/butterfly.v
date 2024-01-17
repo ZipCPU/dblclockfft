@@ -75,7 +75,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 // }}}
-// Copyright (C) 2015-2021, Gisselquist Technology, LLC
+// Copyright (C) 2015-2024, Gisselquist Technology, LLC
 // {{{
 // This file is part of the general purpose pipelined FFT project.
 //
@@ -342,7 +342,7 @@ module	butterfly #(
 	// Instantiate the multiplies
 	// {{{
 	generate if (CKPCE <= 1)
-	begin
+	begin : CKPCE_ONE
 		// {{{
 		// Local declarations
 		// {{{
@@ -358,37 +358,56 @@ module	butterfly #(
 		// We need to pad these first two multiplies by an extra
 		// bit just to keep them aligned with the third,
 		// simpler, multiply.
-		longbimpy #(CWIDTH+1,IWIDTH+2)
-		p1(i_clk, i_ce,
-				{ir_coef_r[CWIDTH-1],ir_coef_r},
-				{r_dif_r[IWIDTH],r_dif_r}, p_one
+		longbimpy #(
+			.IAW(CWIDTH+1), .IBW(IWIDTH+2)
+		) p1(
+			// {{{
+			.i_clk(i_clk), .i_ce(i_ce),
+			.i_a_unsorted({ir_coef_r[CWIDTH-1],ir_coef_r}),
+			.i_b_unsorted({r_dif_r[IWIDTH],r_dif_r}),
+			.o_r(p_one)
 `ifdef	FORMAL
-				, fp_one_ic, fp_one_id
+			, .f_past_a_unsorted(fp_one_ic),
+			.f_past_b_unsorted(fp_one_id)
 `endif
-			);
+			// }}}
+		);
 		// }}}
 
 		// p_two = ir_coef_i * r_dif_i
 		// {{{
-		longbimpy #(CWIDTH+1,IWIDTH+2)
-		p2(i_clk, i_ce,
-				{ir_coef_i[CWIDTH-1],ir_coef_i},
-				{r_dif_i[IWIDTH],r_dif_i}, p_two
+		longbimpy #(
+			.IAW(CWIDTH+1), .IBW(IWIDTH+2)
+		) p2(
+			// {{{
+			.i_clk(i_clk), .i_ce(i_ce),
+			.i_a_unsorted({ir_coef_i[CWIDTH-1],ir_coef_i}),
+			.i_b_unsorted({r_dif_i[IWIDTH],r_dif_i}),
+			.o_r(p_two)
 `ifdef	FORMAL
-				, fp_two_ic, fp_two_id
+			, .f_past_a_unsorted(fp_two_ic),
+			.f_past_b_unsorted(fp_two_id)
 `endif
-			);
+			// }}}
+		);
 		// }}}
 
 		// p_three = (ir_coef_i + ir_coef_r) * (r_dif_r + r_dif_i)
 		// {{{
-		longbimpy #(CWIDTH+1,IWIDTH+2)
-		p3(i_clk, i_ce,
-				p3c_in, p3d_in, p_three
+		longbimpy #(
+			.IAW(CWIDTH+1), .IBW(IWIDTH+2)
+		) p3(
+			// {{{
+			.i_clk(i_clk), .i_ce(i_ce),
+			.i_a_unsorted(p3c_in),
+			.i_b_unsorted(p3d_in),
+			.o_r(p_three)
 `ifdef	FORMAL
-				, fp_three_ic, fp_three_id
+			, .f_past_a_unsorted(fp_three_ic),
+			.f_past_b_unsorted(fp_three_id)
 `endif
-			);
+			// }}}
+		);
 		// }}}
 
 		// }}}
@@ -411,7 +430,7 @@ module	butterfly #(
 		reg			ce_phase;
 
 		reg	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
-		reg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
+		wire	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
 		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]
 					rp_one, rp_two, rp_three,
 					rp2_one, rp2_two, rp2_three;
@@ -476,28 +495,40 @@ module	butterfly #(
 
 		// longmpy = mpy_cof_sum * mpy_dif_sum
 		// {{{
-		longbimpy #(CWIDTH+1,IWIDTH+2)
-		mpy0(i_clk, mpy_pipe_v,
-				mpy_cof_sum, mpy_dif_sum, longmpy
+		longbimpy #(
+			.IAW(CWIDTH+1), .IBW(IWIDTH+2)
+		) mpy0(
+			// {{{
+			.i_clk(i_clk), .i_ce(mpy_pipe_v),
+			.i_a_unsorted(mpy_cof_sum),
+			.i_b_unsorted(mpy_dif_sum),
+			.o_r(longmpy)
 `ifdef	FORMAL
-				, f_past_ic, f_past_id
+			, .f_past_a_unsorted(f_past_ic),
+			.f_past_b_unsorted(f_past_id)
 `endif
-			);
+			// }}}
+		);
 		// }}}
 
 		// mpy_pipe_out = mpy_pipe_vc * mpy_pipe_vd
 		// {{{
 		// This is the shared multiply, but still multiplying
 		// a coefficient (i.e. twiddle factor) times data
-		longbimpy #(CWIDTH+1,IWIDTH+2)
-		mpy1(i_clk, mpy_pipe_v,
-				{ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc },
-				{ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd },
-				mpy_pipe_out
+		longbimpy #(
+			.IAW(CWIDTH+1), .IBW(IWIDTH+2)
+		) mpy1(
+			// {{{
+			.i_clk(i_clk), .i_ce(mpy_pipe_v),
+			.i_a_unsorted({ mpy_pipe_vc[CWIDTH-1], mpy_pipe_vc }),
+			.i_b_unsorted({ mpy_pipe_vd[IWIDTH  ], mpy_pipe_vd }),
+			.o_r(mpy_pipe_out)
 `ifdef	FORMAL
-				, f_past_mux_ic, f_past_mux_id
+			, .f_past_a_unsorted(f_past_mux_ic),
+			.f_past_b_unsorted(f_past_mux_id)
 `endif
-			);
+			// }}}
+		);
 		// }}}
 
 		// rp_one (from mpy_pipe_out, first round)
@@ -683,13 +714,20 @@ module	butterfly #(
 
 		// mpy_pipe_out = mpy_pipe_vc * mpy_pipe_vd
 		// {{{
-		longbimpy #(CWIDTH+1,IWIDTH+2)
-		mpy(i_clk, mpy_pipe_v,
-				mpy_pipe_vc, mpy_pipe_vd, mpy_pipe_out
+		longbimpy #(
+			.IAW(CWIDTH+1), .IBW(IWIDTH+2)
+		) mpy(
+			// {{{
+			.i_clk(i_clk), .i_ce(mpy_pipe_v),
+			.i_a_unsorted(mpy_pipe_vc),
+			.i_b_unsorted(mpy_pipe_vd),
+			.o_r(mpy_pipe_out)
 `ifdef	FORMAL
-				, f_past_ic, f_past_id
+			, .f_past_a_unsorted(f_past_ic),
+			.f_past_b_unsorted(f_past_id)
 `endif
-			);
+			// }}}
+		);
 		// }}}
 
 		// Register the multiply outputs into their various results
@@ -971,7 +1009,8 @@ module	butterfly #(
 	// f_dly[left|right|coef]_[i|r][F_DEPTH-1:1]
 	// {{{
 	genvar	k;
-	generate for(k=1; k<F_DEPTH; k=k+1)
+	generate begin : FDLY
+	for(k=1; k<F_DEPTH; k=k+1)
 	begin : F_PROPAGATE_DELAY_LINES
 
 
@@ -986,7 +1025,7 @@ module	butterfly #(
 			f_dlycoeff_i[k] <= f_dlycoeff_i[k-1];
 		end
 
-	end endgenerate
+	end end endgenerate
 	// }}}
 
 `ifndef VERILATOR
@@ -995,7 +1034,7 @@ module	butterfly #(
 	// to get the design to pass induction.
 	//
 	generate if (CKPCE <= 1)
-	begin
+	begin : F_CKPCE_ONE
 		// {{{
 		// No primary i_ce assumption.  i_ce can be anything
 		//

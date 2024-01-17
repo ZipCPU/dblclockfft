@@ -14,11 +14,21 @@ smtbmc
 
 [script]
 read -formal fftstage.v
-s2: chparam -set LGSPAN 2
-s3: chparam -set LGSPAN 3
-s4: chparam -set LGSPAN 4
-s5: chparam -set LGSPAN 5
-s6: chparam -set LGSPAN 6
+--pycode-begin--
+cmd = "hierarchy -top fftstage"
+if ("s2" in tags):
+	cmd += " -chparam LGSPAN 2"
+elif ("s3" in tags):
+	cmd += " -chparam LGSPAN 3"
+elif ("s4" in tags):
+	cmd += " -chparam LGSPAN 4"
+elif ("s5" in tags):
+	cmd += " -chparam LGSPAN 5"
+elif ("s6" in tags):
+	cmd += " -chparam LGSPAN 6"
+output(cmd)
+--pycode-end--
+proc -norom
 prep -top fftstage
 
 [files]
