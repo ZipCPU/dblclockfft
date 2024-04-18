@@ -286,7 +286,7 @@ module	hwbfly #(
 		reg			mpy_pipe_v;
 		reg			ce_phase;
 
-		wire	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;
+		reg	signed	[(CWIDTH+IWIDTH+1)-1:0]	mpy_pipe_out;
 		reg	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
 
 		reg	signed	[((IWIDTH+1)+(CWIDTH)-1):0]	rp_one,

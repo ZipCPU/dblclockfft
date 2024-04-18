@@ -429,7 +429,7 @@ module	butterfly #(
 		reg			mpy_pipe_v;
 		reg			ce_phase;
 
-		reg	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
+		wire	signed	[(CWIDTH+IWIDTH+3)-1:0]	mpy_pipe_out;
 		wire	signed [IWIDTH+CWIDTH+3-1:0]	longmpy;
 		reg	signed	[((IWIDTH+2)+(CWIDTH+1)-1):0]
 					rp_one, rp_two, rp_three,
