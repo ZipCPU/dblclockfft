@@ -117,7 +117,7 @@ int lstat(const char *filename, struct stat *buf) { return 1; };
 
 // build_dblquarters
 // {{{
-void	build_dblquarters(const char *fname, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
+void	build_dblquarters(const char *fname, const char* prefix, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -158,7 +158,7 @@ SLASHLINE
 		resetw = std::string("i_areset_n");
 
 	fprintf(fp,
-"module\tqtrstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n"
+"module\t%sqtrstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n"
 	"\tparameter	IWIDTH=%d, OWIDTH=IWIDTH+1;\n"
 	"\t// Parameters specific to the core that should be changed when this\n"
 	"\t// core is built ... Note that the minimum LGSPAN is 2.  Smaller\n"
@@ -168,7 +168,9 @@ SLASHLINE
 	"\tinput\twire	[(2*IWIDTH-1):0]	i_data;\n"
 	"\toutput\treg	[(2*OWIDTH-1):0]	o_data;\n"
 	"\toutput\treg				o_sync;\n"
-	"\n", (dbg)?"_dbg":"",
+	"\n", 
+	prefix,
+	(dbg)?"_dbg":"",
 	resetw.c_str(),
 	(dbg)?", o_dbg":"", TST_QTRSTAGE_IWIDTH,
 	TST_QTRSTAGE_LGWIDTH, resetw.c_str());
@@ -206,17 +208,17 @@ SLASHLINE
 	fprintf(fp,
 	"\t\t\t\t\tn_rnd_diff_r, n_rnd_diff_i;\n");
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_sum_r(i_clk, i_ce, "
-	"sum_r, rnd_sum_r);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_sum_r(i_clk, i_ce, "
+	"sum_r, rnd_sum_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_sum_i(i_clk, i_ce, "
-	"sum_i, rnd_sum_i);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_sum_i(i_clk, i_ce, "
+	"sum_i, rnd_sum_i);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_diff_r(i_clk, i_ce, "
-	"diff_r, rnd_diff_r);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_diff_r(i_clk, i_ce, "
+	"diff_r, rnd_diff_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_diff_i(i_clk, i_ce, "
-	"diff_i, rnd_diff_i);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\n\tdo_rnd_diff_i(i_clk, i_ce, "
+	"diff_i, rnd_diff_i);\n\n", prefix, rnd_string);
 	fprintf(fp, "\tassign n_rnd_diff_r = - rnd_diff_r;\n"
 		"\tassign n_rnd_diff_i = - rnd_diff_i;\n");
 
@@ -396,7 +398,7 @@ SLASHLINE
 
 // build_snglquarters
 // {{{
-void	build_snglquarters(const char *fname, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
+void	build_snglquarters(const char *fname, const char* prefix, ROUND_T rounding, const bool async_reset=false, const bool dbg=false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -468,14 +470,14 @@ SLASHLINE
 		resetw = std::string("i_areset_n");
 
 	fprintf(fp,
-"module\tqtrstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n"
+"module\t%sqtrstage%s(i_clk, %s, i_ce, i_sync, i_data, o_data, o_sync%s);\n"
 	"\tparameter	IWIDTH=%d, OWIDTH=IWIDTH+1;\n"
 	"\tparameter\tLGWIDTH=%d, INVERSE=0,SHIFT=0;\n"
 	"\tinput\twire				i_clk, %s, i_ce, i_sync;\n"
 	"\tinput\twire	[(2*IWIDTH-1):0]	i_data;\n"
 	"\toutput\treg	[(2*OWIDTH-1):0]	o_data;\n"
 	"\toutput\treg				o_sync;\n"
-		"\t\n", (dbg)?"_dbg":"", resetw.c_str(),
+		"\t\n", prefix, (dbg)?"_dbg":"", resetw.c_str(),
 		(dbg)?", o_dbg":"", TST_QTRSTAGE_IWIDTH,
 		TST_QTRSTAGE_LGWIDTH, resetw.c_str());
 	if (dbg) { fprintf(fp, "\toutput\twire\t[33:0]\t\t\to_dbg;\n"
@@ -516,17 +518,17 @@ SLASHLINE
 	fprintf(fp,
 	"\twire\tsigned\t[(OWIDTH-1):0]\trnd_sum_r, rnd_sum_i,\n"
 	"\t\t\trnd_diff_r, rnd_diff_i, n_rnd_diff_r, n_rnd_diff_i;\n"
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_r(i_clk, i_ce,\n"
-	"\t\t\t\tsum_r, rnd_sum_r);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_r(i_clk, i_ce,\n"
+	"\t\t\t\tsum_r, rnd_sum_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_i(i_clk, i_ce,\n"
-	"\t\t\t\tsum_i, rnd_sum_i);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_sum_i(i_clk, i_ce,\n"
+	"\t\t\t\tsum_i, rnd_sum_i);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_r(i_clk, i_ce,\n"
-	"\t\t\t\tdiff_r, rnd_diff_r);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_r(i_clk, i_ce,\n"
+	"\t\t\t\tdiff_r, rnd_diff_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_i(i_clk, i_ce,\n"
-	"\t\t\t\tdiff_i, rnd_diff_i);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT)\tdo_rnd_diff_i(i_clk, i_ce,\n"
+	"\t\t\t\tdiff_i, rnd_diff_i);\n\n", prefix, rnd_string);
 	fprintf(fp, "\tassign n_rnd_diff_r = - rnd_diff_r;\n"
 		"\tassign n_rnd_diff_i = - rnd_diff_i;\n");
 	fprintf(fp,
@@ -818,7 +820,7 @@ SLASHLINE
 
 // build_sngllast
 // {{{
-void	build_sngllast(const char *fname, const bool async_reset = false) {
+void	build_sngllast(const char *fname, const char* prefix, const bool async_reset = false) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -847,7 +849,7 @@ SLASHLINE
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 
 	fprintf(fp,
-"module	laststage #(\n"
+"module	%slaststage #(\n"
 	"\t\t// {{{\n"
 	"\t\tparameter IWIDTH=16,OWIDTH=IWIDTH+1, SHIFT=0\n"
 	"\t\t// }}}\n"
@@ -859,7 +861,7 @@ SLASHLINE
 	"\t\toutput\treg			o_sync\n"
 	"\t\t// }}}\n"
 	"\t);\n",
-		resetw.c_str());
+		prefix, resetw.c_str());
 
 	fprintf(fp,
 	"\t// Local declarations\n"
@@ -971,12 +973,12 @@ SLASHLINE
 "\n"
 	"\t// Round the results, generating o_r, o_i, and thus o_val\n"
 	"\t// {{{\n"
-"	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_r(i_clk, i_ce, rnd_r, o_r);\n"
-"	convround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_i(i_clk, i_ce, rnd_i, o_i);\n"
+"	%sconvround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_r(i_clk, i_ce, rnd_r, o_r);\n"
+"	%sconvround #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_i(i_clk, i_ce, rnd_i, o_i);\n"
 "\n"
 "	assign	o_val  = { o_r, o_i };\n"
 	"\t// }}}\n"
-"\n");
+"\n", prefix, prefix);
 
 	fprintf(fp,
 SLASHLINE
@@ -1138,7 +1140,9 @@ void	usage(void) {
 "\t-S\tInclude the final bit reversal stage (default).\n"
 "\t-x <xtrabits>\tUse this many extra bits internally, before any final\n"
 "\t\trounding or truncation of the answer to the final number of\n"
-"\t\tbits.  The default is to use %d extra bits internally.\n",
+"\t\tbits.  The default is to use %d extra bits internally.\n"
+"\t-P <prefix> Adds a prefix to all generated modules. Useful for\n"
+"\t\tdesigns which use multiple different instances of the (i)FFT\n",
 /*
 "\t-0\tA forward FFT (default), meaning that the coefficients are\n"
 "\t\tgiven by e^{-j 2 pi k/N n }.\n"
@@ -1163,7 +1167,7 @@ int main(int argc, char **argv) {
 		real_fft = false,
 		async_reset = false;
 	FILE	*vmain;
-	std::string	coredir = DEF_COREDIR, cmdline = "", hdrname = "";
+	std::string	coredir = DEF_COREDIR, cmdline = "", hdrname = "", prefix = "";
 	ROUND_T	rounding = RND_CONVERGENT;
 	// ROUND_T	rounding = RND_HALFUP;
 
@@ -1183,7 +1187,7 @@ int main(int argc, char **argv) {
 	}
 
 	{ int c;
-	while((c = getopt(argc, argv, "12Aa:c:d:D:f:hik:m:n:p:rsSx:v")) != -1) {
+	while((c = getopt(argc, argv, "12Aa:c:d:D:f:hik:m:n:p:P:rsSx:v")) != -1) {
 		switch(c) {
 		case '1':	single_clock = true;  break;
 		case '2':	single_clock = false; break;
@@ -1222,6 +1226,7 @@ int main(int argc, char **argv) {
 		case 'm':	maxbitsout = atoi(optarg);	break;
 		case 'n':	nbitsin = atoi(optarg);		break;
 		case 'p':	nummpy = atoi(optarg);		break;
+		case 'P':	prefix = std::string(optarg) + "_";	break;
 		case 'r':	real_fft = true;		break;
 		case 'S':	bitreverse = true;		break;
 		case 's':	bitreverse = false;		break;
@@ -1258,6 +1263,10 @@ int main(int argc, char **argv) {
 			printf("A C header file, %s, will be written capturing these\n"
 				"options for a Verilator testbench\n", 
 					hdrname.c_str());
+		
+		if (!prefix.empty()){
+			printf("All files/modules will be prefixed with %s\n", prefix.c_str());
+		}
 		// nummpy
 		// xtrapbits
 	}
@@ -1511,6 +1520,7 @@ SLASHLINE
 
 		fname_string = coredir;
 		fname_string += "/";
+		fname_string += prefix;
 		if (inverse) fname_string += "i";
 		fname_string += "fftmain.v";
 
@@ -1531,7 +1541,7 @@ SLASHLINE
 	fprintf(vmain,
 SLASHLINE
 "//\n"
-"// Filename:\t%sfftmain.v\n"
+"// Filename:\t%s%sfftmain.v\n"
 "// {{{\n" // "}}}"
 "// Project:	%s\n"
 "//\n"
@@ -1539,7 +1549,7 @@ SLASHLINE
 "//		implementation.  As such, all other modules are subordinate\n"
 "//	to this one.  This module accomplish a fixed size Complex FFT on\n"
 "//	%d data points.\n",
-		(inverse)?"i":"",prjname, fftsize);
+		prefix.c_str(),(inverse)?"i":"",prjname, fftsize);
 	if (single_clock) {
 	fprintf(vmain,
 "//	The FFT is fully pipelined, and accepts as inputs one complex two\'s\n"
@@ -1623,8 +1633,8 @@ SLASHLINE
 
 	fprintf(vmain, "//\n");
 	fprintf(vmain, "//\n");
-	fprintf(vmain, "module %sfftmain(i_clk, %s, i_ce,\n",
-		(inverse)?"i":"", resetw.c_str());
+	fprintf(vmain, "module %s%sfftmain(i_clk, %s, i_ce,\n",
+		prefix.c_str(),(inverse)?"i":"", resetw.c_str());
 	if (single_clock) {
 		fprintf(vmain, "\t\ti_sample, o_result, o_sync%s);\n",
 			(dbg)?", o_dbg":"");
@@ -1822,7 +1832,7 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 1, 0, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 1, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(\n"
+				fprintf(vmain, "\t%sfftstage%s\t#(\n"
 					"\t\t// {{{\n"
 					"\t\t.IWIDTH(IWIDTH),\n"
 					"\t\t.CWIDTH(IWIDTH+%d),\n"
@@ -1838,6 +1848,7 @@ SLASHLINE
 					"\t\t.i_clk(i_clk),\n"
 					"\t\t.%s(%s),\n"
 					"\t\t.i_ce(i_ce),\n",
+					prefix.c_str(),
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgtmp-1, (mpystage)?1:0,
@@ -1862,7 +1873,7 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 0, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 0, inverse);
-				fprintf(vmain, "\tfftstage%s\t#(\n"
+				fprintf(vmain, "\t%sfftstage%s\t#(\n"
 					"\t\t// {{{\n"
 					"\t\t.IWIDTH(IWIDTH),\n"
 					"\t\t.CWIDTH(IWIDTH+%d),\n"
@@ -1878,6 +1889,7 @@ SLASHLINE
 					"\t\t.i_clk(i_clk),\n"
 					"\t\t.%s(%s),\n"
 					"\t\t.i_ce(i_ce),\n",
+					prefix.c_str(),
 					((dbg)&&(dbgstage == fftsize))?"_dbg":"",
 					xtracbits, obits+xtrapbits,
 					lgtmp-2, (mpystage)?1:0,
@@ -1897,7 +1909,7 @@ SLASHLINE
 				cmemfp = gen_coeff_open(cmem.c_str());
 				gen_coeffs(cmemfp, fftsize,  nbitsin+xtracbits, 2, 1, inverse);
 				cmem = gen_coeff_fname(EMPTYSTR, fftsize, 2, 1, inverse);
-				fprintf(vmain, "\tfftstage\t#(\n"
+				fprintf(vmain, "\t%sfftstage\t#(\n"
 					"\t\t// {{{\n"
 					"\t\t.IWIDTH(IWIDTH),\n"
 					"\t\t.CWIDTH(IWIDTH+%d),\n"
@@ -1913,6 +1925,7 @@ SLASHLINE
 					"\t\t.i_clk(i_clk),\n"
 					"\t\t.%s(%s),\n"
 					"\t\t.i_ce(i_ce),\n",
+					prefix.c_str(),
 					xtracbits, obits+xtrapbits,
 					lgtmp-2, (mpystage)?1:0,
 					ckpce, cmem.c_str(),
@@ -1934,6 +1947,7 @@ SLASHLINE
 			std::string	fname;
 
 			fname = coredir + "/";
+			fname += prefix;
 			if (inverse)
 				fname += "i";
 			fname += "fftstage";
@@ -1942,20 +1956,20 @@ SLASHLINE
 				dbgname += "_dbg";
 				dbgname += ".v";
 				if (single_clock)
-					build_stage(fname.c_str(), fftsize, 1, 0, nbits, xtracbits, ckpce, async_reset, true);
+					build_stage(fname.c_str(), prefix.c_str(), fftsize, 1, 0, nbits, xtracbits, ckpce, async_reset, true);
 				else
-					build_stage(fname.c_str(), fftsize, 2, 1, nbits, xtracbits, ckpce, async_reset, true);
+					build_stage(fname.c_str(), prefix.c_str(), fftsize, 2, 1, nbits, xtracbits, ckpce, async_reset, true);
 			}
 
 			fname += ".v";
 			if (single_clock) {
-				build_stage(fname.c_str(), fftsize, 1, 0,
+				build_stage(fname.c_str(), prefix.c_str(), fftsize, 1, 0,
 					nbits, xtracbits, ckpce, async_reset,
 					false);
 			} else {
 				// All stages use the same Verilog, so we only
 				// need to build one
-				build_stage(fname.c_str(), fftsize, 2, 1,
+				build_stage(fname.c_str(), prefix.c_str(), fftsize, 2, 1,
 					nbits, xtracbits, ckpce, async_reset, false);
 			}
 			// }}}
@@ -1993,7 +2007,7 @@ SLASHLINE
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 1, 0, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 1, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(\n"
+					fprintf(vmain, "\t%sfftstage%s\t#(\n"
 						"\t\t// {{{\n"
 						"\t\t.IWIDTH(%d),\n"
 						"\t\t.CWIDTH(%d),\n"
@@ -2009,6 +2023,7 @@ SLASHLINE
 						"\t\t.i_clk(i_clk),\n"
 						"\t\t.%s(%s),\n"
 						"\t\t.i_ce(i_ce),\n",
+						prefix.c_str(),
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -2041,7 +2056,7 @@ SLASHLINE
 					gen_coeffs(cmemfp, tmp_size,
 						nbits+xtracbits+xtrapbits, 2, 0, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR, tmp_size, 2, 0, inverse);
-					fprintf(vmain, "\tfftstage%s\t#(\n"
+					fprintf(vmain, "\t%sfftstage%s\t#(\n"
 						"\t\t// {{{\n"
 						"\t\t.IWIDTH(%d),\n"
 						"\t\t.CWIDTH(%d),\n"
@@ -2057,6 +2072,7 @@ SLASHLINE
 						"\t\t.i_clk(i_clk),\n"
 						"\t\t.%s(%s),\n"
 						"\t\t.i_ce(i_ce),\n",
+						prefix.c_str(),
 						((dbg)&&(dbgstage==tmp_size))?"_dbg":"",
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
@@ -2084,7 +2100,7 @@ SLASHLINE
 						2, 1, inverse);
 					cmem = gen_coeff_fname(EMPTYSTR,
 						tmp_size, 2, 1, inverse);
-					fprintf(vmain, "\tfftstage\t#(\n"
+					fprintf(vmain, "\t%sfftstage\t#(\n"
 						"\t\t// {{{\n"
 						"\t\t.IWIDTH(%d),\n"
 						"\t\t.CWIDTH(%d),\n"
@@ -2100,6 +2116,7 @@ SLASHLINE
 						"\t\t.i_clk(i_clk),\n"
 						"\t\t.%s(%s),\n"
 						"\t\t.i_ce(i_ce),\n",
+						prefix.c_str(),
 						nbits+xtrapbits,
 						nbits+xtracbits+xtrapbits,
 						obits+xtrapbits,
@@ -2140,7 +2157,7 @@ SLASHLINE
 				// {{{
 				fprintf(vmain, "\twire\t[%d:0]\tw_d4;\n",
 					2*(obits+xtrapbits)-1);
-				fprintf(vmain, "\tqtrstage%s\t#(\n"
+				fprintf(vmain, "\t%sqtrstage%s\t#(\n"
 					"\t\t// {{{\n"
 					"\t\t.IWIDTH(%d),\n"
 					"\t\t.OWIDTH(%d),\n"
@@ -2153,6 +2170,7 @@ SLASHLINE
 						"\t\t.i_clk(i_clk),\n"
 						"\t\t.%s(%s),\n"
 						"\t\t.i_ce(i_ce),\n",
+					prefix.c_str(),
 					((dbg)&&(dbgstage==4))?"_dbg":"",
 					nbits+xtrapbits, obits+xtrapbits, lgsize,
 					(inverse)?1:0, (dropbit)?0:0,
@@ -2170,7 +2188,7 @@ SLASHLINE
 				// {{{
 				fprintf(vmain, "\t// verilator lint_off UNUSED\n\twire\t\tw_os4;\n\t// verilator lint_on  UNUSED\n");
 				fprintf(vmain, "\twire\t[%d:0]\tw_e4, w_o4;\n", 2*(obits+xtrapbits)-1);
-				fprintf(vmain, "\tqtrstage%s\t#(\n"
+				fprintf(vmain, "\t%sqtrstage%s\t#(\n"
 					"\t\t// {{{\n"
 					"\t\t.IWIDTH(%d),\n"
 					"\t\t.OWIDTH(%d),\n"
@@ -2184,6 +2202,7 @@ SLASHLINE
 					"\t\t.i_clk(i_clk),\n"
 					"\t\t.%s(%s),\n"
 					"\t\t.i_ce(i_ce),\n",
+					prefix.c_str(),
 					((dbg)&&(dbgstage==4))?"_dbg":"",
 					nbits+xtrapbits, obits+xtrapbits, lgsize,
 					(inverse)?1:0, (dropbit)?0:0,
@@ -2250,7 +2269,7 @@ SLASHLINE
 
 			if (single_clock) {
 				// {{{
-				fprintf(vmain, "\tlaststage\t#(\n"
+				fprintf(vmain, "\t%slaststage\t#(\n"
 					"\t\t// {{{\n"
 					"\t\t.IWIDTH(%d),\n"
 					"\t\t.OWIDTH(%d),\n"
@@ -2261,6 +2280,7 @@ SLASHLINE
 					"\t\t.i_clk(i_clk),\n"
 					"\t\t.%s(%s),\n"
 					"\t\t.i_ce(i_ce),\n",
+					prefix.c_str(),
 					nbits+xtrapbits, obits,(dropbit)?0:1,
 					resetw.c_str(), resetw.c_str());
 				fprintf(vmain, "\t\t.i_sync(w_s4),\n"
@@ -2272,7 +2292,7 @@ SLASHLINE
 				// }}}
 			} else {
 				// {{{
-				fprintf(vmain, "\tlaststage\t#(\n"
+				fprintf(vmain, "\t%slaststage\t#(\n"
 					"\t\t// {{{\n"
 					"\t\t.IWIDTH(%d),\n"
 					"\t\t.OWIDTH(%d),\n"
@@ -2283,6 +2303,7 @@ SLASHLINE
 					"\t\t.i_clk(i_clk),\n"
 					"\t\t.%s(%s),\n"
 					"\t\t.i_ce(i_ce),\n",
+					prefix.c_str(),
 					nbits+xtrapbits, obits,(dropbit)?0:1,
 					resetw.c_str(), resetw.c_str());
 				fprintf(vmain, "\t\t.i_sync(w_s4),\n"
@@ -2326,14 +2347,16 @@ SLASHLINE
 	fprintf(vmain, "\t// Now for the bit-reversal stage.\n");
 	if (bitreverse) {
 		if (single_clock) {
-			fprintf(vmain, "\tbitreverse\t#(\n"
+			fprintf(vmain, "\t%sbitreverse\t#(\n"
 				"\t\t// {{{\n"
 				"\t\t.LGSIZE(%d), .WIDTH(%d)\n"
 				"\t\t// }}}\n"
 				"\t) revstage (\n"
 				"\t\t// {{{\n"
 				"\t\t.i_clk(i_clk),\n"
-				"\t\t.%s(%s),\n", lgsize, nbitsout,
+				"\t\t.%s(%s),\n", 
+				prefix.c_str(),
+				lgsize, nbitsout,
 				resetw.c_str(),
 				resetw.c_str());
 			fprintf(vmain,
@@ -2344,7 +2367,7 @@ SLASHLINE
 				"\t\t// }}}\n"
 				"\t);\n");
 		} else {
-			fprintf(vmain, "\tbitreverse\t#(\n"
+			fprintf(vmain, "\t%sbitreverse\t#(\n"
 				"\t\t// {{{\n"
 				"\t\t.LGSIZE(%d),\n"
 				"\t\t.WIDTH(%d)\n"
@@ -2352,7 +2375,9 @@ SLASHLINE
 				"\t) revstage (\n"
 				"\t\t// {{{\n"
 				"\t\t.i_clk(i_clk),\n"
-				"\t\t.%s(%s),\n", lgsize, nbitsout,
+				"\t\t.%s(%s),\n", 
+				prefix.c_str(),
+				lgsize, nbitsout,
 				resetw.c_str(), resetw.c_str());
 			fprintf(vmain,
 				"\t\t.i_ce(i_ce & br_start),\n"
@@ -2431,59 +2456,59 @@ SLASHLINE
 
 		// Butterfly
 		// {{{
-		fname = coredir + "/butterfly.v";
-		build_butterfly(fname.c_str(), xtracbits, rounding,
+		fname = coredir + "/" + prefix + "butterfly.v";
+		build_butterfly(fname.c_str(), prefix.c_str(), xtracbits, rounding,
 			ckpce, async_reset);
 		// }}}
 
 		// The hardware assisted butterfly
 		// {{{
-		fname = coredir + "/hwbfly.v";
-		build_hwbfly(fname.c_str(), xtracbits, rounding,
+		fname = coredir + "/" + prefix + "hwbfly.v";
+		build_hwbfly(fname.c_str(), prefix.c_str(), xtracbits, rounding,
 			ckpce, async_reset);
 		// }}}
 
 		// The binary multiply the hardware assisted multiply depends on
 		// {{{
 		{
-			fname = coredir + "/longbimpy.v";
-			build_longbimpy(fname.c_str());
-			fname = coredir + "/bimpy.v";
-			build_bimpy(fname.c_str());
+			fname = coredir + "/" + prefix + "longbimpy.v";
+			build_longbimpy(fname.c_str(), prefix.c_str());
+			fname = coredir + "/" + prefix + "bimpy.v";
+			build_bimpy(fname.c_str(), prefix.c_str());
 		}
 		// }}}
 
 		// Quarter stage
 		// {{{
 		if ((dbg)&&(dbgstage == 4)) {
-			fname = coredir + "/qtrstage_dbg.v";
+			fname = coredir + "/" + prefix + "qtrstage_dbg.v";
 			if (single_clock)
-				build_snglquarters(fname.c_str(), rounding,
+				build_snglquarters(fname.c_str(), prefix.c_str(), rounding,
 					async_reset, true);
 			else
-				build_dblquarters(fname.c_str(), rounding,
+				build_dblquarters(fname.c_str(), prefix.c_str(),rounding,
 					async_reset, true);
 		}
-		fname = coredir + "/qtrstage.v";
+		fname = coredir + "/" + prefix + "qtrstage.v";
 		if (single_clock)
-			build_snglquarters(fname.c_str(), rounding,
+			build_snglquarters(fname.c_str(), prefix.c_str(), rounding,
 					async_reset, false);
 		else
-			build_dblquarters(fname.c_str(), rounding,
+			build_dblquarters(fname.c_str(), prefix.c_str(), rounding,
 					async_reset, false);
 		// }}}
 
 		// Last stage
 		// {{{
 		if (single_clock) {
-			fname = coredir + "/laststage.v";
-			build_sngllast(fname.c_str(), async_reset);
+			fname = coredir + "/" + prefix + "laststage.v";
+			build_sngllast(fname.c_str(), prefix.c_str(), async_reset);
 		} else {
 			if ((dbg)&&(dbgstage == 2))
-				fname = coredir + "/laststage_dbg.v";
+				fname = coredir + "/" + prefix + "laststage_dbg.v";
 			else
-				fname = coredir + "/laststage.v";
-			build_dblstage(fname.c_str(), rounding,
+				fname = coredir + "/" + prefix + "laststage.v";
+			build_dblstage(fname.c_str(), prefix.c_str(), rounding,
 				async_reset, (dbg)&&(dbgstage==2));
 		}
 		// }}}
@@ -2491,7 +2516,7 @@ SLASHLINE
 		// Bit reversal logic
 		// {{{
 		if (bitreverse) {
-			fname = coredir + "/bitreverse.v";
+			fname = coredir + "/" + prefix + "bitreverse.v";
 			if (single_clock)
 				build_snglbrev(fname.c_str(), async_reset);
 			else
@@ -2501,20 +2526,20 @@ SLASHLINE
 
 		// Rounding
 		// {{{
-		const	char	*rnd_string = "";
+		std::string rnd_string = "";
 		switch(rounding) {
-			case RND_TRUNCATE:	rnd_string = "/truncate.v"; break;
-			case RND_FROMZERO:	rnd_string = "/roundfromzero.v"; break;
-			case RND_HALFUP:	rnd_string = "/roundhalfup.v"; break;
+			case RND_TRUNCATE:	rnd_string = "/" + prefix + "truncate.v"; break;
+			case RND_FROMZERO:	rnd_string = "/" + prefix + "roundfromzero.v"; break;
+			case RND_HALFUP:	rnd_string = "/" + prefix + "roundhalfup.v"; break;
 			default:
-				rnd_string = "/convround.v"; break;
+				rnd_string = "/" + prefix + "convround.v"; break;
 		} fname = coredir + rnd_string;
 		switch(rounding) {
-			case RND_TRUNCATE: build_truncator(fname.c_str()); break;
-			case RND_FROMZERO: build_roundfromzero(fname.c_str()); break;
-			case RND_HALFUP: build_roundhalfup(fname.c_str()); break;
+			case RND_TRUNCATE: build_truncator(fname.c_str(), prefix.c_str()); break;
+			case RND_FROMZERO: build_roundfromzero(fname.c_str(), prefix.c_str()); break;
+			case RND_HALFUP: build_roundhalfup(fname.c_str(), prefix.c_str()); break;
 			default:
-				build_convround(fname.c_str()); break;
+				build_convround(fname.c_str(), prefix.c_str()); break;
 		}
 		// }}}
 	}

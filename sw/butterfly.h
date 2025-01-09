@@ -39,11 +39,12 @@
 #ifndef	BUTTERFLY_H
 #define	BUTTERFLY_H
 
-extern	void	build_butterfly(const char *fname, int xtracbits,
+extern	void	build_butterfly(const char *fname, const char* prefix, int xtracbits,
 			ROUND_T rounding, int ckpce = 1,
 			const bool async_reset = false);
 
-extern	void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding,
+extern	void	build_hwbfly(const char *fname, const char* prefix,
+		int xtracbits, ROUND_T rounding,
 		int ckpce = 3, const bool async_reset= false);
 
 #endif

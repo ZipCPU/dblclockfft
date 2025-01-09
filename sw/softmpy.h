@@ -41,8 +41,8 @@
 #ifndef	SOFTMPY_H
 #define	SOFTMPY_H
 
-extern	void	build_multiply(const char *fname);
-extern	void	build_bimpy(const char *fname);
-extern	void	build_longbimpy(const char *fname);
+extern	void	build_multiply(const char *fname, const char* prefix);
+extern	void	build_bimpy(const char *fname, const char* prefix);
+extern	void	build_longbimpy(const char *fname, const char* prefix);
 
 #endif	// SOFTMPY_H

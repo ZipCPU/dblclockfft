@@ -40,10 +40,11 @@
 
 #include "rounding.h"
 
-extern	void	build_dblstage(const char *fname, ROUND_T rounding,
-		const bool async_reset = false, const bool dbg = false);
+extern	void	build_dblstage(const char *fname, const char* prefix, 
+		ROUND_T rounding, const bool async_reset = false, const bool dbg = false);
 
 extern	void	build_stage(const char *fname,
+		const char* prefix,
 		int stage, int nwide, int offset,
 		int nbits, int xtra, int ckpce,
 		const bool async_reset = false,

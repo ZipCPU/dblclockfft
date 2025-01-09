@@ -73,7 +73,7 @@
 // Builds the penultimate FFT stage, using integer operations only.
 // This stage is called laststage elsewhere.
 //
-void	build_dblstage(const char *fname, ROUND_T rounding,
+void	build_dblstage(const char *fname, const char* prefix, ROUND_T rounding,
 			const bool async_reset, const bool dbg) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -155,7 +155,7 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module\tlaststage%s #(\n"
+"module\t%slaststage%s #(\n"
 	"\t\t// {{{\n"
 	// (i_clk, %s, i_ce, i_sync, i_left, i_right, o_left, o_right, o_sync%s);\n"
 	"\t\tparameter\tIWIDTH=%d,OWIDTH=IWIDTH+1, SHIFT=%d\n"
@@ -166,7 +166,7 @@ SLASHLINE
 	"\t\tinput\twire\t[(2*IWIDTH-1):0]\ti_left, i_right,\n"
 	"\t\toutput\treg\t[(2*OWIDTH-1):0]\to_left, o_right,\n"
 	"\t\toutput\treg\t\t\to_sync%s\n"
-	"\n", (dbg)?"_dbg":"", // resetw.c_str(), (dbg)?", o_dbg":"",
+	"\n", prefix, (dbg)?"_dbg":"", // resetw.c_str(), (dbg)?", o_dbg":"",
 	TST_DBLSTAGE_IWIDTH, TST_DBLSTAGE_SHIFT,
 		resetw.c_str(), (dbg) ? ",":"");
 
@@ -249,17 +249,17 @@ SLASHLINE
 	"\t// }}}\n"
 "\n");
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_0r(i_clk, i_ce,\n"
-	"\t\t\t\t\t\t\trnd_in_0r, o_out_0r);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_0r(i_clk, i_ce,\n"
+	"\t\t\t\t\t\t\trnd_in_0r, o_out_0r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_0i(i_clk, i_ce,\n"
-	"\t\t\t\t\t\t\trnd_in_0i, o_out_0i);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_0i(i_clk, i_ce,\n"
+	"\t\t\t\t\t\t\trnd_in_0i, o_out_0i);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_1r(i_clk, i_ce,\n"
-	"\t\t\t\t\t\t\trnd_in_1r, o_out_1r);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_1r(i_clk, i_ce,\n"
+	"\t\t\t\t\t\t\trnd_in_1r, o_out_1r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_1i(i_clk, i_ce,\n"
-	"\t\t\t\t\t\t\trnd_in_1i, o_out_1i);\n\n", rnd_string);
+	"\t%s%s #(IWIDTH+1,OWIDTH,SHIFT) do_rnd_1i(i_clk, i_ce,\n"
+	"\t\t\t\t\t\t\trnd_in_1i, o_out_1i);\n\n", prefix, rnd_string);
 
 	fprintf(fp, "\n"
 	"\t// o_left, o_right\n"
@@ -297,6 +297,7 @@ SLASHLINE
 // build_stage
 // {{{
 void	build_stage(const char *fname,
+		const char* prefix,
 		int stage, int nwide, int offset,
 		int nbits, int xtra, int ckpce,
 		const bool async_reset, const bool dbg) {
@@ -349,7 +350,7 @@ SLASHLINE
 		(dbg)?"_dbg":"", prjname, creator);
 	fprintf(fstage, "%s", cpyleft);
 	fprintf(fstage, "//\n//\n`default_nettype\tnone\n//\n");
-	fprintf(fstage, "module\tfftstage%s #(\n", (dbg)?"_dbg":"");
+	fprintf(fstage, "module\t%sfftstage%s #(\n", prefix, (dbg)?"_dbg":"");
 	fprintf(fstage, "\t\t// {{{\n");
 	// These parameter values are useless at this point--they are to be
 	// replaced by the parameter values in the calling program.  Only
@@ -591,7 +592,8 @@ SLASHLINE
 "\tgenerate if (OPT_HWMPY)\n"
 "\tbegin : HWBFLY\n"
 "\n"
-	"\t\thwbfly #(\n"
+	"\t\t%shwbfly #(\n", prefix);
+	fprintf(fstage,
 		"\t\t\t// {{{\n"
 		"\t\t\t.IWIDTH(IWIDTH),\n"
 		"\t\t\t.CWIDTH(CWIDTH),\n"
@@ -619,7 +621,8 @@ SLASHLINE
 "\n"
 "\tend else begin : FWBFLY\n"
 "\n"
-	"\t\tbutterfly #(\n"
+	"\t\t%sbutterfly #(\n", prefix);
+	fprintf(fstage,
 		"\t\t\t// {{{\n"
 		"\t\t\t.IWIDTH(IWIDTH),\n"
 		"\t\t\t.CWIDTH(CWIDTH),\n"
