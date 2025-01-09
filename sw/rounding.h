@@ -45,9 +45,9 @@ typedef	enum {
 } ROUND_T;
 
 
-extern	void	build_truncator(const char *fname);
-extern	void	build_roundhalfup(const char *fname);
-extern	void	build_roundfromzero(const char *fname);
-extern	void	build_convround(const char *fname);
+extern	void	build_truncator(const char *fname, const char* prefix);
+extern	void	build_roundhalfup(const char *fname, const char* prefix);
+extern	void	build_roundfromzero(const char *fname, const char* prefix);
+extern	void	build_convround(const char *fname, const char* prefix);
 
 #endif

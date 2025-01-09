@@ -55,7 +55,7 @@
 
 // build_truncator
 // {{{
-void	build_truncator(const char *fname) {
+void	build_truncator(const char *fname, const char* prefix) {
 	printf("TRUNCATING!\n");
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -91,7 +91,8 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	truncate(i_clk, i_ce, i_val, o_val);\n"
+"module	%struncate(i_clk, i_ce, i_val, o_val);\n", prefix);
+	fprintf(fp,
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
 	"\tinput\twire\t\t\t\ti_clk, i_ce;\n"
 	"\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"
@@ -107,7 +108,7 @@ SLASHLINE
 
 // build_roundhalfup
 // {{{
-void	build_roundhalfup(const char *fname) {
+void	build_roundhalfup(const char *fname, const char* prefix) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -135,7 +136,8 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	roundhalfup(i_clk, i_ce, i_val, o_val);\n"
+"module	%sroundhalfup(i_clk, i_ce, i_val, o_val);\n", prefix);
+	fprintf(fp,
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
 	"\tinput\twire\t\t\t\ti_clk, i_ce;\n"
 	"\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"
@@ -181,7 +183,7 @@ SLASHLINE
 
 // build_roundfromzero
 // {{{
-void	build_roundfromzero(const char *fname) {
+void	build_roundfromzero(const char *fname, const char* prefix) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -217,7 +219,8 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	roundfromzero(i_clk, i_ce, i_val, o_val);\n"
+"module	%sroundfromzero(i_clk, i_ce, i_val, o_val);\n", prefix);
+	fprintf(fp,
 	"\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
 	"\tinput\twire\t\t\t\ti_clk, i_ce;\n"
 	"\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"
@@ -305,7 +308,7 @@ SLASHLINE
 
 // build_convround
 // {{{
-void	build_convround(const char *fname) {
+void	build_convround(const char *fname, const char* prefix) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -334,7 +337,8 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	convround(i_clk, i_ce, i_val, o_val);\n"
+"module	%sconvround(i_clk, i_ce, i_val, o_val);\n", prefix);
+	fprintf(fp,
 "\tparameter\tIWID=16, OWID=8, SHIFT=0;\n"
 "\tinput\twire\t\t\t\ti_clk, i_ce;\n"
 "\tinput\twire\tsigned\t[(IWID-1):0]\ti_val;\n"

@@ -62,7 +62,7 @@
 
 // build_multiply
 // {{{
-void	build_multiply(const char *fname) {
+void	build_multiply(const char *fname, const char* prefix) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -100,8 +100,8 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	shiftaddmpy(i_clk, i_ce, i_a, i_b, o_r);\n"
-	"\tparameter\tAWIDTH=%d,BWIDTH=", TST_SHIFTADDMPY_AW);
+"module	%sshiftaddmpy(i_clk, i_ce, i_a, i_b, o_r);\n"
+	"\tparameter\tAWIDTH=%d,BWIDTH=", prefix, TST_SHIFTADDMPY_AW);
 #ifdef	TST_SHIFTADDMPY_BW
 	fprintf(fp, "%d;\n", TST_SHIFTADDMPY_BW);
 #else
@@ -171,7 +171,7 @@ SLASHLINE
 
 // build_bimpy -- the binary sub-multiply (everything else is addition)
 // {{{
-void	build_bimpy(const char *fname) {
+void	build_bimpy(const char *fname, const char* prefix) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -205,7 +205,8 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	bimpy #(\n" // (i_clk, i_reset, i_ce, i_a, i_b, o_r);\n"
+"module	%sbimpy #(\n", prefix); // (i_clk, i_reset, i_ce, i_a, i_b, o_r);\n"
+	fprintf(fp,
 		"\t\t// {{{\n"
 		"\t\tparameter\tBW=18, // Number of bits in i_b\n"
 		"\t\tlocalparam\tLUTB=2 // Number of bits in i_a for our LUT multiply\n"
@@ -308,7 +309,7 @@ SLASHLINE
 
 // build_longbimpy
 // {{{
-void	build_longbimpy(const char *fname) {
+void	build_longbimpy(const char *fname, const char* prefix) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
 		fprintf(stderr, "Could not open \'%s\' for writing\n", fname);
@@ -339,7 +340,7 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	longbimpy #(\n");
+"module	%slongbimpy #(\n", prefix);
 
 	fprintf(fp, "\t\t// {{{\n"
 	"\t\tparameter	IAW=%d,	// The width of i_a, min width is 5\n"

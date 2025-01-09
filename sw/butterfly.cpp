@@ -94,7 +94,7 @@ int lstat(const char *filename, struct stat *buf) { return 1; };
 
 // build_butterfly
 // {{{
-void	build_butterfly(const char *fname, int xtracbits, ROUND_T rounding,
+void	build_butterfly(const char *fname, const char *prefix, int xtracbits, ROUND_T rounding,
 			int	ckpce, const bool async_reset) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -200,9 +200,10 @@ SLASHLINE
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 
 	fprintf(fp,
-"module\tbutterfly #(\n"
+"module\t%sbutterfly #(\n"
 	"\t\t// {{{\n"
-	"\t\t// Public changeable parameters ...\n");
+	"\t\t// Public changeable parameters ...\n",
+	prefix);
 
 	fprintf(fp,
 	"\t\t// IWIDTH\n"
@@ -1129,17 +1130,17 @@ SLASHLINE
 	"\tassign	left_si = { {(2){fifo_i[(IWIDTH+CWIDTH)]}}, fifo_i };\n\n");
 
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
-	"\tdo_rnd_left_r(i_clk, i_ce, left_sr, rnd_left_r);\n\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_left_r(i_clk, i_ce, left_sr, rnd_left_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
-	"\tdo_rnd_left_i(i_clk, i_ce, left_si, rnd_left_i);\n\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_left_i(i_clk, i_ce, left_si, rnd_left_i);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
-	"\tdo_rnd_right_r(i_clk, i_ce, mpy_r, rnd_right_r);\n\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_r(i_clk, i_ce, mpy_r, rnd_right_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
-	"\tdo_rnd_right_i(i_clk, i_ce, mpy_i, rnd_right_i);\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_i(i_clk, i_ce, mpy_i, rnd_right_i);\n", prefix, rnd_string);
 	fprintf(fp, "\t// }}}\n\n");
 	fprintf(fp,
 	"\t// fifo_read, mpy_r, mpy_i\n"
@@ -1546,7 +1547,7 @@ SLASHLINE
 
 // build_hwbfly
 // {{{
-void	build_hwbfly(const char *fname, int xtracbits, ROUND_T rounding,
+void	build_hwbfly(const char *fname, const char* prefix, int xtracbits, ROUND_T rounding,
 		int ckpce, const bool async_reset) {
 	FILE	*fp = fopen(fname, "w");
 	if (NULL == fp) {
@@ -1609,7 +1610,7 @@ SLASHLINE
 	fprintf(fp, "%s", cpyleft);
 	fprintf(fp, "//\n//\n`default_nettype\tnone\n//\n");
 	fprintf(fp,
-"module	hwbfly #(\n"
+"module	%shwbfly #(\n"
 	// (i_clk, %s, i_ce, i_coef, i_left, i_right, i_aux,\n"
 	//	"\t\to_left, o_right, o_aux);\n"
 		"\t\t// {{{\n"
@@ -1629,7 +1630,7 @@ SLASHLINE
 		"\t\t// {{{\n"
 		"\t\t// The number of clocks per clock enable, 1, 2, or 3.\n"
 		"\t\tparameter\t[1:0]\tCKPCE=%d\n\t\t// }}}\n\t\t// }}}\n",
-			xtracbits, ckpce);
+			prefix, xtracbits, ckpce);
 
 	fprintf(fp,
 	"\t) (\n"
@@ -2213,17 +2214,17 @@ SLASHLINE
 	fprintf(fp,
 	"\t// Round the results\n"
 	"\t// {{{\n"
-	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2)\n"
-	"\tdo_rnd_left_r(i_clk, i_ce, left_sr, rnd_left_r);\n\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2)\n"
+	"\tdo_rnd_left_r(i_clk, i_ce, left_sr, rnd_left_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2)\n"
-	"\tdo_rnd_left_i(i_clk, i_ce, left_si, rnd_left_i);\n\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+1,OWIDTH,SHIFT+2)\n"
+	"\tdo_rnd_left_i(i_clk, i_ce, left_si, rnd_left_i);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
-	"\tdo_rnd_right_r(i_clk, i_ce, mpy_r, rnd_right_r);\n\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_r(i_clk, i_ce, mpy_r, rnd_right_r);\n\n", prefix, rnd_string);
 	fprintf(fp,
-	"\t%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
-	"\tdo_rnd_right_i(i_clk, i_ce, mpy_i, rnd_right_i);\n\t// }}}\n\n", rnd_string);
+	"\t%s%s #(CWIDTH+IWIDTH+3,OWIDTH,SHIFT+4)\n"
+	"\tdo_rnd_right_i(i_clk, i_ce, mpy_i, rnd_right_i);\n\t// }}}\n\n", prefix, rnd_string);
 
 
 	fprintf(fp,
